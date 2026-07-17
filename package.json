@@ -1,0 +1,9 @@
+{
+  "name": "keeper",
+  "private": true,
+  "scripts": {
+    "start:backend": "cd backend && JAVA_HOME=~/.sdkman/candidates/java/21.0.4-tem ./mvnw mn:run",
+    "test:backend": "cd backend && JAVA_HOME=~/.sdkman/candidates/java/21.0.4-tem ./mvnw test",
+    "start:frontend": "cd frontend && npm run dev"
+  }
+}

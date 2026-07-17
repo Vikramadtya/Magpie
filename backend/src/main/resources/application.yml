@@ -1,0 +1,93 @@
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        all:
+          allowed-origins:
+            - "http://localhost:5173"
+          allowed-methods:
+            - "*"
+          allowed-headers:
+            - "*"
+          exposed-headers:
+            - "*"
+  application:
+    name: backend
+  security:
+    authentication: cookie
+    redirect:
+      login-success: http://localhost:5173/auth/callback
+      login-failure: http://localhost:5173/login?error=true
+    oauth2:
+      clients:
+        google:
+          client-id: '${OAUTH_CLIENT_ID:YOUR_GOOGLE_CLIENT_ID}'
+          client-secret: '${OAUTH_CLIENT_SECRET:YOUR_GOOGLE_CLIENT_SECRET}'
+          openid:
+            issuer: 'https://accounts.google.com'
+    endpoints:
+      oauth2:
+        login:
+          enabled: true
+        callback:
+          enabled: true
+    token:
+      jwt:
+        signatures:
+          secret:
+            generator:
+              secret: '"this-is-a-very-long-secret-key-for-local-dev-only-do-not-use-in-prod-1234567890"'
+    intercept-url-map:
+      - pattern: /**
+        http-method: OPTIONS
+        access:
+          - isAnonymous()
+      - pattern: /oauth/**
+        access:
+          - isAnonymous()
+      - pattern: /api/auth/**
+        access:
+          - isAnonymous()
+      - pattern: /swagger/**
+        access:
+          - isAnonymous()
+      - pattern: /swagger-ui/**
+        access:
+          - isAnonymous()
+      - pattern: /**
+        access:
+          - isAuthenticated()
+  router:
+    static-resources:
+      swagger:
+        paths: classpath:META-INF/swagger
+        mapping: /swagger/**
+      swagger-ui:
+        paths: classpath:META-INF/swagger/views/swagger-ui
+        mapping: /swagger-ui/**
+
+datasources:
+  default:
+    url: jdbc:postgresql://localhost:5433/keeper
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: password
+    dialect: POSTGRES
+    schema-generate: NONE
+
+flyway:
+  datasources:
+    default:
+      enabled: true
+
+jpa:
+  default:
+    packages-to-scan:
+      - 'com.keeper.domain'
+      - 'com.keeper.util'
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: none
+        show_sql: false

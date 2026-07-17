@@ -1,0 +1,18 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Keeper Backend" type="Application" factoryName="Application">
+    <envs>
+      <env name="MICRONAUT_ENVIRONMENTS" value="local" />
+    </envs>
+    <option name="MAIN_CLASS_NAME" value="com.keeper.Application" />
+    <module name="backend" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.keeper.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

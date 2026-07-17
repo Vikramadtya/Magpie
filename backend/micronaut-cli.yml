@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: com.keeper
+testFramework: junit
+sourceLanguage: java
+buildTool: maven
+features: [app-name, data, data-jpa, h2, http-client-test, java, java-application, jdbc-hikari, junit, logback, maven, maven-enforcer-plugin, micronaut-aot, micronaut-configuration-validation-gradle-plugin, micronaut-http-validation, micronaut-processing-compiler-args, netty-server, openapi, properties, readme, serialization-jackson, shade, static-resources]

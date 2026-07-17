@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:17
+    container_name: keeper_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: keeper
+    ports:
+      - "5433:5432"
+    volumes:
+      - keeper_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: keeper_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATASOURCES_DEFAULT_URL=jdbc:postgresql://db:5432/keeper
+      - DATASOURCES_DEFAULT_USERNAME=postgres
+      - DATASOURCES_DEFAULT_PASSWORD=password
+
+    volumes:
+      - ./backend:/app
+      - ~/.m2:/root/.m2
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    container_name: keeper_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  keeper_pgdata:
