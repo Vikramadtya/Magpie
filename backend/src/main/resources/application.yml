@@ -1,5 +1,9 @@
 micronaut:
   server:
+    host-resolution:
+      host-header: X-Forwarded-Host
+      protocol-header: X-Forwarded-Proto
+      port-header: X-Forwarded-Port
     cors:
       enabled: true
       configurations:
