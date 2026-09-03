@@ -86,8 +86,7 @@ flyway:
 jpa:
   default:
     packages-to-scan:
-      - 'com.keeper.domain'
-      - 'com.keeper.util'
+      - 'com.keeper'
     properties:
       hibernate:
         hbm2ddl:
