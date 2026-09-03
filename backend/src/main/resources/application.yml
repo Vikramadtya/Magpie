@@ -57,6 +57,12 @@ micronaut:
       - pattern: /swagger-ui/**
         access:
           - isAnonymous()
+      - pattern: /
+        access:
+          - isAnonymous()
+      - pattern: /health
+        access:
+          - isAnonymous()
       - pattern: /**
         access:
           - isAuthenticated()
