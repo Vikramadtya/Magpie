@@ -25,7 +25,7 @@ const navItems = [
   { path: '/how-it-works', label: 'How It Works', icon: HelpCircle },
 ];
 
-import { WorkspaceDataProvider } from '../../components/providers/WorkspaceDataProvider';
+
 
 export default function SidebarLayout() {
   const [isDark, setIsDark] = useState(false);
@@ -102,9 +102,7 @@ export default function SidebarLayout() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative">
         <div className="w-full max-w-6xl mx-auto px-10 py-10">
-          <WorkspaceDataProvider workspaceId={workspaceId}>
-            <Outlet />
-          </WorkspaceDataProvider>
+          <Outlet />
         </div>
       </main>
     </div>

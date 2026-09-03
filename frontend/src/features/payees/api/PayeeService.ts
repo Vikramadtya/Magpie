@@ -1,13 +1,14 @@
+import { PayeeApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 import type { Payee } from './types';
 
+const api = new PayeeApi(undefined, '', apiClient);
+
 export const PayeeService = {
   getAll: async (workspaceId: string): Promise<Payee[]> => {
-    // We attempt to get payees from backend
-    // If the backend call fails, we still return an empty array
     try {
-      const response = await apiClient.get<Payee[]>(`/v1/payees/${workspaceId}`);
-      return Array.isArray(response.data) ? response.data : [];
+      const response = await api.getPayees(workspaceId);
+      return response.data.content || [];
     } catch (e) {
       console.error('Failed to get payees', e);
       return [];

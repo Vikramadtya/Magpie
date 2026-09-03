@@ -1,0 +1,1130 @@
+openapi: 3.0.3
+info:
+  title: Keeper API
+  description: OpenAPI specification for Keeper
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/accounts/{workspaceId}:
+    get:
+      tags:
+        - Account
+      summary: Get all accounts for a workspace
+      operationId: getAccounts
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountDTO'
+    post:
+      tags:
+        - Account
+      summary: Create a new account
+      operationId: createAccount
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreateDTO'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDTO'
+  /api/v1/accounts/{workspaceId}/{id}:
+    put:
+      tags:
+        - Account
+      summary: Update an account
+      operationId: updateAccount
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDTO'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDTO'
+    delete:
+      tags:
+        - Account
+      summary: Delete an account
+      operationId: deleteAccount
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: No Content
+
+  # Transactions
+  /api/v1/transactions/{workspaceId}:
+    get:
+      tags:
+        - Transaction
+      summary: Get transactions
+      operationId: getTransactions
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: payeeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageTransactionDTO'
+    post:
+      tags:
+        - Transaction
+      summary: Create a transaction
+      operationId: createTransaction
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreateDTO'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDTO'
+  /api/v1/transactions/{workspaceId}/{id}:
+    put:
+      tags:
+        - Transaction
+      summary: Update a transaction
+      operationId: updateTransaction
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreateDTO'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDTO'
+    delete:
+      tags:
+        - Transaction
+      summary: Delete a transaction
+      operationId: deleteTransaction
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/transactions/grouped/{workspaceId}:
+    get:
+      tags:
+        - Transaction
+      summary: Get transactions grouped by date
+      operationId: getGroupedTransactions
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupedTransactionsDTO'
+
+  /api/v1/categories/tree/{workspaceId}:
+    get:
+      tags:
+        - Category
+      summary: Get categories as a tree
+      operationId: getCategoryTree
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryNodeDTO'
+
+  # Budgets
+  /api/v1/budgets/summary/{workspaceId}:
+    get:
+      tags:
+        - Budget
+      summary: Get budget summary
+      operationId: getBudgetSummary
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetSummaryDTO'
+  /api/v1/budgets/{workspaceId}:
+    get:
+      tags:
+        - Budget
+      summary: Get budgets
+      operationId: getBudgets
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: period
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BudgetDTO'
+    post:
+      tags:
+        - Budget
+      summary: Create budget
+      operationId: createBudget
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetDTO'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetDTO'
+  /api/v1/budgets/{workspaceId}/{id}:
+    put:
+      tags:
+        - Budget
+      summary: Update budget
+      operationId: updateBudget
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetDTO'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetDTO'
+    delete:
+      tags:
+        - Budget
+      summary: Delete budget
+      operationId: deleteBudget
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+
+  # Goals
+  /api/v1/goals/{workspaceId}:
+    get:
+      tags:
+        - Goal
+      summary: Get goals
+      operationId: getGoals
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GoalDTO'
+    post:
+      tags:
+        - Goal
+      summary: Create goal
+      operationId: createGoal
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalDTO'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalDTO'
+  /api/v1/goals/{workspaceId}/{id}:
+    put:
+      tags:
+        - Goal
+      summary: Update goal
+      operationId: updateGoal
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalDTO'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalDTO'
+    delete:
+      tags:
+        - Goal
+      summary: Delete goal
+      operationId: deleteGoal
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+
+  # Subscriptions
+  /api/v1/subscriptions/{workspaceId}:
+    get:
+      tags:
+        - Subscription
+      summary: Get subscriptions
+      operationId: getSubscriptions
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubscriptionDTO'
+    post:
+      tags:
+        - Subscription
+      summary: Create subscription
+      operationId: createSubscription
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionDTO'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDTO'
+  /api/v1/subscriptions/{workspaceId}/{id}:
+    put:
+      tags:
+        - Subscription
+      summary: Update subscription
+      operationId: updateSubscription
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionDTO'
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDTO'
+    delete:
+      tags:
+        - Subscription
+      summary: Delete subscription
+      operationId: deleteSubscription
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+                  
+  # Payees
+  /api/v1/payees/{workspaceId}:
+    get:
+      tags:
+        - Payee
+      summary: Get payees
+      operationId: getPayees
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagePayeeDTO'
+
+  # Dashboard
+  /api/analytics/dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard data
+      operationId: getDashboard
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: baseCurrency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardDataDTO'
+
+components:
+  schemas:
+    AccountDTO:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - currency
+        - balance
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        subType:
+          type: string
+        currency:
+          type: string
+        balance:
+          type: number
+        parentId:
+          type: string
+          format: uuid
+        icon:
+          type: string
+
+    AccountCreateDTO:
+      type: object
+      required:
+        - name
+        - type
+        - currency
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        currency:
+          type: string
+        initialBalance:
+          type: number
+        parentId:
+          type: string
+          format: uuid
+
+    TransactionDTO:
+      type: object
+      required:
+        - id
+        - amount
+        - type
+        - date
+        - status
+        - currency
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        type:
+          type: string
+        date:
+          type: string
+          format: date
+        notes:
+          type: string
+        name:
+          type: string
+        payee:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+        categoryName:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        currency:
+          type: string
+        entries:
+          type: array
+          items:
+            type: object
+        comments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              comment:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+
+    TransactionCreateDTO:
+      type: object
+      required:
+        - amount
+        - type
+        - date
+      properties:
+        amount:
+          type: number
+        type:
+          type: string
+        date:
+          type: string
+          format: date
+        notes:
+          type: string
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        payeeId:
+          type: string
+          format: uuid
+        currency:
+          type: string
+
+    BudgetDTO:
+      type: object
+      required:
+        - id
+        - categoryName
+        - amount
+        - spent
+        - period
+      properties:
+        id:
+          type: string
+          format: uuid
+        categoryName:
+          type: string
+        amount:
+          type: number
+        spent:
+          type: number
+        period:
+          type: string
+
+    GoalDTO:
+      type: object
+      required:
+        - id
+        - name
+        - targetAmount
+        - savedAmount
+        - priority
+        - currency
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        targetAmount:
+          type: number
+        savedAmount:
+          type: number
+        dueDate:
+          type: string
+          format: date
+        priority:
+          type: integer
+        currency:
+          type: string
+        accountId:
+          type: string
+          format: uuid
+
+    SubscriptionDTO:
+      type: object
+      required:
+        - id
+        - name
+        - amount
+        - nextBillingDate
+        - billingCycle
+        - status
+        - currency
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        amount:
+          type: number
+        nextBillingDate:
+          type: string
+          format: date
+        billingCycle:
+          type: string
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        categoryName:
+          type: string
+        status:
+          type: string
+        currency:
+          type: string
+
+    PayeeDTO:
+      type: object
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        icon:
+          type: string
+        transactionCount:
+          type: integer
+
+    DashboardDataDTO:
+      type: object
+      required:
+        - keyMetrics
+        - recentTransactions
+        - netWorth
+        - spendingByCategory
+        - categorySpending
+        - cashFlow
+      properties:
+        keyMetrics:
+          type: object
+          properties:
+            netWorth:
+              type: number
+            cashBalance:
+              type: number
+            creditBalance:
+              type: number
+            investmentBalance:
+              type: number
+            monthlyIncome:
+              type: number
+            monthlyExpenses:
+              type: number
+            savingsRate:
+              type: number
+            totalActiveGoals:
+              type: number
+            nativeNetWorth:
+              type: number
+            nativeMonthlyIncome:
+              type: number
+            nativeMonthlyExpense:
+              type: number
+            avgDailySpend:
+              type: number
+        recentTransactions:
+          type: array
+          items:
+            type: object
+        netWorth:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              balance:
+                type: number
+        spendingByCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              amount:
+                type: number
+              color:
+                type: string
+        categorySpending:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              amount:
+                type: number
+              color:
+                type: string
+        cashFlow:
+          type: array
+          items:
+            type: object
+    PageTransactionDTO:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionDTO'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+    PagePayeeDTO:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PayeeDTO'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+    CategoryNodeDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        icon:
+          type: string
+        color:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNodeDTO'
+    BudgetSummaryDTO:
+      type: object
+      properties:
+        totalBudgeted:
+          type: number
+        totalSpent:
+          type: number
+        budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetDTO'
+    GroupedTransactionsDTO:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          $ref: '#/components/schemas/TransactionDTO'

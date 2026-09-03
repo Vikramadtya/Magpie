@@ -2,17 +2,19 @@ import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSettingsStore, formatCurrencyGlobal } from '../../../store/useSettingsStore';
-import { useFinanceStore } from '../../../store/useFinanceStore';
-import type { Account } from '../../../store/useFinanceStore';
+import { useAccounts } from './useAccounts';
+import { useSubscriptions } from '../../subscriptions/hooks/useSubscriptions';
+import type { Account } from '../../../types/models';
 import { apiClient } from '../../../utils/api';
 
 export const useAccountsViewModel = () => {
   const workspaceId = localStorage.getItem('workspaceId') || '';
   
-  const accounts = useFinanceStore(state => state.accounts) as Account[];
-  const loadingAccounts = useFinanceStore(state => state.isInitializing);
-  const dashboard = useFinanceStore(state => state.dashboardData);
-  const subscriptions = useFinanceStore(state => state.subscriptions);
+  const { data: accountsData, isLoading: loadingAccounts } = useAccounts(workspaceId);
+  const { data: subscriptionsData } = useSubscriptions(workspaceId);
+  
+  const accounts = accountsData || [];
+  const subscriptions = subscriptionsData || [];
   const currency = useSettingsStore(state => state.settings.currency);
   
   const computedMetrics = useMemo(() => {
@@ -32,7 +34,7 @@ export const useAccountsViewModel = () => {
       nativeUpcomingCharges: {} as Record<string, number>,
     };
 
-    accounts.forEach(acc => {
+    accounts.forEach((acc: Account) => {
       const c = acc.currency || currency;
       const bal = Number(acc.balance) || 0;
       // In a real app, you would convert based on fx rates. Here we assume 1:1 if not matching for simplicity,

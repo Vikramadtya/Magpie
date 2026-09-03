@@ -13,18 +13,24 @@ const queryClient = new QueryClient({
   },
 })
 
-// TODO: Initialize Sentry here when DSN is available
-// import * as Sentry from "@sentry/react";
-// Sentry.init({
-//   dsn: "YOUR_DSN",
-//   integrations: [
-//     Sentry.browserTracingIntegration(),
-//     Sentry.replayIntegration(),
-//   ],
-//   tracesSampleRate: 1.0,
-//   replaysSessionSampleRate: 0.1,
-//   replaysOnErrorSampleRate: 1.0,
-// });
+import log from './utils/logger';
+import { env } from './config/env';
+import * as Sentry from "@sentry/react";
+
+Sentry.init({
+  dsn: env.SENTRY_DSN,
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  beforeSend(event) {
+    log.error('Sentry captured an event:', event);
+    return event;
+  }
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

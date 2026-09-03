@@ -1,11 +1,15 @@
-import { DefaultApi } from '../../../api-client';
+import { BudgetApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 
-const api = new DefaultApi(undefined, '', apiClient);
+const api = new BudgetApi(undefined, '', apiClient);
 
 export const BudgetService = {
   getAll: async (workspaceId: string) => {
     const response = await api.getBudgets(workspaceId);
+    return response.data;
+  },
+  getSummary: async (workspaceId: string) => {
+    const response = await api.getBudgetSummary(workspaceId);
     return response.data;
   },
   create: async (workspaceId: string, budget: any) => { 

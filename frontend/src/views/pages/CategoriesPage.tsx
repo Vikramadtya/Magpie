@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, ListTree, Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StateView } from '../../components/ui/StateView';
-import { useAccounts } from '../../features/accounts/hooks/useAccounts';
+import { useCategoryTree } from '../../features/categories/hooks/useCategories';
 import { apiClient } from '../../utils/api';
 import { Modal } from '../../components/ui/Modal';
 import { Loader2 } from 'lucide-react';
@@ -22,8 +22,8 @@ import EmojiPicker from 'emoji-picker-react';
 
 export default function CategoriesPage() {
   const workspaceId = localStorage.getItem('workspaceId') || '';
-  const { data: allAccounts = [], isLoading: loading, error, refetch } = useAccounts(workspaceId);
-  const categories = allAccounts.filter((a: any) => a.type === 'EXPENSE' || a.type === 'INCOME');
+  const { data: expenseTree = [], isLoading: loadingExp, error: errExp, refetch: refetchExp } = useCategoryTree(workspaceId, 'EXPENSE');
+  const { data: incomeTree = [], isLoading: loadingInc, error: errInc, refetch: refetchInc } = useCategoryTree(workspaceId, 'INCOME');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -61,7 +61,9 @@ export default function CategoriesPage() {
       setNewCatName('');
       setNewCatParentId('');
       setNewCatIcon('📁');
-      refetch();
+      setNewCatIcon('📁');
+      refetchExp();
+      refetchInc();
       toast.success("Category created successfully");
     } catch (err) {
       console.error(err);
@@ -92,7 +94,9 @@ export default function CategoriesPage() {
       });
       setIsEditModalOpen(false);
       setEditingCategory(null);
-      refetch();
+      setEditingCategory(null);
+      refetchExp();
+      refetchInc();
       toast.success("Category updated successfully");
     } catch (err) {
       console.error(err);
@@ -107,7 +111,8 @@ export default function CategoriesPage() {
     try {
       await apiClient.delete(`/api/v1/accounts/${WORKSPACE_ID}/${id}`);
       
-      refetch();
+      refetchExp();
+      refetchInc();
       toast.success("Category deleted successfully");
     } catch (err) {
       console.error(err);
@@ -115,49 +120,41 @@ export default function CategoriesPage() {
     }
   };
 
-  const getTree = (type: string) => {
-    const list = categories.filter(c => c.type === type);
-    const roots = list.filter(c => !c.parentId);
-    
-    const renderNode = (node: CategoryAccount, depth = 0) => {
-      const children = list.filter(c => c.parentId === node.id);
-      return (
-        <div key={node.id} className="w-full">
-          <div className={`group flex items-center justify-between p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors`} style={{ paddingLeft: `${depth * 2 + 1}rem` }}>
-            <div className="flex items-center gap-3">
-              {depth > 0 ? <ListTree className="w-4 h-4 text-gray-300" /> : <div className="w-4 h-4" />}
-              <span className="text-xl">{node.icon || '📁'}</span>
-              <span className="font-medium text-gray-900">{node.name}</span>
-            </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => handleEdit(node)}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Edit Category"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => handleDelete(node.id)}
-                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  title="Delete Category"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+  const renderTree = (nodes: any[], depth = 0) => {
+    return nodes.map(node => (
+      <div key={node.id} className="w-full">
+        <div className={`group flex items-center justify-between p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors`} style={{ paddingLeft: `${depth * 2 + 1}rem` }}>
+          <div className="flex items-center gap-3">
+            {depth > 0 ? <ListTree className="w-4 h-4 text-gray-300" /> : <div className="w-4 h-4" />}
+            <span className="text-xl">{node.icon || '📁'}</span>
+            <span className="font-medium text-gray-900">{node.name}</span>
           </div>
-          {children.map(child => renderNode(child, depth + 1))}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <button 
+                onClick={() => handleEdit(node)}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Edit Category"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => handleDelete(node.id)}
+                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                title="Delete Category"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
         </div>
-      );
-    };
-
-    return roots.map(root => renderNode(root, 0));
+        {node.children && renderTree(node.children, depth + 1)}
+      </div>
+    ));
   };
 
   const getState = () => {
-    if (loading) return 'loading';
-    if (error) return 'error';
-    if (categories.length === 0) return 'empty';
+    if (loadingExp || loadingInc) return 'loading';
+    if (errExp || errInc) return 'error';
+    if (expenseTree.length === 0 && incomeTree.length === 0) return 'empty';
     return 'success';
   };
 
@@ -176,23 +173,23 @@ export default function CategoriesPage() {
 
       <StateView 
         state={getState()} 
-        error={error?.message || null} 
-        onRetry={() => refetch()}
-        title={error ? "Failed to Load" : "No Categories Found"}
-        description={error ? undefined : "Create your first category."}
+        error={errExp?.message || errInc?.message || null} 
+        onRetry={() => { refetchExp(); refetchInc(); }}
+        title={(errExp || errInc) ? "Failed to Load" : "No Categories Found"}
+        description={(errExp || errInc) ? undefined : "Create your first category."}
         className="mt-8"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <h2 className="text-xl font-bold text-gray-900 mb-4 px-3">Expenses</h2>
             <div className="border border-gray-100 rounded-2xl overflow-hidden">
-              {getTree('EXPENSE')}
+              {renderTree(expenseTree)}
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <h2 className="text-xl font-bold text-gray-900 mb-4 px-3">Income</h2>
             <div className="border border-gray-100 rounded-2xl overflow-hidden">
-              {getTree('INCOME')}
+              {renderTree(incomeTree)}
             </div>
           </div>
         </div>
@@ -232,7 +229,9 @@ export default function CategoriesPage() {
             <label className="text-sm font-bold text-gray-700">Parent Category (Optional)</label>
             <select value={newCatParentId} onChange={e => setNewCatParentId(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500">
               <option value="">None (Top Level)</option>
-              {categories.filter(c => c.type === newCatType).map(c => (
+              {newCatType === 'EXPENSE' ? expenseTree.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              )) : incomeTree.map((c: any) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

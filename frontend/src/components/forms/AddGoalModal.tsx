@@ -3,12 +3,15 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
 import { useCreateGoal, useUpdateGoal } from '../../features/goals/hooks/useGoals';
 import type { Goal } from '../../features/goals/api/types';
 import { useSettingsStore, getCurrencySymbol } from '../../store/useSettingsStore';
-import { useFinanceStore } from '../../store/useFinanceStore';
-import { cn } from '../../utils/cn';
+import { useAccounts } from '../../features/accounts/hooks/useAccounts';
 
 interface AddGoalModalProps {
   isOpen: boolean;
@@ -21,22 +24,23 @@ const goalSchema = z.object({
   name: z.string().min(1, "Name is required"),
   targetAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be greater than 0"),
   dueDate: z.string().optional(),
-  priority: z.string().default('0'),
+  priority: z.string(),
   accountId: z.string().min(1, "Linked Account is required"),
   currency: z.string().min(3, "Currency is required"),
 });
 
 type GoalFormValues = z.infer<typeof goalSchema>;
 
+// million-ignore
 export function AddGoalModal({ isOpen, onClose, workspaceId, goalToEdit }: AddGoalModalProps) {
   const createMutation = useCreateGoal();
   const updateMutation = useUpdateGoal();
-  const currency = useSettingsStore(state => state.settings.currency);
-  const accounts = useFinanceStore(state => state.accounts).filter(a => a.type === 'ASSET' || a.type === 'EQUITY');
+  const currency = useSettingsStore(state => state.settings.currency) || 'USD';
+  const { data: allAccounts = [] } = useAccounts(workspaceId);
+  const accounts = allAccounts.filter((a: any) => a.type === 'ASSET' || a.type === 'EQUITY');
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<GoalFormValues>({
-    // @ts-ignore
-    resolver: zodResolver(goalSchema as any) as any,
+    resolver: zodResolver(goalSchema),
     defaultValues: {
       name: '',
       targetAmount: '',
@@ -47,11 +51,13 @@ export function AddGoalModal({ isOpen, onClose, workspaceId, goalToEdit }: AddGo
     }
   });
 
+  const watchAccountId = watch('accountId');
+
   useEffect(() => {
-    if (!goalToEdit && isOpen && accounts.length > 0 && !watch('accountId')) {
+    if (!goalToEdit && isOpen && accounts.length > 0 && !watchAccountId) {
       setValue('accountId', accounts[0].id);
     }
-  }, [isOpen, accounts, setValue, watch, goalToEdit]);
+  }, [isOpen, accounts, setValue, watchAccountId, goalToEdit]);
 
   useEffect(() => {
     if (goalToEdit && isOpen) {
@@ -107,85 +113,96 @@ export function AddGoalModal({ isOpen, onClose, workspaceId, goalToEdit }: AddGo
         )}
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Goal Name</label>
-          <input 
+          <Label htmlFor="name">Goal Name</Label>
+          <Input 
+            id="name"
             {...register('name')}
             placeholder="e.g. New Car Fund"
-            className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.name ? "border-rose-500" : "border-gray-200")} 
+            className={errors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
           />
           {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Target Amount</label>
+            <Label htmlFor="targetAmount">Target Amount</Label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">{getCurrencySymbol(currency)}</span>
-              <input 
+              <Input 
+                id="targetAmount"
                 {...register('targetAmount')}
                 type="number" step="0.01" placeholder="0.00"
-                className={cn("w-full pl-7 pr-3 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.targetAmount ? "border-rose-500" : "border-gray-200")} 
+                className={errors.targetAmount ? "pl-7 border-red-500 focus-visible:ring-red-500" : "pl-7"}
               />
             </div>
             {errors.targetAmount && <p className="text-xs text-rose-500">{errors.targetAmount.message}</p>}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Target Date</label>
-            <input 
+            <Label htmlFor="dueDate">Target Date</Label>
+            <Input 
+              id="dueDate"
               {...register('dueDate')}
               type="date"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900"
+              className={errors.dueDate ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Currency</label>
-            <select 
+            <Label htmlFor="currency">Currency</Label>
+            <Select 
+              id="currency"
               {...register('currency')}
-              className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.currency ? "border-rose-500" : "border-gray-200")}
+              error={!!errors.currency}
             >
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
               <option value="INR">INR (₹)</option>
               <option value="JPY">JPY (¥)</option>
-            </select>
+            </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Priority</label>
-            <select 
+            <Label htmlFor="priority">Priority</Label>
+            <Select 
+              id="priority"
               {...register('priority')}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900"
+              error={!!errors.priority}
             >
               <option value="0">Normal</option>
               <option value="1">High</option>
               <option value="2">Critical</option>
-            </select>
+            </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Linked Account</label>
-            <select 
+            <Label htmlFor="accountId">Linked Account</Label>
+            <Select 
+              id="accountId"
               {...register('accountId')}
-              className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.accountId ? "border-rose-500" : "border-gray-200")}
+              error={!!errors.accountId}
             >
               {accounts.map(acc => (
                 <option key={acc.id} value={acc.id}>{acc.name} ({getCurrencySymbol(acc.currency || currency)})</option>
               ))}
-            </select>
+            </Select>
             {errors.accountId && <p className="text-xs text-rose-500">{errors.accountId.message}</p>}
           </div>
         </div>
 
         <div className="pt-4 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 disabled:opacity-50 flex items-center gap-2">
+          </Button>
+          <Button 
+            type="submit" 
+            variant="default"
+            disabled={createMutation.isPending || updateMutation.isPending}
+            className="flex items-center gap-2"
+          >
             {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
             {createMutation.isPending || updateMutation.isPending ? 'Saving...' : goalToEdit ? 'Save Changes' : 'Create Goal'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

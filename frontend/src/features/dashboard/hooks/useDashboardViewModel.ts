@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useFinanceStore } from '../../../store/useFinanceStore';
+import { useDashboard } from './useDashboard';
 import { useSettingsStore, formatCurrencyGlobal } from '../../../store/useSettingsStore';
 
 export const useDashboardViewModel = () => {
   const WORKSPACE_ID = localStorage.getItem('workspaceId') || '';
   
-  const dashboard = useFinanceStore(state => state.dashboardData);
-  const loading = useFinanceStore(state => state.isInitializing);
+  const { data: dashboard, isLoading: loading } = useDashboard(WORKSPACE_ID, 12);
   const currency = useSettingsStore(state => state.settings.currency);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,9 +19,9 @@ export const useDashboardViewModel = () => {
     return {
       netWorth: dashboard.keyMetrics?.netWorth || dashboard.netWorth?.[dashboard.netWorth.length - 1]?.balance || 0,
       netWorthHistory: dashboard.netWorth || [],
-      monthlyIncome: dashboard.cashFlow?.[dashboard.cashFlow.length - 1]?.income || 0,
-      monthlyExpense: dashboard.cashFlow?.[dashboard.cashFlow.length - 1]?.expense || 0,
-      cashFlow: dashboard.cashFlow?.map((cf: any) => ({ month: cf.month, amount: cf.income - cf.expense })) || [],
+      monthlyIncome: (dashboard.cashFlow?.[dashboard.cashFlow.length - 1] as any)?.income || 0,
+      monthlyExpense: (dashboard.cashFlow?.[dashboard.cashFlow.length - 1] as any)?.expense || 0,
+      cashFlow: dashboard.cashFlow?.map((cf: any) => ({ month: cf.month, amount: (cf.income || 0) - (cf.expense || 0) })) || [],
       categorySpending: dashboard.categorySpending?.map((cs: any) => ({ name: cs.categoryName, value: cs.amount, color: cs.color })) || [],
       recentTransactions: dashboard.recentTransactions || [],
       nativeNetWorth: dashboard.keyMetrics?.nativeNetWorth || {},
@@ -44,10 +43,14 @@ export const useDashboardViewModel = () => {
 
   const netWorthChange = useMemo(() => {
     if (data && data.netWorthHistory.length >= 2) {
-      const current = data.netWorthHistory[data.netWorthHistory.length - 1].balance;
-      const previous = data.netWorthHistory[data.netWorthHistory.length - 2].balance;
+      const currentObj = data.netWorthHistory[data.netWorthHistory.length - 1];
+      const previousObj = data.netWorthHistory[data.netWorthHistory.length - 2];
+      
+      const current = currentObj ? currentObj.balance : 0;
+      const previous = previousObj ? previousObj.balance : 0;
+
       if (previous !== 0) {
-        return ((current - previous) / Math.abs(previous)) * 100;
+        return (((current ?? 0) - (previous ?? 0)) / Math.abs(previous ?? 1)) * 100;
       }
     }
     return 0;

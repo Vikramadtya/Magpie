@@ -1,56 +1,49 @@
+version: '3.8'
+
 services:
-  db:
-    image: postgres:17
-    container_name: keeper_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: keeper
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "5433:5432"
-    volumes:
-      - keeper_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-
+      - "80:80"
+    depends_on:
+      - backend
 
   backend:
-    build:
+    build: 
       context: ./backend
-      dockerfile: Dockerfile.dev
-    container_name: keeper_backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      - DATASOURCES_DEFAULT_URL=jdbc:postgresql://db:5432/keeper
-      - DATASOURCES_DEFAULT_USERNAME=postgres
-      - DATASOURCES_DEFAULT_PASSWORD=password
-
-    volumes:
-      - ./backend:/app
-      - ~/.m2:/root/.m2
+      - DB_URL=jdbc:postgresql://db:5432/keeper
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - JWT_SECRET=${JWT_SECRET:-please_set_me_in_production}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - MICRONAUT_ENVIRONMENTS=prod
     depends_on:
       db:
         condition: service_healthy
 
-  frontend:
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile.dev
-    container_name: keeper_frontend
-    ports:
-      - "5173:5173"
+  db:
+    image: postgres:15-alpine
     environment:
-      - VITE_API_URL=http://localhost:8080
+      - POSTGRES_DB=keeper
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+    ports:
+      - "5432:5432"
     volumes:
-      - ./apps/web:/app
-      - /app/node_modules
-    depends_on:
-      - backend
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d keeper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  keeper_pgdata:
+  postgres-data:

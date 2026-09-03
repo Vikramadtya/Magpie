@@ -4,6 +4,7 @@ import type { FallbackProps } from 'react-error-boundary';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
+// million-ignore
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div className="flex flex-col items-center justify-center p-8 bg-rose-50/50 rounded-3xl border border-rose-100 min-h-[300px] text-center w-full">
@@ -31,6 +32,7 @@ interface ErrorBoundaryProps {
   onReset?: () => void;
 }
 
+// million-ignore
 export function ErrorBoundary({ children, className, onReset }: ErrorBoundaryProps) {
   return (
     <div className={cn("w-full", className)}>

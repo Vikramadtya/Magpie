@@ -1,11 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TransactionService } from '../api/TransactionService';
-import type { Transaction } from '../../../store/useFinanceStore';
+import type { Transaction } from '../../../types/models';
 
 export const useTransactions = (workspaceId: string) => {
   return useQuery({
     queryKey: ['transactions', workspaceId],
     queryFn: () => TransactionService.getAll(workspaceId),
+    enabled: !!workspaceId,
+  });
+};
+
+export const useGroupedTransactions = (workspaceId: string, params: any) => {
+  return useQuery({
+    queryKey: ['transactions', 'grouped', workspaceId, params],
+    queryFn: () => TransactionService.getGrouped(workspaceId, params),
     enabled: !!workspaceId,
   });
 };

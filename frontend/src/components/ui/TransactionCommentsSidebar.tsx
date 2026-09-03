@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Send, User, Building2 } from 'lucide-react';
-import { useFinanceStore } from '../../store/useFinanceStore';
-import type { Transaction } from '../../store/useFinanceStore';
+import type { Transaction } from '../../types/models';
 import { useAddComment } from '../../features/transactions/hooks/useTransactions';
 import { cn } from '../../utils/cn';
 

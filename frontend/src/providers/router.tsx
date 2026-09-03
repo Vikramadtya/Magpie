@@ -15,6 +15,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 // Lazy loaded pages
 const LoginPage = React.lazy(() => import('../views/pages/auth/LoginPage'));
 const AuthCallback = React.lazy(() => import('../views/pages/auth/AuthCallback'));
+const LandingPage = React.lazy(() => import('../views/pages/public/LandingPage'));
 const DashboardPage = React.lazy(() => import('../views/pages/DashboardPage'));
 const AccountsPage = React.lazy(() => import('../views/pages/AccountsPage'));
 const TransactionsPage = React.lazy(() => import('../views/pages/TransactionsPage'));
@@ -57,12 +58,20 @@ const PublicLayout = () => {
   );
 };
 
+import { useRouteError } from 'react-router-dom';
+
 // Global Error Page
 const GlobalError = () => {
+  const error = useRouteError();
+  console.error("Router GlobalError caught:", error);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text p-4">
       <h1 className="text-4xl font-bold mb-4">Oops!</h1>
       <p className="text-lg text-secondary mb-8">We couldn't find the page you're looking for or an error occurred.</p>
+      <div className="text-red-500 max-w-lg mb-8 text-sm overflow-auto">
+        {error instanceof Error ? error.message : JSON.stringify(error)}
+      </div>
       <a href="/" className="px-6 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity">
         Go Home
       </a>
@@ -76,6 +85,14 @@ export const router = createBrowserRouter([
     element: <PublicLayout />,
     errorElement: <GlobalError />,
     children: [
+      {
+        index: true,
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <LandingPage />
+          </Suspense>
+        )
+      },
       {
         path: 'login',
         element: <LoginPage />
@@ -95,10 +112,6 @@ export const router = createBrowserRouter([
     element: <PrivateLayout />,
     errorElement: <GlobalError />,
     children: [
-      {
-        index: true,
-        element: <Navigate to="/dashboard" replace />
-      },
       {
         path: 'dashboard',
         element: (

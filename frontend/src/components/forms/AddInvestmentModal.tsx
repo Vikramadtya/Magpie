@@ -30,6 +30,7 @@ const investmentSchema = z.object({
 
 type InvestmentFormValues = z.infer<typeof investmentSchema>;
 
+// million-ignore
 export function AddInvestmentModal({ isOpen, onClose, workspaceId }: AddInvestmentModalProps) {
   const { data: accounts = [] } = useAccounts(workspaceId);
   const currency = useSettingsStore(state => state.settings.currency);

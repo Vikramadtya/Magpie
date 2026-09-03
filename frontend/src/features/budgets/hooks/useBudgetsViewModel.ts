@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useSettingsStore, formatCurrencyGlobal } from '../../../store/useSettingsStore';
-import { useBudgets, useDeleteBudget } from '../hooks/useBudgets';
+import { useBudgetSummary, useDeleteBudget } from '../hooks/useBudgets';
 import type { Budget } from '../api/types';
 
 export const useBudgetsViewModel = () => {
   const workspaceId = localStorage.getItem('workspaceId') || '';
-  const { data: budgets = [], isLoading, error, refetch } = useBudgets(workspaceId);
+  const { data: summary, isLoading, error, refetch } = useBudgetSummary(workspaceId);
   const deleteMutation = useDeleteBudget();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,8 +25,9 @@ export const useBudgetsViewModel = () => {
   const currency = useSettingsStore(state => state.settings.currency);
   const formatCurrency = (val: any, sourceCurrency = currency) => formatCurrencyGlobal(Number(val), currency, sourceCurrency);
 
-  const totalBudgeted = useMemo(() => budgets.reduce((acc, b) => acc + b.amount, 0), [budgets]);
-  const totalSpent = useMemo(() => budgets.reduce((acc, b) => acc + b.spent, 0), [budgets]);
+  const budgets = summary?.budgets || [];
+  const totalBudgeted = summary?.totalBudgeted || 0;
+  const totalSpent = summary?.totalSpent || 0;
 
   const stateStatus = useMemo(() => {
     if (isLoading) return 'loading';

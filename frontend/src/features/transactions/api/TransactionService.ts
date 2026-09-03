@@ -1,12 +1,13 @@
-import { DefaultApi } from '../../../api-client';
+import { TransactionApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 
-const api = new DefaultApi(undefined, '', apiClient);
+const api = new TransactionApi(undefined, '', apiClient);
 
 export const TransactionService = {
   getAll: async (workspaceId: string) => {
-    const response = await api.getAllTransactions(workspaceId);
-    return response.data.map((tx: any) => {
+    const response = await api.getTransactions(workspaceId);
+    const transactions = response.data.content || [];
+    return transactions.map((tx: any) => {
       const entry = tx.entries?.[0];
       return {
         id: tx.id,
@@ -23,6 +24,17 @@ export const TransactionService = {
         comments: tx.comments,
       };
     });
+  },
+  getGrouped: async (workspaceId: string, params: any) => {
+    const response = await api.getGroupedTransactions(
+      workspaceId,
+      params.accountId === 'ALL' ? undefined : params.accountId,
+      undefined, // startDate
+      undefined, // endDate
+      undefined, // type
+      params.searchQuery || undefined
+    );
+    return response.data;
   },
   create: async (workspaceId: string, tx: any, isTransfer?: boolean) => {
     const response = await api.createTransaction(workspaceId, tx);

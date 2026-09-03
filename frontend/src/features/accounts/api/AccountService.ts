@@ -1,11 +1,11 @@
-import { DefaultApi } from '../../../api-client';
+import { AccountApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 
-const api = new DefaultApi(undefined, '', apiClient);
+const api = new AccountApi(undefined, '', apiClient);
 
 export const AccountService = {
   getAll: async (workspaceId: string) => {
-    const response = await api.getAllAccounts(workspaceId);
+    const response = await api.getAccounts(workspaceId);
     return response.data.map((acc: any) => ({
       id: acc.id,
       name: acc.name,

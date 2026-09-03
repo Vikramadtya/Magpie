@@ -10,6 +10,14 @@ export const useBudgets = (workspaceId: string) => {
   });
 };
 
+export const useBudgetSummary = (workspaceId: string) => {
+  return useQuery({
+    queryKey: ['budgetSummary', workspaceId],
+    queryFn: () => BudgetService.getSummary(workspaceId),
+    enabled: !!workspaceId,
+  });
+};
+
 export const useCreateBudget = () => {
   const queryClient = useQueryClient();
   return useMutation({

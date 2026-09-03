@@ -1,34 +1,34 @@
 # DefaultApi
 
-All URIs are relative to *http://localhost*
+All URIs are relative to *http://localhost:8080*
 
 |Method | HTTP request | Description|
 |------------- | ------------- | -------------|
-|[**createAccount**](#createaccount) | **POST** /api/v1/accounts/{workspaceId} | |
-|[**createBudget**](#createbudget) | **POST** /api/v1/budgets/{workspaceId} | |
-|[**createGoal**](#creategoal) | **POST** /api/v1/goals/{workspaceId} | |
-|[**createSubscription**](#createsubscription) | **POST** /api/v1/subscriptions/{workspaceId} | |
-|[**createTransaction**](#createtransaction) | **POST** /api/v1/transactions/{workspaceId} | |
-|[**deleteAccount**](#deleteaccount) | **DELETE** /api/v1/accounts/{workspaceId}/{accountId} | |
-|[**deleteBudget**](#deletebudget) | **DELETE** /api/v1/budgets/{workspaceId}/{budgetId} | |
-|[**deleteGoal**](#deletegoal) | **DELETE** /api/v1/goals/{workspaceId}/{goalId} | |
-|[**deleteSubscription**](#deletesubscription) | **DELETE** /api/v1/subscriptions/{workspaceId}/{subscriptionId} | |
-|[**deleteTransaction**](#deletetransaction) | **DELETE** /api/v1/transactions/{workspaceId}/{transactionId} | |
-|[**fundGoal**](#fundgoal) | **POST** /api/v1/goals/{workspaceId}/{goalId}/fund | |
-|[**getAllAccounts**](#getallaccounts) | **GET** /api/v1/accounts/{workspaceId} | |
-|[**getAllTransactions**](#getalltransactions) | **GET** /api/v1/transactions/{workspaceId} | |
-|[**getBudgets**](#getbudgets) | **GET** /api/v1/budgets/{workspaceId} | |
-|[**getDashboard**](#getdashboard) | **GET** /api/analytics/dashboard | |
-|[**getGoals**](#getgoals) | **GET** /api/v1/goals/{workspaceId} | |
-|[**getSubscriptions**](#getsubscriptions) | **GET** /api/v1/subscriptions/{workspaceId} | |
-|[**updateAccount**](#updateaccount) | **PUT** /api/v1/accounts/{workspaceId}/{accountId} | |
-|[**updateBudget**](#updatebudget) | **PUT** /api/v1/budgets/{workspaceId}/{budgetId} | |
-|[**updateGoal**](#updategoal) | **PUT** /api/v1/goals/{workspaceId}/{goalId} | |
-|[**updateSubscription**](#updatesubscription) | **PUT** /api/v1/subscriptions/{workspaceId}/{subscriptionId} | |
-|[**updateTransaction**](#updatetransaction) | **PUT** /api/v1/transactions/{workspaceId}/{transactionId} | |
+|[**createAccount**](#createaccount) | **POST** /api/v1/accounts/{workspaceId} | Create a new account|
+|[**createBudget**](#createbudget) | **POST** /api/v1/budgets/{workspaceId} | Create budget|
+|[**createGoal**](#creategoal) | **POST** /api/v1/goals/{workspaceId} | Create goal|
+|[**createSubscription**](#createsubscription) | **POST** /api/v1/subscriptions/{workspaceId} | Create subscription|
+|[**createTransaction**](#createtransaction) | **POST** /api/v1/transactions/{workspaceId} | Create a transaction|
+|[**deleteAccount**](#deleteaccount) | **DELETE** /api/v1/accounts/{workspaceId}/{id} | Delete an account|
+|[**deleteBudget**](#deletebudget) | **DELETE** /api/v1/budgets/{workspaceId}/{id} | Delete budget|
+|[**deleteGoal**](#deletegoal) | **DELETE** /api/v1/goals/{workspaceId}/{id} | Delete goal|
+|[**deleteSubscription**](#deletesubscription) | **DELETE** /api/v1/subscriptions/{workspaceId}/{id} | Delete subscription|
+|[**deleteTransaction**](#deletetransaction) | **DELETE** /api/v1/transactions/{workspaceId}/{id} | Delete a transaction|
+|[**getAccounts**](#getaccounts) | **GET** /api/v1/accounts/{workspaceId} | Get all accounts for a workspace|
+|[**getBudgets**](#getbudgets) | **GET** /api/v1/budgets/{workspaceId} | Get budgets|
+|[**getDashboard**](#getdashboard) | **GET** /api/analytics/dashboard | Get dashboard data|
+|[**getGoals**](#getgoals) | **GET** /api/v1/goals/{workspaceId} | Get goals|
+|[**getPayees**](#getpayees) | **GET** /api/v1/payees/{workspaceId} | Get payees|
+|[**getSubscriptions**](#getsubscriptions) | **GET** /api/v1/subscriptions/{workspaceId} | Get subscriptions|
+|[**getTransactions**](#gettransactions) | **GET** /api/v1/transactions/{workspaceId} | Get transactions|
+|[**updateAccount**](#updateaccount) | **PUT** /api/v1/accounts/{workspaceId}/{id} | Update an account|
+|[**updateBudget**](#updatebudget) | **PUT** /api/v1/budgets/{workspaceId}/{id} | Update budget|
+|[**updateGoal**](#updategoal) | **PUT** /api/v1/goals/{workspaceId}/{id} | Update goal|
+|[**updateSubscription**](#updatesubscription) | **PUT** /api/v1/subscriptions/{workspaceId}/{id} | Update subscription|
+|[**updateTransaction**](#updatetransaction) | **PUT** /api/v1/transactions/{workspaceId}/{id} | Update a transaction|
 
 # **createAccount**
-> Account createAccount(account)
+> AccountDTO createAccount(accountCreateDTO)
 
 
 ### Example
@@ -37,18 +37,18 @@ All URIs are relative to *http://localhost*
 import {
     DefaultApi,
     Configuration,
-    Account
+    AccountCreateDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let account: Account; //
+let accountCreateDTO: AccountCreateDTO; //
 
 const { status, data } = await apiInstance.createAccount(
     workspaceId,
-    account
+    accountCreateDTO
 );
 ```
 
@@ -56,13 +56,13 @@ const { status, data } = await apiInstance.createAccount(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **account** | **Account**|  | |
+| **accountCreateDTO** | **AccountCreateDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**Account**
+**AccountDTO**
 
 ### Authorization
 
@@ -77,12 +77,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | createAccount 200 response |  -  |
+|**201** | Created |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **createBudget**
-> BudgetControllerBudgetDTO createBudget(createBudgetDTO)
+> BudgetDTO createBudget(budgetDTO)
 
 
 ### Example
@@ -91,18 +91,18 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateBudgetDTO
+    BudgetDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let createBudgetDTO: CreateBudgetDTO; //
+let budgetDTO: BudgetDTO; //
 
 const { status, data } = await apiInstance.createBudget(
     workspaceId,
-    createBudgetDTO
+    budgetDTO
 );
 ```
 
@@ -110,13 +110,13 @@ const { status, data } = await apiInstance.createBudget(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createBudgetDTO** | **CreateBudgetDTO**|  | |
+| **budgetDTO** | **BudgetDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**BudgetControllerBudgetDTO**
+**BudgetDTO**
 
 ### Authorization
 
@@ -131,12 +131,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | createBudget 200 response |  -  |
+|**201** | Created |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **createGoal**
-> GoalControllerGoalDTO createGoal(createGoalDTO)
+> GoalDTO createGoal(goalDTO)
 
 
 ### Example
@@ -145,18 +145,18 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateGoalDTO
+    GoalDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let createGoalDTO: CreateGoalDTO; //
+let goalDTO: GoalDTO; //
 
 const { status, data } = await apiInstance.createGoal(
     workspaceId,
-    createGoalDTO
+    goalDTO
 );
 ```
 
@@ -164,13 +164,13 @@ const { status, data } = await apiInstance.createGoal(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createGoalDTO** | **CreateGoalDTO**|  | |
+| **goalDTO** | **GoalDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**GoalControllerGoalDTO**
+**GoalDTO**
 
 ### Authorization
 
@@ -185,12 +185,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | createGoal 200 response |  -  |
+|**201** | Created |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **createSubscription**
-> SubscriptionControllerSubscriptionDTO createSubscription(createSubscriptionDTO)
+> SubscriptionDTO createSubscription(subscriptionDTO)
 
 
 ### Example
@@ -199,18 +199,18 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateSubscriptionDTO
+    SubscriptionDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let createSubscriptionDTO: CreateSubscriptionDTO; //
+let subscriptionDTO: SubscriptionDTO; //
 
 const { status, data } = await apiInstance.createSubscription(
     workspaceId,
-    createSubscriptionDTO
+    subscriptionDTO
 );
 ```
 
@@ -218,13 +218,13 @@ const { status, data } = await apiInstance.createSubscription(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createSubscriptionDTO** | **CreateSubscriptionDTO**|  | |
+| **subscriptionDTO** | **SubscriptionDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**SubscriptionControllerSubscriptionDTO**
+**SubscriptionDTO**
 
 ### Authorization
 
@@ -239,12 +239,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | createSubscription 200 response |  -  |
+|**201** | Created |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **createTransaction**
-> TransactionDTO createTransaction(createTransactionDTO)
+> TransactionDTO createTransaction(transactionCreateDTO)
 
 
 ### Example
@@ -253,18 +253,18 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateTransactionDTO
+    TransactionCreateDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let createTransactionDTO: CreateTransactionDTO; //
+let transactionCreateDTO: TransactionCreateDTO; //
 
 const { status, data } = await apiInstance.createTransaction(
     workspaceId,
-    createTransactionDTO
+    transactionCreateDTO
 );
 ```
 
@@ -272,7 +272,7 @@ const { status, data } = await apiInstance.createTransaction(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createTransactionDTO** | **CreateTransactionDTO**|  | |
+| **transactionCreateDTO** | **TransactionCreateDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
 
 
@@ -293,12 +293,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | createTransaction 200 response |  -  |
+|**201** | Created |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteAccount**
-> object deleteAccount()
+> deleteAccount()
 
 
 ### Example
@@ -313,11 +313,11 @@ const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let accountId: string; // (default to undefined)
+let id: string; // (default to undefined)
 
 const { status, data } = await apiInstance.deleteAccount(
     workspaceId,
-    accountId
+    id
 );
 ```
 
@@ -326,12 +326,12 @@ const { status, data } = await apiInstance.deleteAccount(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **accountId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**object**
+void (empty response body)
 
 ### Authorization
 
@@ -340,18 +340,18 @@ No authorization required
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | deleteAccount 200 response |  -  |
+|**204** | No Content |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteBudget**
-> object deleteBudget()
+> deleteBudget()
 
 
 ### Example
@@ -366,11 +366,11 @@ const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let budgetId: string; // (default to undefined)
+let id: string; // (default to undefined)
 
 const { status, data } = await apiInstance.deleteBudget(
     workspaceId,
-    budgetId
+    id
 );
 ```
 
@@ -379,12 +379,12 @@ const { status, data } = await apiInstance.deleteBudget(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **budgetId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**object**
+void (empty response body)
 
 ### Authorization
 
@@ -393,18 +393,18 @@ No authorization required
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | deleteBudget 200 response |  -  |
+|**204** | Deleted |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteGoal**
-> object deleteGoal()
+> deleteGoal()
 
 
 ### Example
@@ -419,11 +419,11 @@ const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let goalId: string; // (default to undefined)
+let id: string; // (default to undefined)
 
 const { status, data } = await apiInstance.deleteGoal(
     workspaceId,
-    goalId
+    id
 );
 ```
 
@@ -432,12 +432,12 @@ const { status, data } = await apiInstance.deleteGoal(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **goalId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**object**
+void (empty response body)
 
 ### Authorization
 
@@ -446,18 +446,18 @@ No authorization required
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | deleteGoal 200 response |  -  |
+|**204** | Deleted |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteSubscription**
-> object deleteSubscription()
+> deleteSubscription()
 
 
 ### Example
@@ -472,11 +472,11 @@ const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let subscriptionId: string; // (default to undefined)
+let id: string; // (default to undefined)
 
 const { status, data } = await apiInstance.deleteSubscription(
     workspaceId,
-    subscriptionId
+    id
 );
 ```
 
@@ -485,12 +485,12 @@ const { status, data } = await apiInstance.deleteSubscription(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **subscriptionId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**object**
+void (empty response body)
 
 ### Authorization
 
@@ -499,18 +499,18 @@ No authorization required
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | deleteSubscription 200 response |  -  |
+|**204** | Deleted |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteTransaction**
-> object deleteTransaction()
+> deleteTransaction()
 
 
 ### Example
@@ -525,11 +525,11 @@ const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let transactionId: string; // (default to undefined)
+let id: string; // (default to undefined)
 
 const { status, data } = await apiInstance.deleteTransaction(
     workspaceId,
-    transactionId
+    id
 );
 ```
 
@@ -538,12 +538,12 @@ const { status, data } = await apiInstance.deleteTransaction(
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **transactionId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**object**
+void (empty response body)
 
 ### Authorization
 
@@ -552,74 +552,18 @@ No authorization required
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | deleteTransaction 200 response |  -  |
+|**204** | Deleted |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **fundGoal**
-> GoalControllerGoalDTO fundGoal(requestBody)
-
-
-### Example
-
-```typescript
-import {
-    DefaultApi,
-    Configuration
-} from './api';
-
-const configuration = new Configuration();
-const apiInstance = new DefaultApi(configuration);
-
-let workspaceId: string; // (default to undefined)
-let goalId: string; // (default to undefined)
-let requestBody: { [key: string]: number; }; //
-
-const { status, data } = await apiInstance.fundGoal(
-    workspaceId,
-    goalId,
-    requestBody
-);
-```
-
-### Parameters
-
-|Name | Type | Description  | Notes|
-|------------- | ------------- | ------------- | -------------|
-| **requestBody** | **{ [key: string]: number; }**|  | |
-| **workspaceId** | [**string**] |  | defaults to undefined|
-| **goalId** | [**string**] |  | defaults to undefined|
-
-
-### Return type
-
-**GoalControllerGoalDTO**
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
- - **Content-Type**: application/json
- - **Accept**: application/json
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-|**200** | fundGoal 200 response |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **getAllAccounts**
-> Array<Account> getAllAccounts()
+# **getAccounts**
+> Array<AccountDTO> getAccounts()
 
 
 ### Example
@@ -635,7 +579,7 @@ const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
 
-const { status, data } = await apiInstance.getAllAccounts(
+const { status, data } = await apiInstance.getAccounts(
     workspaceId
 );
 ```
@@ -649,7 +593,7 @@ const { status, data } = await apiInstance.getAllAccounts(
 
 ### Return type
 
-**Array<Account>**
+**Array<AccountDTO>**
 
 ### Authorization
 
@@ -664,62 +608,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | getAllAccounts 200 response |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **getAllTransactions**
-> Array<TransactionDTO> getAllTransactions()
-
-
-### Example
-
-```typescript
-import {
-    DefaultApi,
-    Configuration
-} from './api';
-
-const configuration = new Configuration();
-const apiInstance = new DefaultApi(configuration);
-
-let workspaceId: string; // (default to undefined)
-
-const { status, data } = await apiInstance.getAllTransactions(
-    workspaceId
-);
-```
-
-### Parameters
-
-|Name | Type | Description  | Notes|
-|------------- | ------------- | ------------- | -------------|
-| **workspaceId** | [**string**] |  | defaults to undefined|
-
-
-### Return type
-
-**Array<TransactionDTO>**
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
- - **Content-Type**: Not defined
- - **Accept**: application/json
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-|**200** | getAllTransactions 200 response |  -  |
+|**200** | Successful response |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getBudgets**
-> Array<BudgetControllerBudgetDTO> getBudgets()
+> Array<BudgetDTO> getBudgets()
 
 
 ### Example
@@ -749,7 +643,7 @@ const { status, data } = await apiInstance.getBudgets(
 
 ### Return type
 
-**Array<BudgetControllerBudgetDTO>**
+**Array<BudgetDTO>**
 
 ### Authorization
 
@@ -764,12 +658,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | getBudgets 200 response |  -  |
+|**200** | Successful response |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getDashboard**
-> { [key: string]: any; } getDashboard()
+> DashboardDataDTO getDashboard()
 
 
 ### Example
@@ -783,10 +677,10 @@ import {
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
-let months: number; // (default to 12)
+let workspaceId: string; // (default to undefined)
 
 const { status, data } = await apiInstance.getDashboard(
-    months
+    workspaceId
 );
 ```
 
@@ -794,12 +688,12 @@ const { status, data } = await apiInstance.getDashboard(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **months** | [**number**] |  | defaults to 12|
+| **workspaceId** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**{ [key: string]: any; }**
+**DashboardDataDTO**
 
 ### Authorization
 
@@ -814,12 +708,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | getDashboard 200 response |  -  |
+|**200** | Successful response |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getGoals**
-> Array<GoalControllerGoalDTO> getGoals()
+> Array<GoalDTO> getGoals()
 
 
 ### Example
@@ -849,7 +743,7 @@ const { status, data } = await apiInstance.getGoals(
 
 ### Return type
 
-**Array<GoalControllerGoalDTO>**
+**Array<GoalDTO>**
 
 ### Authorization
 
@@ -864,12 +758,62 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | getGoals 200 response |  -  |
+|**200** | Successful response |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getPayees**
+> Array<PayeeDTO> getPayees()
+
+
+### Example
+
+```typescript
+import {
+    DefaultApi,
+    Configuration
+} from './api';
+
+const configuration = new Configuration();
+const apiInstance = new DefaultApi(configuration);
+
+let workspaceId: string; // (default to undefined)
+
+const { status, data } = await apiInstance.getPayees(
+    workspaceId
+);
+```
+
+### Parameters
+
+|Name | Type | Description  | Notes|
+|------------- | ------------- | ------------- | -------------|
+| **workspaceId** | [**string**] |  | defaults to undefined|
+
+
+### Return type
+
+**Array<PayeeDTO>**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** | Successful response |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getSubscriptions**
-> Array<SubscriptionControllerSubscriptionDTO> getSubscriptions()
+> Array<SubscriptionDTO> getSubscriptions()
 
 
 ### Example
@@ -899,7 +843,7 @@ const { status, data } = await apiInstance.getSubscriptions(
 
 ### Return type
 
-**Array<SubscriptionControllerSubscriptionDTO>**
+**Array<SubscriptionDTO>**
 
 ### Authorization
 
@@ -914,12 +858,62 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | getSubscriptions 200 response |  -  |
+|**200** | Successful response |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getTransactions**
+> Array<TransactionDTO> getTransactions()
+
+
+### Example
+
+```typescript
+import {
+    DefaultApi,
+    Configuration
+} from './api';
+
+const configuration = new Configuration();
+const apiInstance = new DefaultApi(configuration);
+
+let workspaceId: string; // (default to undefined)
+
+const { status, data } = await apiInstance.getTransactions(
+    workspaceId
+);
+```
+
+### Parameters
+
+|Name | Type | Description  | Notes|
+|------------- | ------------- | ------------- | -------------|
+| **workspaceId** | [**string**] |  | defaults to undefined|
+
+
+### Return type
+
+**Array<TransactionDTO>**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** | Successful response |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **updateAccount**
-> Account updateAccount(account)
+> AccountDTO updateAccount(accountDTO)
 
 
 ### Example
@@ -928,20 +922,20 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    Account
+    AccountDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let accountId: string; // (default to undefined)
-let account: Account; //
+let id: string; // (default to undefined)
+let accountDTO: AccountDTO; //
 
 const { status, data } = await apiInstance.updateAccount(
     workspaceId,
-    accountId,
-    account
+    id,
+    accountDTO
 );
 ```
 
@@ -949,14 +943,14 @@ const { status, data } = await apiInstance.updateAccount(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **account** | **Account**|  | |
+| **accountDTO** | **AccountDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **accountId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**Account**
+**AccountDTO**
 
 ### Authorization
 
@@ -971,12 +965,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | updateAccount 200 response |  -  |
+|**200** | Updated |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **updateBudget**
-> BudgetControllerBudgetDTO updateBudget(createBudgetDTO)
+> BudgetDTO updateBudget(budgetDTO)
 
 
 ### Example
@@ -985,20 +979,20 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateBudgetDTO
+    BudgetDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let budgetId: string; // (default to undefined)
-let createBudgetDTO: CreateBudgetDTO; //
+let id: string; // (default to undefined)
+let budgetDTO: BudgetDTO; //
 
 const { status, data } = await apiInstance.updateBudget(
     workspaceId,
-    budgetId,
-    createBudgetDTO
+    id,
+    budgetDTO
 );
 ```
 
@@ -1006,14 +1000,14 @@ const { status, data } = await apiInstance.updateBudget(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createBudgetDTO** | **CreateBudgetDTO**|  | |
+| **budgetDTO** | **BudgetDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **budgetId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**BudgetControllerBudgetDTO**
+**BudgetDTO**
 
 ### Authorization
 
@@ -1028,12 +1022,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | updateBudget 200 response |  -  |
+|**200** | Updated |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **updateGoal**
-> GoalControllerGoalDTO updateGoal(createGoalDTO)
+> GoalDTO updateGoal(goalDTO)
 
 
 ### Example
@@ -1042,20 +1036,20 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateGoalDTO
+    GoalDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let goalId: string; // (default to undefined)
-let createGoalDTO: CreateGoalDTO; //
+let id: string; // (default to undefined)
+let goalDTO: GoalDTO; //
 
 const { status, data } = await apiInstance.updateGoal(
     workspaceId,
-    goalId,
-    createGoalDTO
+    id,
+    goalDTO
 );
 ```
 
@@ -1063,14 +1057,14 @@ const { status, data } = await apiInstance.updateGoal(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createGoalDTO** | **CreateGoalDTO**|  | |
+| **goalDTO** | **GoalDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **goalId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**GoalControllerGoalDTO**
+**GoalDTO**
 
 ### Authorization
 
@@ -1085,12 +1079,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | updateGoal 200 response |  -  |
+|**200** | Updated |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **updateSubscription**
-> SubscriptionControllerSubscriptionDTO updateSubscription(createSubscriptionDTO)
+> SubscriptionDTO updateSubscription(subscriptionDTO)
 
 
 ### Example
@@ -1099,20 +1093,20 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateSubscriptionDTO
+    SubscriptionDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let subscriptionId: string; // (default to undefined)
-let createSubscriptionDTO: CreateSubscriptionDTO; //
+let id: string; // (default to undefined)
+let subscriptionDTO: SubscriptionDTO; //
 
 const { status, data } = await apiInstance.updateSubscription(
     workspaceId,
-    subscriptionId,
-    createSubscriptionDTO
+    id,
+    subscriptionDTO
 );
 ```
 
@@ -1120,14 +1114,14 @@ const { status, data } = await apiInstance.updateSubscription(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createSubscriptionDTO** | **CreateSubscriptionDTO**|  | |
+| **subscriptionDTO** | **SubscriptionDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **subscriptionId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
 
-**SubscriptionControllerSubscriptionDTO**
+**SubscriptionDTO**
 
 ### Authorization
 
@@ -1142,12 +1136,12 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | updateSubscription 200 response |  -  |
+|**200** | Updated |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **updateTransaction**
-> TransactionDTO updateTransaction(createTransactionDTO)
+> TransactionDTO updateTransaction(transactionCreateDTO)
 
 
 ### Example
@@ -1156,20 +1150,20 @@ No authorization required
 import {
     DefaultApi,
     Configuration,
-    CreateTransactionDTO
+    TransactionCreateDTO
 } from './api';
 
 const configuration = new Configuration();
 const apiInstance = new DefaultApi(configuration);
 
 let workspaceId: string; // (default to undefined)
-let transactionId: string; // (default to undefined)
-let createTransactionDTO: CreateTransactionDTO; //
+let id: string; // (default to undefined)
+let transactionCreateDTO: TransactionCreateDTO; //
 
 const { status, data } = await apiInstance.updateTransaction(
     workspaceId,
-    transactionId,
-    createTransactionDTO
+    id,
+    transactionCreateDTO
 );
 ```
 
@@ -1177,9 +1171,9 @@ const { status, data } = await apiInstance.updateTransaction(
 
 |Name | Type | Description  | Notes|
 |------------- | ------------- | ------------- | -------------|
-| **createTransactionDTO** | **CreateTransactionDTO**|  | |
+| **transactionCreateDTO** | **TransactionCreateDTO**|  | |
 | **workspaceId** | [**string**] |  | defaults to undefined|
-| **transactionId** | [**string**] |  | defaults to undefined|
+| **id** | [**string**] |  | defaults to undefined|
 
 
 ### Return type
@@ -1199,7 +1193,7 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-|**200** | updateTransaction 200 response |  -  |
+|**200** | Updated |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

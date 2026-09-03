@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useCreateAccount } from '../../features/accounts/hooks/useAccounts';
+
 interface AddAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -10,152 +18,153 @@ interface AddAccountModalProps {
   workspaceId: string;
 }
 
+const accountSchema = z.object({
+  name: z.string().min(1, "Account name is required"),
+  type: z.string().min(1, "Type is required"),
+  currency: z.string().min(1, "Currency is required"),
+  initialBalance: z.string().refine(val => !isNaN(parseFloat(val)), "Invalid balance amount"),
+});
+
+type AccountFormValues = z.infer<typeof accountSchema>;
+
+// million-ignore
 export function AddAccountModal({ isOpen, onClose, onSuccess, workspaceId }: AddAccountModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
   const defaultCurrency = useSettingsStore(state => state.settings.currency) || 'USD';
-
-  const [name, setName] = useState('');
-  const [type, setType] = useState('ASSET');
-  const [currency, setCurrency] = useState(defaultCurrency);
-  const [initialBalance, setInitialBalance] = useState('');
-
-  // Update default currency if it changes
-  useEffect(() => {
-    if (isOpen) {
-      setCurrency(defaultCurrency);
-    }
-  }, [isOpen, defaultCurrency]);
-
-  useEffect(() => {
-    // LIABILITY accounts (credit cards, loans) typically start at 0
-    if (type === 'LIABILITY') {
-      setInitialBalance('0.00');
-    } else {
-      setInitialBalance('');
-    }
-  }, [type]);
   const createMutation = useCreateAccount();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<AccountFormValues>({
+    resolver: zodResolver(accountSchema),
+    defaultValues: {
+      name: '',
+      type: 'ASSET',
+      currency: defaultCurrency,
+      initialBalance: ''
+    }
+  });
 
+  const watchType = watch('type');
+
+  useEffect(() => {
+    if (isOpen) {
+      reset({
+        name: '',
+        type: 'ASSET',
+        currency: defaultCurrency,
+        initialBalance: ''
+      });
+    }
+  }, [isOpen, defaultCurrency, reset]);
+
+  useEffect(() => {
+    if (watchType === 'LIABILITY') {
+      setValue('initialBalance', '0.00');
+    } else {
+      setValue('initialBalance', '');
+    }
+  }, [watchType, setValue]);
+
+  const onSubmit = async (data: AccountFormValues) => {
     try {
-      const accountClass = type === 'CASH' ? 'ASSET' : type;
-      const subType = type === 'CASH' ? 'CASH' : type;
+      const accountClass = data.type === 'CASH' ? 'ASSET' : data.type;
+      const subType = data.type === 'CASH' ? 'CASH' : data.type;
 
       const payload = {
-        name: name.trim(),
+        name: data.name.trim(),
         type: accountClass as any,
         subType: subType,
-        currency: currency,
-        initialBalance: initialBalance ? Math.round(parseFloat(initialBalance) * 100) : 0
+        currency: data.currency,
+        initialBalance: data.initialBalance ? Math.round(parseFloat(data.initialBalance) * 100) : 0
       };
 
       await createMutation.mutateAsync({ workspaceId, account: payload as any });
 
       onSuccess();
       onClose();
-      // Reset form
-      setName('');
-      setType('ASSET');
-      setCurrency(defaultCurrency);
-      setInitialBalance('');
     } catch (err: any) {
-      setError(err.message || 'Failed to create account');
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Account">
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        {createMutation.isError && (
           <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-sm font-bold border border-rose-100">
-            {error}
+            {createMutation.error?.message || 'Failed to create account'}
           </div>
         )}
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Account Name</label>
-          <input 
-            type="text" 
-            required
+          <Label htmlFor="name">Account Name</Label>
+          <Input 
+            id="name"
+            {...register('name')}
             placeholder="e.g. Chase Sapphire"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white focus:shadow-[0_8px_30px_rgb(37,99,235,0.08)]" 
+            className={errors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
           />
+          {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Account Type</label>
-            <select 
-              value={type}
-              onChange={e => setType(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white"
+            <Label htmlFor="type">Account Type</Label>
+            <Select 
+              id="type"
+              {...register('type')}
+              error={!!errors.type}
             >
               <option value="ASSET">Checking / Savings (Asset)</option>
               <option value="CASH">Cash (Asset)</option>
               <option value="LIABILITY">Credit Card / Loan (Liability)</option>
               <option value="EQUITY">Equity / Investment</option>
-            </select>
+            </Select>
+            {errors.type && <p className="text-xs text-rose-500">{errors.type.message}</p>}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Currency</label>
-            <select 
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white"
+            <Label htmlFor="currency">Currency</Label>
+            <Select 
+              id="currency"
+              {...register('currency')}
+              error={!!errors.currency}
             >
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
               <option value="INR">INR (₹)</option>
-            </select>
+            </Select>
+            {errors.currency && <p className="text-xs text-rose-500">{errors.currency.message}</p>}
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Initial Balance</label>
+          <Label htmlFor="initialBalance">Initial Balance</Label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
-              {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₹'}
-            </span>
-            <input 
+            <Input 
+              id="initialBalance"
               type="number" 
               step="0.01"
-              required
+              {...register('initialBalance')}
               placeholder="0.00"
-              value={initialBalance}
-              onChange={e => setInitialBalance(e.target.value)}
-              className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white focus:shadow-[0_8px_30px_rgb(37,99,235,0.08)]" 
+              className={errors.initialBalance ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
           </div>
+          {errors.initialBalance && <p className="text-xs text-rose-500">{errors.initialBalance.message}</p>}
         </div>
 
         <div className="pt-4 flex justify-end gap-3">
-          <button 
-            type="button" 
-            onClick={onClose}
-            className="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-          >
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button 
+          </Button>
+          <Button 
             type="submit" 
-            disabled={loading}
-            className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center gap-2"
+            variant="default"
+            disabled={createMutation.isPending}
+            className="flex items-center gap-2"
           >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {loading ? 'Creating...' : 'Create Account'}
-          </button>
+            {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {createMutation.isPending ? 'Creating...' : 'Create Account'}
+          </Button>
         </div>
       </form>
     </Modal>

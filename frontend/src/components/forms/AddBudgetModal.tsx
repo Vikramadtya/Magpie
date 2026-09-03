@@ -3,12 +3,15 @@ import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
 import { useCreateBudget, useUpdateBudget } from '../../features/budgets/hooks/useBudgets';
+import { useCategoryTree } from '../../features/categories/hooks/useCategories';
 import type { Budget } from '../../features/budgets/api/types';
-import { useFinanceStore } from '../../store/useFinanceStore';
-import { useSettingsStore, getCurrencySymbol } from '../../store/useSettingsStore';
-import { cn } from '../../utils/cn';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 interface AddBudgetModalProps {
   isOpen: boolean;
@@ -26,14 +29,14 @@ const budgetSchema = z.object({
 
 type BudgetFormValues = z.infer<typeof budgetSchema>;
 
+// million-ignore
 export function AddBudgetModal({ isOpen, onClose, workspaceId, budgetToEdit }: AddBudgetModalProps) {
   const createMutation = useCreateBudget();
   const updateMutation = useUpdateBudget();
-  const accounts = useFinanceStore(state => state.accounts);
   const currency = useSettingsStore(state => state.settings.currency);
+  const { data: categoryTree = [] } = useCategoryTree(workspaceId, 'EXPENSE');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<BudgetFormValues>({
-    // @ts-ignore
     resolver: zodResolver(budgetSchema as any) as any,
     defaultValues: {
       categoryId: '',
@@ -56,13 +59,24 @@ export function AddBudgetModal({ isOpen, onClose, workspaceId, budgetToEdit }: A
     }
   }, [budgetToEdit, isOpen, reset, currency]);
 
+  const getCategoryName = (id: string, nodes: any[]): string => {
+    for (const node of nodes) {
+      if (node.id === id) return node.name;
+      if (node.children) {
+        const found = getCategoryName(id, node.children);
+        if (found) return found;
+      }
+    }
+    return '';
+  };
+
   const onSubmit = async (data: BudgetFormValues) => {
     try {
       const amountInCents = Math.round(parseFloat(data.amount) * 100);
 
       const payload = {
         categoryId: data.categoryId,
-        name: accounts.find(a => a.id === data.categoryId)?.name || '',
+        name: getCategoryName(data.categoryId, categoryTree),
         amount: amountInCents,
         currency: data.currency,
         period: data.period,
@@ -89,38 +103,31 @@ export function AddBudgetModal({ isOpen, onClose, workspaceId, budgetToEdit }: A
         )}
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Category</label>
-          <select 
+          <Label htmlFor="categoryId">Category</Label>
+          <Select 
+            id="categoryId"
             {...register('categoryId')}
-            className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white", errors.categoryId ? "border-rose-500" : "border-gray-200")}
+            error={!!errors.categoryId}
           >
             <option value="">Select a Category...</option>
-            {(() => {
-              const cats = accounts.filter(a => a.type === 'EXPENSE');
-              const roots = cats.filter(c => !c.parentId);
-              return roots.map(root => {
-                const children = cats.filter(c => c.parentId === root.id);
-                return (
-                  <optgroup key={root.id} label={root.name}>
-                    <option value={root.id}>{root.icon ? `${root.icon} ` : ''}{root.name}</option>
-                    {children.map(child => <option key={child.id} value={child.id}>↳ {child.icon ? `${child.icon} ` : ''}{child.name}</option>)}
-                  </optgroup>
-                );
-              });
-            })()}
-          </select>
+            {categoryTree.map((root: any) => (
+              <optgroup key={root.id} label={root.name}>
+                <option value={root.id}>{root.icon ? `${root.icon} ` : ''}{root.name}</option>
+                {root.children?.map((child: any) => (
+                  <option key={child.id} value={child.id}>↳ {child.icon ? `${child.icon} ` : ''}{child.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
           {errors.categoryId && <p className="text-xs text-rose-500">{errors.categoryId.message}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Amount Limit</label>
+            <Label htmlFor="amount">Amount Limit</Label>
             <div className="flex gap-2">
               <div className="w-1/3">
-                <select 
-                  {...register('currency')}
-                  className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white", errors.currency ? "border-rose-500" : "border-gray-200")}
-                >
+                <Select id="currency" {...register('currency')} error={!!errors.currency}>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
                   <option value="GBP">GBP</option>
@@ -128,14 +135,14 @@ export function AddBudgetModal({ isOpen, onClose, workspaceId, budgetToEdit }: A
                   <option value="AUD">AUD</option>
                   <option value="CAD">CAD</option>
                   <option value="SGD">SGD</option>
-                </select>
+                </Select>
               </div>
-              <div className="relative w-2/3">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold"></span>
-                <input 
+              <div className="w-2/3">
+                <Input 
+                  id="amount"
                   {...register('amount')}
                   type="number" step="0.01" placeholder="0.00"
-                  className={cn("w-full pl-6 pr-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white", errors.amount ? "border-rose-500" : "border-gray-200")} 
+                  className={errors.amount ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
               </div>
             </div>
@@ -143,26 +150,28 @@ export function AddBudgetModal({ isOpen, onClose, workspaceId, budgetToEdit }: A
           </div>
           
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Period</label>
-            <select 
-              {...register('period')}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white"
-            >
+            <Label htmlFor="period">Period</Label>
+            <Select id="period" {...register('period')}>
               <option value="MONTHLY">Monthly</option>
               <option value="YEARLY">Yearly</option>
               <option value="WEEKLY">Weekly</option>
-            </select>
+            </Select>
           </div>
         </div>
 
         <div className="pt-4 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center gap-2">
+          </Button>
+          <Button 
+            type="submit" 
+            variant="default" 
+            disabled={createMutation.isPending || updateMutation.isPending}
+            className="flex items-center gap-2"
+          >
             {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
             {createMutation.isPending || updateMutation.isPending ? 'Saving...' : budgetToEdit ? 'Save Changes' : 'Save Budget'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

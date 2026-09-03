@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import type { Account } from '../../../store/useFinanceStore';
+import type { Account } from '../../../types/models';
 
 interface AccountCardProps {
   account: Account;

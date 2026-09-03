@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
+import { Card, CardHeader, CardContent, CardFooter } from '../../../components/ui/Card';
+import { env } from '../../../config/env';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -32,7 +34,7 @@ export default function LoginPage() {
           className="glass-panel py-8 px-4 shadow sm:rounded-2xl sm:px-10 text-center"
         >
           <a
-            href="http://localhost:8080/oauth/login/google"
+            href={`${env.API_URL}/oauth/login/google`}
             className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-border rounded-lg shadow-sm text-sm font-medium text-primary bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

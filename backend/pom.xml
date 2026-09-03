@@ -61,6 +61,18 @@
     </dependency>
 
     <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>2.15.2</version> <!-- Match typical micronaut 4 jackson version -->
+    </dependency>
+
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <scope>runtime</scope>
@@ -198,9 +210,47 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- MapStruct for DTO mapping -->
+    <dependency>
+      <groupId>org.mapstruct</groupId>
+      <artifactId>mapstruct</artifactId>
+      <version>1.5.5.Final</version>
+    </dependency>
+
+    <!-- RFC 7807 Problem Details -->
+    <dependency>
+      <groupId>io.micronaut.problem</groupId>
+      <artifactId>micronaut-problem-json</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- JSON Logging for Production -->
+    <dependency>
+      <groupId>net.logstash.logback</groupId>
+      <artifactId>logstash-logback-encoder</artifactId>
+      <version>7.4</version>
+      <scope>runtime</scope>
+    </dependency>
+
   </dependencies>
   <build>
     <plugins>
+      <!-- Code Formatter & Linter -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <java>
+            <googleJavaFormat>
+              <version>1.17.0</version>
+              <style>GOOGLE</style>
+            </googleJavaFormat>
+            <removeUnusedImports/>
+          </java>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>io.micronaut.maven</groupId>
         <artifactId>micronaut-maven-plugin</artifactId>
@@ -222,6 +272,40 @@
       </plugin>
 
       <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <version>7.2.0</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <inputSpec>${project.basedir}/src/main/resources/keeper-api.yaml</inputSpec>
+              <generatorName>java-micronaut-client</generatorName>
+              <apiPackage>com.keeper.api</apiPackage>
+              <modelPackage>com.keeper.dto</modelPackage>
+              <generateSupportingFiles>false</generateSupportingFiles>
+              <generateApiTests>false</generateApiTests>
+              <generateModelTests>false</generateModelTests>
+              <configOptions>
+                <useJakartaEe>true</useJakartaEe>
+                <generateExamples>false</generateExamples>
+
+                <generateOperationsToReturnNotImplemented>false</generateOperationsToReturnNotImplemented>
+                <reactive>false</reactive>
+                <useAuth>false</useAuth>
+                <useLombok>false</useLombok>
+                <build>maven</build>
+                <introspected>true</introspected>
+                <useOptional>false</useOptional>
+              </configOptions>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
@@ -237,6 +321,11 @@
               <groupId>org.projectlombok</groupId>
               <artifactId>lombok</artifactId>
               <version>1.18.34</version>
+            </path>
+            <path>
+              <groupId>org.mapstruct</groupId>
+              <artifactId>mapstruct-processor</artifactId>
+              <version>1.5.5.Final</version>
             </path>
             <path>
               <groupId>io.micronaut</groupId>
@@ -275,17 +364,7 @@
                 </exclusion>
               </exclusions>
             </path>
-            <path>
-              <groupId>io.micronaut.serde</groupId>
-              <artifactId>micronaut-serde-processor</artifactId>
-              <version>${micronaut.serialization.version}</version>
-              <exclusions>
-                <exclusion>
-                  <groupId>io.micronaut</groupId>
-                  <artifactId>micronaut-inject</artifactId>
-                </exclusion>
-              </exclusions>
-            </path>
+
           </annotationProcessorPaths>
           <compilerArgs>
             <arg>-Amicronaut.processing.group=com.keeper</arg>

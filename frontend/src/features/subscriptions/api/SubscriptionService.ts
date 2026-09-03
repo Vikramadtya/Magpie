@@ -1,7 +1,7 @@
-import { DefaultApi } from '../../../api-client';
+import { SubscriptionApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 
-const api = new DefaultApi(undefined, '', apiClient);
+const api = new SubscriptionApi(undefined, '', apiClient);
 
 export const SubscriptionService = {
   getAll: async (workspaceId: string) => {

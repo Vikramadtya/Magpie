@@ -5,15 +5,14 @@ import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
 
 @OpenAPIDefinition(
-    info = @Info(
+    info =
+        @Info(
             title = "Keeper API",
             version = "1.0",
-            description = "Keeper Budgeting App API Contract"
-    )
-)
+            description = "Keeper Budgeting App API Contract"))
 public class Application {
 
-    public static void main(String[] args) {
-        Micronaut.run(Application.class, args);
-    }
+  public static void main(String[] args) {
+    Micronaut.run(Application.class, args);
+  }
 }

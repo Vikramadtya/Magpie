@@ -44,9 +44,9 @@ export default function DashboardPage() {
       </div>
     );
   } else {
-    renderedNetWorth = <div className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight drop-shadow-sm">{vm.formatCurrency(vm.data.nativeNetWorth[vm.displayMode] || 0, vm.displayMode)}</div>;
-    renderedIncome = <div className="text-2xl font-bold text-gray-900">{vm.formatCurrency(vm.data.nativeMonthlyIncome[vm.displayMode] || 0, vm.displayMode)}</div>;
-    renderedExpense = <div className="text-2xl font-bold text-rose-600">{vm.formatCurrency(vm.data.nativeMonthlyExpense[vm.displayMode] || 0, vm.displayMode)}</div>;
+    renderedNetWorth = <div className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight drop-shadow-sm">{vm.formatCurrency((vm.data.nativeNetWorth as Record<string, number>)[vm.displayMode] || 0, vm.displayMode)}</div>;
+    renderedIncome = <div className="text-2xl font-bold text-gray-900">{vm.formatCurrency((vm.data.nativeMonthlyIncome as Record<string, number>)[vm.displayMode] || 0, vm.displayMode)}</div>;
+    renderedExpense = <div className="text-2xl font-bold text-rose-600">{vm.formatCurrency((vm.data.nativeMonthlyExpense as Record<string, number>)[vm.displayMode] || 0, vm.displayMode)}</div>;
   }
 
   return (

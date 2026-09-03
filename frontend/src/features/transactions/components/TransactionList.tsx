@@ -1,7 +1,7 @@
 import { GroupedVirtuoso } from 'react-virtuoso';
 import { ArrowUpRight, ArrowDownRight, ArrowRightLeft, Pencil, Trash2, MessageSquare } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import type { Transaction } from '../../../store/useFinanceStore';
+import type { Transaction } from '../../../types/models';
 
 interface TransactionListProps {
   grouped: Record<string, Transaction[]>;

@@ -1,24 +1,12 @@
-import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
-import { Toaster, toast } from 'sonner';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './providers/router';
 import { useEffect } from 'react';
 import { useSettingsStore } from './store/useSettingsStore';
-
-// Create a client with global error handling
-const queryClient = new QueryClient({
-  mutationCache: new MutationCache({
-    onError: (error) => {
-      toast.error(`Action failed: ${error.message}`);
-    },
-  }),
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { queryClient } from './providers/queryClient';
+import log from './utils/logger';
 
 function AppInitialData() {
   const fetchSettings = useSettingsStore(state => state.fetchSettings);
@@ -29,17 +17,21 @@ function AppInitialData() {
     const userId = localStorage.getItem('userId');
 
     if (token && workspaceId) {
+      log.debug('AppInitialData: Token and WorkspaceID found. Fetching initial settings...');
       const loadInitialData = async () => {
         try {
           await Promise.all([
             userId ? fetchSettings(userId) : Promise.resolve()
           ]);
+          log.debug('AppInitialData: Initial data loaded successfully.');
         } catch (error) {
-          console.error("Failed to load initial data", error);
+          log.error('AppInitialData: Failed to load initial data', error);
         }
       };
 
       loadInitialData();
+    } else {
+      log.debug('AppInitialData: No active session found.');
     }
   }, [fetchSettings]);
 
@@ -51,7 +43,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Toaster position="top-center" richColors theme="dark" />
       <AppInitialData />
-      <RouterProvider router={router} />
+      <ErrorBoundary>
+        <RouterProvider router={router} />
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }

@@ -3,12 +3,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { Button } from '../ui/Button';
 import { Loader2 } from 'lucide-react';
-import { cn } from '../../utils/cn';
 import { useAccounts } from '../../features/accounts/hooks/useAccounts';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { useCreateSubscription } from '../../features/subscriptions/hooks/useSubscriptions';
-import { useFinanceStore } from '../../store/useFinanceStore';
-import { useSettingsStore, getCurrencySymbol } from '../../store/useSettingsStore';
+import { useCategoryTree } from '../../features/categories/hooks/useCategories';
 
 interface AddSubscriptionModalProps {
   isOpen: boolean;
@@ -27,29 +30,33 @@ const subscriptionSchema = z.object({
 
 type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
 
+// million-ignore
 export function AddSubscriptionModal({ isOpen, onClose, workspaceId }: AddSubscriptionModalProps) {
-  const accounts = useFinanceStore(state => state.accounts);
+  const { data: accounts = [] } = useAccounts(workspaceId);
   const createMutation = useCreateSubscription();
-  const currency = useSettingsStore(state => state.settings.currency);
+  const currency = useSettingsStore(state => state.settings.currency) || 'USD';
+  
+  const { data: categoryTree = [] } = useCategoryTree(workspaceId, 'EXPENSE');
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<SubscriptionFormValues>({
-    // @ts-ignore
-    resolver: zodResolver(subscriptionSchema as any) as any,
+    resolver: zodResolver(subscriptionSchema),
     defaultValues: {
       name: '',
       amount: '',
       nextBillingDate: '',
       categoryId: '',
       accountId: '',
-      currency: currency || 'USD'
+      currency: currency
     }
   });
 
+  const watchAccountId = watch('accountId');
+
   useEffect(() => {
-    if (isOpen && accounts.length > 0 && !watch('accountId')) {
+    if (isOpen && accounts.length > 0 && !watchAccountId) {
       setValue('accountId', accounts.filter(a => a.type !== 'EXPENSE')[0]?.id || accounts[0].id);
     }
-  }, [isOpen, accounts, setValue, watch]);
+  }, [isOpen, accounts, setValue, watchAccountId]);
 
   const onSubmit = async (data: SubscriptionFormValues) => {
     try {
@@ -58,14 +65,14 @@ export function AddSubscriptionModal({ isOpen, onClose, workspaceId }: AddSubscr
       const payload = {
         name: data.name.trim(),
         amount: amountInCents,
-        billingCycle: 'MONTHLY',
+        billingCycle: 'MONTHLY' as any,
         nextBillingDate: data.nextBillingDate,
         accountId: data.accountId,
         categoryId: data.categoryId,
         currency: data.currency,
       };
 
-      await createMutation.mutateAsync({ workspaceId, subscription: payload });
+      await createMutation.mutateAsync({ workspaceId, subscription: payload as any });
       reset();
       onClose();
     } catch (err: any) {
@@ -78,27 +85,29 @@ export function AddSubscriptionModal({ isOpen, onClose, workspaceId }: AddSubscr
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {createMutation.isError && (
           <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-sm font-bold border border-rose-100">
-            {createMutation.error.message || 'Failed to save subscription'}
+            {createMutation.error?.message || 'Failed to save subscription'}
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Subscription Name</label>
-            <input 
+            <Label htmlFor="name">Subscription Name</Label>
+            <Input 
+              id="name"
               {...register('name')}
               placeholder="e.g. Netflix"
-              className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.name ? "border-rose-500" : "border-gray-200")} 
+              className={errors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
             {errors.name && <p className="text-xs text-rose-500">{errors.name.message}</p>}
           </div>
+          
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Amount</label>
+            <Label htmlFor="amount">Amount</Label>
             <div className="flex gap-2">
               <div className="w-1/3">
-                <select 
+                <Select 
                   {...register('currency')}
-                  className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white", errors.currency ? "border-rose-500" : "border-gray-200")}
+                  error={!!errors.currency}
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -107,14 +116,14 @@ export function AddSubscriptionModal({ isOpen, onClose, workspaceId }: AddSubscr
                   <option value="AUD">AUD</option>
                   <option value="CAD">CAD</option>
                   <option value="SGD">SGD</option>
-                </select>
+                </Select>
               </div>
               <div className="relative w-2/3">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold"></span>
-                <input 
+                <Input 
+                  id="amount"
                   {...register('amount')}
                   type="number" step="0.01" placeholder="0.00"
-                  className={cn("w-full pl-6 pr-3 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.amount ? "border-rose-500" : "border-gray-200")} 
+                  className={errors.amount ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
               </div>
             </div>
@@ -124,57 +133,60 @@ export function AddSubscriptionModal({ isOpen, onClose, workspaceId }: AddSubscr
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Source Account</label>
-            <select 
+            <Label htmlFor="accountId">Source Account</Label>
+            <Select 
+              id="accountId"
               {...register('accountId')}
-              className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.accountId ? "border-rose-500" : "border-gray-200")}
+              error={!!errors.accountId}
             >
               {accounts.filter(a => a.type !== 'EXPENSE').map(a => <option key={a.id} value={a.id}>{a.name} ({a.type})</option>)}
-            </select>
+            </Select>
             {errors.accountId && <p className="text-xs text-rose-500">{errors.accountId.message}</p>}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Next Billing Date</label>
-            <input 
+            <Label htmlFor="nextBillingDate">Next Billing Date</Label>
+            <Input 
+              id="nextBillingDate"
               {...register('nextBillingDate')}
               type="date"
-              className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900", errors.nextBillingDate ? "border-rose-500" : "border-gray-200")} 
+              className={errors.nextBillingDate ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
             {errors.nextBillingDate && <p className="text-xs text-rose-500">{errors.nextBillingDate.message}</p>}
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Category</label>
-          <select 
+          <Label htmlFor="categoryId">Category</Label>
+          <Select 
+            id="categoryId"
             {...register('categoryId')}
-            className={cn("w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900 transition-shadow focus:bg-white", errors.categoryId ? "border-rose-500" : "border-gray-200")}
+            error={!!errors.categoryId}
           >
             <option value="">Select a Category...</option>
-            {(() => {
-              const cats = accounts.filter(a => a.type === 'EXPENSE');
-              const roots = cats.filter(c => !c.parentId);
-              return roots.map(root => {
-                const children = cats.filter(c => c.parentId === root.id);
-                return (
-                  <optgroup key={root.id} label={root.name}>
-                    <option value={root.id}>{root.icon ? `${root.icon} ` : ''}{root.name}</option>
-                    {children.map(child => <option key={child.id} value={child.id}>↳ {child.icon ? `${child.icon} ` : ''}{child.name}</option>)}
-                  </optgroup>
-                );
-              });
-            })()}
-          </select>
+            {categoryTree.map(root => (
+              <optgroup key={root.id} label={root.name}>
+                <option value={root.id}>{root.icon ? `${root.icon} ` : ''}{root.name}</option>
+                {root.children?.map(child => (
+                  <option key={child.id} value={child.id}>↳ {child.icon ? `${child.icon} ` : ''}{child.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
         </div>
 
         <div className="pt-4 flex justify-end gap-3">
-          <button type="button" onClick={() => { reset(); onClose(); }} className="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+          <Button type="button" variant="outline" onClick={() => { reset(); onClose(); }}>
             Cancel
-          </button>
-          <button type="submit" disabled={createMutation.isPending} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 disabled:opacity-50 flex items-center gap-2">
+          </Button>
+          <Button 
+            type="submit" 
+            variant="default"
+            disabled={createMutation.isPending}
+            className="flex items-center gap-2"
+          >
             {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             {createMutation.isPending ? 'Saving...' : 'Add Subscription'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

@@ -5,7 +5,7 @@ micronaut:
       configurations:
         all:
           allowed-origins:
-            - "http://localhost:5173"
+            - "${FRONTEND_URL:http://localhost:5173}"
           allowed-methods:
             - "*"
           allowed-headers:
@@ -15,17 +15,19 @@ micronaut:
   application:
     name: backend
   security:
-    authentication: cookie
+    authentication: bearer
     redirect:
-      login-success: http://localhost:5173/auth/callback
-      login-failure: http://localhost:5173/login?error=true
+      login-success: "${FRONTEND_URL:http://localhost:5173}/auth/callback"
+      login-failure: "${FRONTEND_URL:http://localhost:5173}/login?error=true"
     oauth2:
       clients:
         google:
-          client-id: '${OAUTH_CLIENT_ID:YOUR_GOOGLE_CLIENT_ID}'
-          client-secret: '${OAUTH_CLIENT_SECRET:YOUR_GOOGLE_CLIENT_SECRET}'
+          client-id: "${GOOGLE_CLIENT_ID}"
+          client-secret: "${GOOGLE_CLIENT_SECRET}"
           openid:
             issuer: 'https://accounts.google.com'
+            authorization:
+              prompt: SELECT_ACCOUNT
     endpoints:
       oauth2:
         login:
@@ -37,7 +39,7 @@ micronaut:
         signatures:
           secret:
             generator:
-              secret: '"this-is-a-very-long-secret-key-for-local-dev-only-do-not-use-in-prod-1234567890"'
+              secret: "${JWT_SECRET}"
     intercept-url-map:
       - pattern: /**
         http-method: OPTIONS
@@ -69,10 +71,10 @@ micronaut:
 
 datasources:
   default:
-    url: jdbc:postgresql://localhost:5433/keeper
+    url: "${DB_URL:jdbc:postgresql://localhost:5433/keeper}"
     driverClassName: org.postgresql.Driver
-    username: postgres
-    password: password
+    username: "${DB_USER:postgres}"
+    password: "${DB_PASSWORD:password}"
     dialect: POSTGRES
     schema-generate: NONE
 

@@ -21,13 +21,23 @@ interface UserSettings {
   currency: string;
 }
 
-interface SettingsStore {
+export interface SettingsStore {
   settings: UserSettings;
+  isLoading: boolean;
+  error: string | null;
+  selectedAccountId: string;
+  updateSettings: (newSettings: Partial<UserSettings>) => Promise<void>;
   fetchSettings: (userId: string) => Promise<void>;
+  setSelectedAccountId: (id: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: { currency: 'USD' },
+  isLoading: false,
+  error: null,
+  selectedAccountId: 'ALL',
+  updateSettings: async () => {},
+  setSelectedAccountId: (id: string) => set({ selectedAccountId: id }),
   fetchSettings: async (_userId: string) => {
     try {
       const stored = localStorage.getItem('keeper_settings');

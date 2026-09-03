@@ -1,7 +1,7 @@
-import { DefaultApi } from '../../../api-client';
+import { GoalApi } from '../../../api-client';
 import { apiClient } from '../../../utils/api';
 
-const api = new DefaultApi(undefined, '', apiClient);
+const api = new GoalApi(undefined, '', apiClient);
 
 export const GoalService = {
   getAll: async (workspaceId: string) => {
