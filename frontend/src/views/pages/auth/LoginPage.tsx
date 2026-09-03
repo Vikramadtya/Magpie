@@ -45,6 +45,29 @@ export default function LoginPage() {
             </svg>
             Continue with Google
           </a>
+          
+          {env.USE_MOCK_API && (
+            <div className="mt-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-background text-muted-foreground">Developer Mode</span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.setItem('token', 'mock_jwt_token_for_development');
+                  localStorage.setItem('workspaceId', 'default-workspace');
+                  window.location.href = '/';
+                }}
+                className="mt-4 w-full flex items-center justify-center gap-3 py-3 px-4 border border-accent/50 rounded-lg shadow-sm text-sm font-medium text-accent hover:bg-accent/10 transition-all"
+              >
+                Simulate Mock Login
+              </button>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>
