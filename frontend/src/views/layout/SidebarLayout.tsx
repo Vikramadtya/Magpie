@@ -45,9 +45,7 @@ export default function SidebarLayout() {
       <aside className="w-[260px] border-r border-border bg-sidebar flex flex-col pt-8 pb-4 transition-colors duration-200">
         <div className="px-6 mb-8 flex items-center justify-between">
           <h1 className="text-[19px] font-bold tracking-tight text-primary flex items-center gap-2">
-            <div className="w-6 h-6 bg-accent rounded-md flex items-center justify-center">
-              <span className="text-white text-xs font-bold">K</span>
-            </div>
+            <img src="/logo.svg" alt="Keeper" className="w-6 h-6" />
             Keeper
           </h1>
           <button 

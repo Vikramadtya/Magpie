@@ -18,9 +18,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
-          <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center shadow-sm">
-            <span className="text-white text-xl font-bold">K</span>
-          </div>
+          <img src="/logo.svg" alt="Keeper" className="w-12 h-12 drop-shadow-sm" />
         </div>
         <h2 className="mt-2 text-center text-3xl font-bold tracking-tight text-primary">
           Log in to Keeper
