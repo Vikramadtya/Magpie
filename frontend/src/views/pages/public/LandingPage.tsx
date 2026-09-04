@@ -1,3 +1,4 @@
+import logo from '../../../assets/logo.svg';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -111,7 +112,7 @@ const LandingPage = () => {
       {/* Navbar */}
       <nav className="relative z-10 max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="Keeper" className="w-8 h-8 drop-shadow-sm" />
+          <img src={logo} alt="Keeper" className="w-8 h-8 drop-shadow-sm" />
           <span className="text-xl font-bold tracking-tight">Keeper</span>
         </div>
         <button 
@@ -245,7 +246,7 @@ const LandingPage = () => {
       <footer className="border-t border-white/5 relative z-10">
         <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-6 text-gray-400 text-sm">
           <div className="flex items-center gap-2 text-white">
-            <img src="/logo.svg" alt="Keeper" className="w-5 h-5" />
+            <img src={logo} alt="Keeper" className="w-5 h-5" />
             <span className="font-bold">Keeper</span>
           </div>
           <p>© 2026 Keeper. All rights reserved.</p>

@@ -1,3 +1,4 @@
+import logo from '../../../assets/logo.svg';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardFooter } from '../../../components/ui/Card';
@@ -18,7 +19,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
-          <img src="/logo.svg" alt="Keeper" className="w-12 h-12 drop-shadow-sm" />
+          <img src={logo} alt="Keeper" className="w-12 h-12 drop-shadow-sm" />
         </div>
         <h2 className="mt-2 text-center text-3xl font-bold tracking-tight text-primary">
           Log in to Keeper
