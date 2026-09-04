@@ -44,6 +44,8 @@ micronaut:
           secret:
             generator:
               secret: "${JWT_SECRET}"
+            validation:
+              secret: "${JWT_SECRET}"
     intercept-url-map:
       - pattern: /**
         http-method: OPTIONS
