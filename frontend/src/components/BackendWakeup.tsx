@@ -16,8 +16,9 @@ export function BackendWakeup() {
       // If the backend doesn't respond quickly (1.5s), assume it's waking up from sleep and show a toast
       const timeoutId = setTimeout(() => {
         if (!isReady) {
-          toastId = toast.loading('Backend server is waking up from sleep. Please give it a minute...', {
-            duration: 300000, // 5 minutes max
+          toastId = toast.loading('Backend server is waking up from sleep... Please wait.', {
+            duration: Infinity, // Never disappear until ready
+            dismissible: false,
           });
         }
       }, 1500);
@@ -39,7 +40,7 @@ export function BackendWakeup() {
             isReady = true;
             clearTimeout(timeoutId);
             if (toastId) {
-              toast.success('Backend server is online!', { id: toastId, duration: 3000 });
+              toast.success('Backend server is ready!', { id: toastId, duration: 4000 });
             }
             return; // Success, stop polling
           }
