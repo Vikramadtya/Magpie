@@ -38,10 +38,13 @@ function AppInitialData() {
   return null;
 }
 
+import { BackendWakeup } from './components/BackendWakeup';
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster position="top-center" richColors theme="dark" />
+      <BackendWakeup />
       <AppInitialData />
       <ErrorBoundary>
         <RouterProvider router={router} />
