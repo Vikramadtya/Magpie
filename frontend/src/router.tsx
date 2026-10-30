@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import AppLayout from './components/layout/AppLayout';
+import { RouteError } from './components/RouteError';
 
 const lazyPage = <T extends { default: React.ComponentType }>(load: () => Promise<T>) => lazy(load);
 
@@ -47,6 +48,7 @@ function Landing() {
 }
 
 export const router = createBrowserRouter([
+  { errorElement: <RouteError />, children: [
   { path: '/', element: <Landing /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/auth/callback', element: <AuthCallback /> },
@@ -69,6 +71,7 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
+  ] },
 ]);
 
 export { Outlet };
