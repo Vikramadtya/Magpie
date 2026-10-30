@@ -1,5 +1,11 @@
 micronaut:
+  serde:
+    serialization:
+      inclusion: ALWAYS
   server:
+    max-request-size: 6MB
+    multipart:
+      max-file-size: 5MB
     host-resolution:
       host-header: X-Forwarded-Host
       protocol-header: X-Forwarded-Proto
@@ -10,12 +16,9 @@ micronaut:
         all:
           allowed-origins:
             - "${FRONTEND_URL:http://localhost:5173}"
-          allowed-methods:
-            - "*"
-          allowed-headers:
-            - "*"
-          exposed-headers:
-            - "*"
+          allowed-methods: [GET, POST, PATCH, PUT, DELETE]
+          allowed-headers: [Authorization, Content-Type, Idempotency-Key]
+          allow-credentials: true
   application:
     name: backend
   security:
@@ -54,7 +57,7 @@ micronaut:
       - pattern: /oauth/**
         access:
           - isAnonymous()
-      - pattern: /api/auth/**
+      - pattern: /api/v1/auth/**
         access:
           - isAnonymous()
       - pattern: /swagger/**
@@ -89,18 +92,19 @@ datasources:
     password: "${DB_PASSWORD:password}"
     dialect: POSTGRES
     schema-generate: NONE
+    maximum-pool-size: "${DB_POOL_SIZE:10}"
+    minimum-idle: 2
 
 flyway:
   datasources:
     default:
       enabled: true
 
-jpa:
-  default:
-    packages-to-scan:
-      - 'com.keeper'
-    properties:
-      hibernate:
-        hbm2ddl:
-          auto: none
-        show_sql: false
+keeper:
+  cookie:
+    secure: "${COOKIE_SECURE:true}"
+
+# Our HealthController serves /health; the built-in management endpoint would shadow it.
+endpoints:
+  all:
+    enabled: false
