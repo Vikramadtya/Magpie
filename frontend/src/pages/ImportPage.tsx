@@ -66,7 +66,7 @@ export default function ImportPage() {
       <PageHeader title="Import / export" subtitle="Bring in bank statements or take your data with you" actions={<Button variant="outline" onClick={() => void exportCsv()}><Download className="w-4 h-4 mr-2" />Export CSV</Button>} />
 
       {canEdit ? (
-        <section className="glass-panel p-5 space-y-4">
+        <section className="glass-panel p-6 space-y-5">
           <h2 className="font-semibold">Import a CSV</h2>
           <p className="text-sm text-secondary">Needs a header row with <code>date</code> and <code>amount</code> (negative = spending), or <code>debit</code>/<code>credit</code> columns. A <code>description</code> column is used as the note. Rows already imported are skipped.</p>
           <div className="grid sm:grid-cols-3 gap-3">
@@ -79,7 +79,10 @@ export default function ImportPage() {
               </Select>
             </Field>
             <Field label="File (max 5 MB)">
-              <input ref={input} type="file" accept=".csv,text/csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} className="block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-2 file:text-sm" />
+              <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border bg-surface px-3.5 text-sm text-secondary transition-colors hover:border-accent hover:text-primary focus-within:ring-4 focus-within:ring-accent/15">
+                <Upload className="w-4 h-4 shrink-0" /><span className="truncate">{file ? file.name : 'Choose a CSV file'}</span>
+                <input ref={input} type="file" accept=".csv,text/csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} className="sr-only" />
+              </label>
             </Field>
           </div>
           <Button onClick={runPreview} disabled={!file || !account || previewMut.isPending}><Upload className="w-4 h-4 mr-2" />Preview</Button>

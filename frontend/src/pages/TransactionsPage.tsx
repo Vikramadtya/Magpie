@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 import type { Transaction, TransactionFilters, TxType } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
+import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -243,12 +245,12 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
     <div>
-      {showDate && <div className="px-4 pt-3 pb-1 text-xs font-medium text-secondary bg-black/[0.02] dark:bg-white/[0.03]">{prettyDate(tx.occurredOn)}</div>}
-      <div className={cn('group flex items-center gap-3 px-4 py-2.5 border-b border-border/60', pending && 'opacity-60', selected && 'bg-accent/10')}>
+      {showDate && <div className="px-5 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-secondary bg-primary/[0.025]">{prettyDate(tx.occurredOn)}</div>}
+      <div className={cn('group flex items-center gap-3.5 px-5 py-3 border-b border-border/60 transition-colors hover:bg-primary/[0.02]', pending && 'opacity-60', selected && 'bg-accent/10')}>
         {selecting && <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Select ${title}`} className="w-4 h-4" />}
-        <div className="w-8 h-8 shrink-0 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-secondary">
-          {tx.type === 'TRANSFER' ? <ArrowLeftRight className="w-4 h-4" /> : <span className="text-sm">{(tx.categoryName ?? title)[0]}</span>}
-        </div>
+        {tx.type === 'TRANSFER'
+          ? <span className="w-9 h-9 shrink-0 rounded-full bg-primary/[0.06] flex items-center justify-center text-secondary"><ArrowLeftRight className="w-4 h-4" /></span>
+          : <Avatar name={tx.categoryName ?? title} size={36} />}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
           <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
@@ -260,7 +262,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
             </p>
           )}
         </div>
-        <Amount minor={tx.direction * tx.amountMinor} currency={tx.currency} signed={tx.type !== 'TRANSFER'} className="text-sm font-semibold" />
+        <Amount minor={tx.direction * tx.amountMinor} currency={tx.currency} signed={tx.type !== 'TRANSFER'} className="text-[15px] font-semibold tracking-[-0.01em]" />
         {!pending && !selecting && (
           <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
@@ -272,10 +274,6 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
       </div>
     </div>
   );
-}
-
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return <button aria-label={label} title={label} onClick={onClick} className="p-1.5 rounded-md text-secondary hover:text-primary hover:bg-black/5 dark:hover:bg-white/10">{children}</button>;
 }
 
 function CommentsModal({ tx, onClose }: { tx: Transaction | null; onClose: () => void }) {

@@ -36,8 +36,8 @@ export function StateView({ isLoading, error, isEmpty, onRetry, emptyTitle, empt
   }
   if (error) {
     return (
-      <div className="glass-panel p-8 text-center">
-        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
+      <div className="glass-panel p-10 text-center">
+        <span className="mx-auto mb-4 flex w-12 h-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-500"><AlertCircle className="w-6 h-6" /></span>
         <p className="font-medium mb-1">Couldn't load this</p>
         <p className="text-sm text-secondary mb-4">Check your connection and try again.</p>
         {onRetry && (
@@ -50,10 +50,10 @@ export function StateView({ isLoading, error, isEmpty, onRetry, emptyTitle, empt
   }
   if (isEmpty) {
     return (
-      <div className="glass-panel p-10 text-center">
-        <FileX className="w-8 h-8 text-secondary mx-auto mb-3" />
-        <p className="font-medium mb-1">{emptyTitle ?? 'Nothing here yet'}</p>
-        {emptyHint && <p className="text-sm text-secondary mb-4">{emptyHint}</p>}
+      <div className="glass-panel px-6 py-14 text-center">
+        <span className="mx-auto mb-4 flex w-12 h-12 items-center justify-center rounded-2xl bg-accent/10 text-accent"><FileX className="w-6 h-6" /></span>
+        <p className="font-semibold mb-1">{emptyTitle ?? 'Nothing here yet'}</p>
+        {emptyHint && <p className="text-sm text-secondary mb-5 max-w-sm mx-auto">{emptyHint}</p>}
         {emptyAction}
       </div>
     );

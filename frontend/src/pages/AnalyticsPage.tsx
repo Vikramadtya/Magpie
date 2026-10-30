@@ -5,11 +5,11 @@ import { Link } from 'react-router-dom';
 import { FxWarning } from '../components/FxWarning';
 import { Delta } from '../components/ui/Delta';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Segmented } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { Stat } from '../components/ui/Stat';
 import { useCashFlow, useNetWorth, useOverview, useTopPayees } from '../hooks/useInsights';
-import { cn } from '../lib/cn';
 import { isoDate, shortDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { paletteColor } from '../lib/palette';
@@ -50,11 +50,7 @@ export default function AnalyticsPage() {
           </Select>
         ) : undefined}
       />
-      <div className="inline-flex p-1 rounded-lg bg-black/5 dark:bg-white/10 mb-6" role="tablist">
-        {TABS.map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn('px-4 py-1.5 text-sm font-medium rounded-md', tab === k ? 'bg-surface shadow-sm' : 'text-secondary')}>{label}</button>
-        ))}
-      </div>
+      <Segmented className="mb-6" value={tab} onChange={setTab} options={TABS} />
       {tab === 'forecast' && <Suspense fallback={<Skeleton className="h-64" />}><ForecastTab /></Suspense>}
       {tab === 'patterns' && <Suspense fallback={<Skeleton className="h-64" />}><PatternsTab /></Suspense>}
       {tab === 'overview' && <Overview from={from} to={to} />}

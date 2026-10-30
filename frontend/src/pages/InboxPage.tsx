@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Account, InboxItem } from '../api/types';
 import { Amount } from '../components/ui/Amount';
+import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
+import { Segmented } from '../components/ui/Segmented';
 import { Field } from '../components/ui/Field';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
-import { StateView } from '../components/ui/StateView';
+import { Skeleton, StateView } from '../components/ui/StateView';
 import { groupCategories } from '../features/transactions/TransactionDialog';
 import { useFxQuote } from '../hooks/useInsights';
 import { useAcceptItem, useApplyUpdate, useDismissItem, useInbox, useKeepItem, useRemoveRecords } from '../hooks/useInbox';
@@ -29,11 +31,7 @@ export default function InboxPage() {
   return (
     <>
       <PageHeader title="To review" subtitle="Group expenses and settlements from your expense-split app, waiting to be recorded in your ledger" />
-      <div className="inline-flex p-1 rounded-lg bg-black/5 dark:bg-white/10 mb-6" role="tablist">
-        {([['todo', 'To review'], ['done', 'Recorded']] as const).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn('px-4 py-1.5 text-sm font-medium rounded-md', tab === k ? 'bg-surface shadow-sm' : 'text-secondary')}>{label}</button>
-        ))}
-      </div>
+      <Segmented className="mb-6" value={tab} onChange={setTab} options={[['todo', 'To review'], ['done', 'Recorded']] as const} />
       <StateView
         isLoading={inbox.isLoading}
         error={inbox.error}
@@ -42,7 +40,7 @@ export default function InboxPage() {
         emptyTitle={tab === 'todo' ? 'Nothing to review' : 'Nothing recorded yet'}
         emptyHint={tab === 'todo' ? 'Group expenses you enter in the split app show up here. Connect the app in Settings if you have not yet.' : undefined}
         emptyAction={tab === 'todo' ? <Link to="/settings"><Button variant="outline">Connect the app</Button></Link> : undefined}
-        skeleton={<div className="h-24 animate-pulse rounded-lg bg-black/5 dark:bg-white/10" />}
+        skeleton={<Skeleton className="h-28" />}
       >
         <ul className="space-y-4">
           {items.map((i) => (tab === 'done' ? <DoneRow key={i.id} item={i} /> : <ReviewCard key={i.id} item={i} accounts={accounts} />))}
@@ -54,9 +52,13 @@ export default function InboxPage() {
 
 function DoneRow({ item }: { item: InboxItem }) {
   return (
-    <li className="glass-panel p-4 flex flex-wrap justify-between gap-2 text-sm">
-      <span>{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : 'Shared expense')}{item.groupName ? ` · ${item.groupName}` : ''} <span className="text-xs text-secondary">· {prettyDate(item.occurredOn)}</span></span>
-      <span className="tabular-nums">{formatMoney(item.totalMinor, item.currency)}{item.myShareMinor != null && item.kind === 'EXPENSE' ? <span className="text-xs text-secondary"> · your share {formatMoney(item.myShareMinor, item.currency)}</span> : null}</span>
+    <li className="glass-panel p-4 flex items-center gap-3 text-sm">
+      <Avatar name={item.groupName ?? item.counterparty ?? item.title ?? 'S'} />
+      <span className="flex-1 min-w-0">
+        <span className="block font-medium truncate">{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : 'Shared expense')}</span>
+        <span className="block text-xs text-secondary">{item.groupName ? `${item.groupName} · ` : ''}{prettyDate(item.occurredOn)}</span>
+      </span>
+      <span className="text-right tabular-nums"><span className="block font-semibold">{formatMoney(item.totalMinor, item.currency)}</span>{item.myShareMinor != null && item.kind === 'EXPENSE' && <span className="block text-xs text-secondary">your share {formatMoney(item.myShareMinor, item.currency)}</span>}</span>
     </li>
   );
 }

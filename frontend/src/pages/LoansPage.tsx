@@ -1,9 +1,13 @@
-import { Banknote, Plus } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { Loan } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
+import { Avatar } from '../components/ui/Avatar';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
+import { Stat } from '../components/ui/Stat';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -48,18 +52,9 @@ export default function LoansPage() {
         {data && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="glass-panel p-4">
-                <p className="text-xs text-secondary">Owed to you</p>
-                <p className="text-2xl font-bold mt-1 tabular-nums text-green-600 dark:text-green-400">{formatMoney(data.owedToMeMinor, data.currency)}</p>
-              </div>
-              <div className="glass-panel p-4">
-                <p className="text-xs text-secondary">You owe</p>
-                <p className="text-2xl font-bold mt-1 tabular-nums text-red-500">{formatMoney(data.iOweMinor, data.currency)}</p>
-              </div>
-              <div className="glass-panel p-4 col-span-2 lg:col-span-1">
-                <p className="text-xs text-secondary">Net</p>
-                <p className="text-2xl font-bold mt-1 tabular-nums"><Amount minor={data.owedToMeMinor - data.iOweMinor} currency={data.currency} signed /></p>
-              </div>
+              <Stat icon={<ArrowDownLeft className="w-4 h-4" />} tone="income" label="Owed to you" value={formatMoney(data.owedToMeMinor, data.currency)} />
+              <Stat icon={<ArrowUpRight className="w-4 h-4" />} tone="expense" label="You owe" value={formatMoney(data.iOweMinor, data.currency)} />
+              <Stat className="col-span-2 lg:col-span-1" label="Net" value={<Amount minor={data.owedToMeMinor - data.iOweMinor} currency={data.currency} signed />} />
             </div>
 
             {data.people.length > 0 && (
@@ -67,11 +62,12 @@ export default function LoansPage() {
                 <h2 className="font-semibold mb-3">By person</h2>
                 <ul className="divide-y divide-border">
                   {data.people.map((p) => (
-                    <li key={p.person} className="py-2.5 flex justify-between text-sm">
-                      <span>{p.person} <span className="text-xs text-secondary">· {p.openLoans} open</span></span>
-                      <span className={cn('tabular-nums font-medium', p.netMinor >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500')}>
+                    <li key={p.person} className="py-3 flex items-center gap-3 text-sm">
+                      <Avatar name={p.person} />
+                      <span className="flex-1 min-w-0"><span className="font-medium">{p.person}</span> <span className="text-xs text-secondary">· {p.openLoans} open</span></span>
+                      <Badge tone={p.netMinor >= 0 ? 'good' : 'bad'} className="text-xs px-2.5 py-1">
                         {p.netMinor >= 0 ? `owes you ${formatMoney(p.netMinor, data.currency)}` : `you owe ${formatMoney(-p.netMinor, data.currency)}`}
-                      </span>
+                      </Badge>
                     </li>
                   ))}
                 </ul>
@@ -80,27 +76,27 @@ export default function LoansPage() {
 
             <ul className="space-y-3">
               {data.loans.map((l) => (
-                <li key={l.id} className={cn('glass-panel p-4', l.status === 'SETTLED' && 'opacity-70')}>
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <div>
-                      <p className="font-medium flex items-center gap-2">
-                        <Banknote className="w-4 h-4 text-accent" />
-                        {l.direction === 'LENT' ? `You lent to ${l.person}` : `You borrowed from ${l.person}`}
-                      </p>
-                      <p className="text-xs text-secondary mt-0.5">
-                        {prettyDate(l.occurredOn)}{l.dueOn ? ` · due ${prettyDate(l.dueOn)}` : ''}{l.note ? ` · ${l.note}` : ''}
-                      </p>
+                <li key={l.id} className={cn('glass-panel p-5 group', l.status === 'SETTLED' && 'opacity-70')}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar name={l.person} size={40} />
+                      <div className="min-w-0">
+                        <p className="font-semibold">{l.direction === 'LENT' ? `Lent to ${l.person}` : `Borrowed from ${l.person}`}</p>
+                        <p className="text-xs text-secondary mt-0.5">
+                          {prettyDate(l.occurredOn)}{l.dueOn ? ` · due ${prettyDate(l.dueOn)}` : ''}{l.note ? ` · ${l.note}` : ''}
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="tabular-nums font-semibold">{l.status === 'SETTLED' ? 'Settled' : `${formatMoney(l.outstandingMinor, l.currency)} left`}</p>
-                      <p className="text-xs text-secondary tabular-nums">{formatMoney(l.repaidMinor, l.currency)} of {formatMoney(l.principalMinor, l.currency)} repaid</p>
+                      {l.status === 'SETTLED' ? <Badge tone="good">Settled</Badge> : <p className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{formatMoney(l.outstandingMinor, l.currency)} <span className="text-sm font-normal text-secondary">left</span></p>}
+                      <p className="text-xs text-secondary tabular-nums mt-0.5">{formatMoney(l.repaidMinor, l.currency)} of {formatMoney(l.principalMinor, l.currency)} repaid</p>
                     </div>
                   </div>
-                  <div className="mt-3"><ProgressBar tone="accent" value={(l.repaidMinor / l.principalMinor) * 100} label="Repaid" /></div>
-                  <div className="flex gap-1 mt-3">
-                    {canEdit && l.status === 'OPEN' && <Button size="sm" onClick={() => setRepaying(l)}>{l.direction === 'LENT' ? 'Record repayment received' : 'Record repayment'}</Button>}
+                  <div className="mt-4"><ProgressBar tone="accent" value={(l.repaidMinor / l.principalMinor) * 100} label="Repaid" /></div>
+                  <div className="flex items-center gap-2 mt-4">
+                    {canEdit && l.status === 'OPEN' && <Button size="sm" variant="outline" onClick={() => setRepaying(l)}>{l.direction === 'LENT' ? 'Record repayment received' : 'Record repayment'}</Button>}
                     <Button size="sm" variant="ghost" onClick={() => setOpen(open === l.id ? null : l.id)}>{open === l.id ? 'Hide history' : 'History'}</Button>
-                    {canEdit && <Button size="sm" variant="ghost" onClick={() => setDeleting(l)}>Delete</Button>}
+                    {canEdit && <IconButton className="ml-auto sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" label="Delete loan" onClick={() => setDeleting(l)}><Trash2 className="w-4 h-4" /></IconButton>}
                   </div>
                   {open === l.id && <History id={l.id} />}
                 </li>

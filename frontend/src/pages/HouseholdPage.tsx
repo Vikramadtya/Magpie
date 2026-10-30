@@ -3,7 +3,10 @@ import { useState, type FormEvent } from 'react';
 import type { Household, HouseholdSummary } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
+import { Avatar } from '../components/ui/Avatar';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { Input } from '../components/ui/Input';
 import { MonthPicker } from '../components/ui/MonthPicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
@@ -32,7 +35,7 @@ export default function HouseholdPage() {
         <div className="space-y-10">
           {active.map((h) => <HouseholdView key={h.id} household={h} />)}
           {active.length === 0 && (
-            <section className="glass-panel p-5 max-w-xl">
+            <section className="glass-panel p-6 max-w-xl">
               <h2 className="font-semibold">Start a household</h2>
               <p className="text-sm text-secondary mt-1 mb-4">Invite your partner or family. You keep your own accounts and budgets; the household adds a combined view of spending, shared budgets, trips and, if you both choose, net worth and investments.</p>
               <form onSubmit={submit} className="flex gap-2">
@@ -59,7 +62,7 @@ function HouseholdView({ household: h }: { household: Household }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-bold">{h.name}</h2>
+        <h2 className="text-xl font-semibold tracking-[-0.02em]">{h.name}</h2>
         <div className="flex items-center gap-2">
           <MonthPicker month={month} onChange={setMonth} />
           <Button variant="outline" size="sm" disabled={leave.isPending} onClick={() => { if (window.confirm(`Leave ${h.name}? Your data stays yours.`)) leave.mutate(h.id); }}>Leave</Button>
@@ -74,7 +77,7 @@ function HouseholdView({ household: h }: { household: Household }) {
       {summary.data && <BudgetsCard household={h} summary={summary.data} />}
 
       {(trips.data ?? []).length > 0 && (
-        <section className="glass-panel p-5">
+        <section className="glass-panel p-6">
           <h3 className="font-semibold mb-3">Trips together</h3>
           <p className="text-xs text-secondary mb-3">Trips with the same name in each person's ledger are combined.</p>
           <ul className="divide-y divide-border">
@@ -95,7 +98,7 @@ function HouseholdView({ household: h }: { household: Household }) {
       )}
 
       {wealth.data && (
-        <section className="glass-panel p-5">
+        <section className="glass-panel p-6">
           <h3 className="font-semibold mb-3">Net worth & investments</h3>
           {wealth.data.netWorthByMember.length === 0 && wealth.data.holdings.length === 0 ? (
             <p className="text-sm text-secondary">Nobody is sharing this yet. Each person decides above.</p>
@@ -143,14 +146,16 @@ function MembersCard({ household: h, meId, isOwner }: { household: Household; me
   };
 
   return (
-    <section className="glass-panel p-5 grid md:grid-cols-2 gap-6">
+    <section className="glass-panel p-6 grid md:grid-cols-2 gap-6">
       <div>
-        <h3 className="font-semibold mb-3">People</h3>
-        <ul className="space-y-1.5">
+        <h3 className="font-semibold mb-4">People</h3>
+        <ul className="space-y-3">
           {h.members.map((m) => (
-            <li key={m.id} className="flex items-center justify-between text-sm">
-              <span>{m.name}{m.me ? ' (you)' : ''} {m.status === 'PENDING' && <span className="text-xs text-secondary">· invited</span>}</span>
-              {isOwner && !m.me && <button aria-label={`Remove ${m.name}`} onClick={() => remove.mutate({ id: h.id, memberId: m.id })}><X className="w-4 h-4" /></button>}
+            <li key={m.id} className="flex items-center gap-3 text-sm">
+              <Avatar name={m.name} />
+              <span className="flex-1 min-w-0 font-medium truncate">{m.name}{m.me ? ' (you)' : ''}</span>
+              {m.status === 'PENDING' && <Badge tone="warn">Invited</Badge>}
+              {isOwner && !m.me && <IconButton label={`Remove ${m.name}`} onClick={() => remove.mutate({ id: h.id, memberId: m.id })}><X className="w-4 h-4" /></IconButton>}
             </li>
           ))}
         </ul>
@@ -179,11 +184,11 @@ function MembersCard({ household: h, meId, isOwner }: { household: Household; me
 function SpendingCard({ household: h, summary }: { household: Household; summary: HouseholdSummary }) {
   const top = summary.byMember.reduce((a, m) => Math.max(a, m.amountMinor), 0) || 1;
   return (
-    <section className="glass-panel p-5">
-      <div className="flex flex-wrap justify-between gap-2 mb-4">
+    <section className="glass-panel p-6">
+      <div className="flex flex-wrap justify-between gap-2 mb-5">
         <div>
-          <p className="text-xs text-secondary">Household spending</p>
-          <p className="text-2xl font-bold tabular-nums"><Amount minor={summary.spentMinor} currency={h.currency} /></p>
+          <p className="text-[13px] font-medium text-secondary">Household spending</p>
+          <p className="text-[32px] leading-tight font-semibold tabular-nums tracking-[-0.03em] mt-1"><Amount minor={summary.spentMinor} currency={h.currency} /></p>
         </div>
         {summary.notSharing.length > 0 && <p className="text-xs text-secondary self-end">Not shared by {summary.notSharing.join(', ')}.</p>}
       </div>
@@ -191,7 +196,7 @@ function SpendingCard({ household: h, summary }: { household: Household; summary
         <ul className="space-y-3">
           {summary.byMember.map((m) => (
             <li key={m.memberId}>
-              <div className="flex justify-between text-sm mb-1"><span>{m.name}</span><Amount minor={m.amountMinor} currency={h.currency} /></div>
+              <div className="flex justify-between text-sm mb-1.5"><span className="flex items-center gap-2"><Avatar name={m.name} size={22} />{m.name}</span><Amount minor={m.amountMinor} currency={h.currency} /></div>
               <ProgressBar value={(m.amountMinor / top) * 100} tone="accent" label={m.name} />
             </li>
           ))}
@@ -222,7 +227,7 @@ function BudgetsCard({ household: h, summary }: { household: Household; summary:
   };
 
   return (
-    <section className="glass-panel p-5">
+    <section className="glass-panel p-6">
       <h3 className="font-semibold mb-1">Household budgets</h3>
       <p className="text-xs text-secondary mb-4">Matched by category name across everyone's ledgers. Your personal budgets are separate.</p>
       <ul className="space-y-4">

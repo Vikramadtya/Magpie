@@ -1,7 +1,9 @@
-import { Copy, Plus, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useWorkspace } from '../auth/AuthProvider';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { Field } from '../components/ui/Field';
 import { Modal } from '../components/ui/Modal';
 import { MonthPicker } from '../components/ui/MonthPicker';
@@ -15,7 +17,8 @@ import { useCopyBudgets, useBudgets, useRemoveBudget, useSetBudget } from '../ho
 import { useCategories, usePeople } from '../hooks/useReference';
 import { monthKey } from '../lib/dates';
 import { formatMoney, parseMoney, toInputValue } from '../lib/money';
-import type { BudgetLine } from '../api/types';
+import type { BudgetLine, BudgetSummary } from '../api/types';
+import { Ring } from '../components/ui/Ring';
 
 export default function BudgetsPage() {
   const { canEdit } = useWorkspace();
@@ -48,48 +51,66 @@ export default function BudgetsPage() {
         emptyHint="Set a limit for a category, or copy last month's budgets."
       >
         {b && (
-          <>
-            <div className="glass-panel p-5 mb-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-secondary">Spent so far</span>
-                <span className="tabular-nums font-medium">{formatMoney(b.spentMinor, b.currency)} of {formatMoney(b.budgetedMinor, b.currency)}</span>
-              </div>
-              <ProgressBar value={b.budgetedMinor > 0 ? (b.spentMinor / b.budgetedMinor) * 100 : 0} label="Total budget used" />
-            </div>
-            <ul className="space-y-3">
+          <div className="space-y-6">
+            <Summary b={b} />
+            <ul className="grid md:grid-cols-2 gap-4">
               {b.lines.map((l) => {
                 const total = l.amountMinor + l.rolloverMinor;
                 const pct = total > 0 ? (l.spentMinor / total) * 100 : l.spentMinor > 0 ? 101 : 0;
+                const over = l.remainingMinor < 0;
                 return (
-                  <li key={l.categoryId} className="glass-panel p-4">
-                    <div className="flex justify-between items-start gap-3 mb-2">
-                      <div>
-                        <p className="font-medium">{l.categoryName}</p>
-                        {l.rolloverMinor > 0 && <p className="text-xs text-secondary">Includes {formatMoney(l.rolloverMinor, b.currency)} carried over</p>}
+                  <li key={l.categoryId} className="glass-panel p-5 group">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: l.color ?? 'var(--accent-blue)' }} />
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{l.categoryName}</p>
+                          <p className="text-xs text-secondary tabular-nums">{formatMoney(l.spentMinor, b.currency)} of {formatMoney(total, b.currency)}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`tabular-nums font-semibold ${l.remainingMinor < 0 ? 'text-red-500' : ''}`}>
-                          {l.remainingMinor < 0 ? `${formatMoney(-l.remainingMinor, b.currency)} over` : `${formatMoney(l.remainingMinor, b.currency)} left`}
-                        </p>
-                        <p className="text-xs text-secondary tabular-nums">{formatMoney(l.spentMinor, b.currency)} / {formatMoney(total, b.currency)}</p>
-                      </div>
+                      <Badge tone={over ? 'bad' : pct >= 85 ? 'warn' : 'good'}>{over ? 'Over' : `${Math.round(pct)}% used`}</Badge>
                     </div>
+                    <p className={`mt-4 mb-2 text-2xl font-semibold tabular-nums tracking-[-0.025em] ${over ? 'text-red-500' : ''}`}>
+                      {over ? formatMoney(-l.remainingMinor, b.currency) : formatMoney(l.remainingMinor, b.currency)}
+                      <span className="ml-1.5 text-sm font-normal text-secondary">{over ? 'over' : 'left'}</span>
+                    </p>
                     <ProgressBar value={pct} label={l.categoryName} />
-                    {canEdit && (
-                      <div className="flex gap-1 mt-2">
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(l)}>Edit</Button>
-                        <Button variant="ghost" size="sm" onClick={() => remove.mutate({ categoryId: l.categoryId, month })}><Trash2 className="w-3.5 h-3.5 mr-1" />Remove</Button>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between mt-3 min-h-8">
+                      <p className="text-xs text-secondary">
+                        {l.rolloverMinor > 0 ? `Includes ${formatMoney(l.rolloverMinor, b.currency)} carried over` : l.rollover ? 'Unspent carries over' : ''}
+                        {l.includeOthers ? `${l.rollover ? ' · ' : ''}Counts others' spending` : ''}
+                      </p>
+                      {canEdit && (
+                        <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          <IconButton label="Edit budget" onClick={() => setEditing(l)}><Pencil className="w-4 h-4" /></IconButton>
+                          <IconButton label="Remove budget" onClick={() => remove.mutate({ categoryId: l.categoryId, month })}><Trash2 className="w-4 h-4" /></IconButton>
+                        </div>
+                      )}
+                    </div>
                   </li>
                 );
               })}
             </ul>
-          </>
+          </div>
         )}
       </StateView>
       {editing && <BudgetModal line={editing === 'new' ? null : editing} month={month} existing={new Set(b?.lines.map((l) => l.categoryId))} currency={b?.currency ?? 'USD'} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+function Summary({ b }: { b: BudgetSummary }) {
+  const pct = b.budgetedMinor > 0 ? (b.spentMinor / b.budgetedMinor) * 100 : 0;
+  const left = b.budgetedMinor - b.spentMinor;
+  return (
+    <section className="glass-panel p-6 flex flex-wrap items-center gap-6">
+      <Ring value={pct} size={96} stroke={9} color={pct > 100 ? '#E5484D' : pct >= 85 ? '#F2A33A' : '#30A46C'}>{Math.round(pct)}%</Ring>
+      <div className="grid grid-cols-3 gap-6 flex-1 min-w-[16rem]">
+        <div><p className="text-[13px] text-secondary">Budgeted</p><p className="text-xl font-semibold tabular-nums tracking-[-0.02em] mt-1">{formatMoney(b.budgetedMinor, b.currency)}</p></div>
+        <div><p className="text-[13px] text-secondary">Spent</p><p className="text-xl font-semibold tabular-nums tracking-[-0.02em] mt-1">{formatMoney(b.spentMinor, b.currency)}</p></div>
+        <div><p className="text-[13px] text-secondary">{left < 0 ? 'Over' : 'Left'}</p><p className={`text-xl font-semibold tabular-nums tracking-[-0.02em] mt-1 ${left < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatMoney(Math.abs(left), b.currency)}</p></div>
+      </div>
+    </section>
   );
 }
 

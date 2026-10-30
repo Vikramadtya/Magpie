@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Copy } from 'lucide-react';
+import { Copy, Link2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { workspaceApi } from '../api/endpoints';
@@ -50,8 +50,8 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" subtitle={user?.email} />
       <div className="space-y-6 max-w-3xl">
-        <section className="glass-panel p-5">
-          <h2 className="font-semibold mb-3">Your ledger</h2>
+        <section className="glass-panel p-6">
+          <h2 className="font-semibold mb-4">Your ledger</h2>
           <form onSubmit={save} className="grid sm:grid-cols-[1fr_8rem_auto] gap-3 items-end">
             <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></Field>
             <Field label="Main currency"><Select value={currency} onChange={(e) => setCurrency(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
@@ -62,24 +62,27 @@ export default function SettingsPage() {
           </p>
         </section>
 
-        <section className="glass-panel p-5">
+        <section className="glass-panel p-6">
           <h2 className="font-semibold mb-1">Connect your expense-split app</h2>
           <p className="text-sm text-secondary mb-4">
             Group expenses are entered in the split app and arrive in <strong>To review</strong>. Create a connection here and paste its code into the split app. It can only send items to this ledger, and you can revoke it any time.
           </p>
-          <StateView isLoading={connections.isLoading} error={connections.error} isEmpty={(connections.data ?? []).length === 0} emptyTitle="Not connected yet">
+          {(connections.data ?? []).length === 0 ? (
+            <p className="text-sm text-secondary rounded-xl bg-primary/[0.04] px-4 py-3 mb-4">Not connected yet.</p>
+          ) : (
             <ul className="divide-y divide-border text-sm mb-4">
               {connections.data?.map((c) => (
-                <li key={c.id} className="py-2.5 flex items-center justify-between gap-3">
-                  <div>
+                <li key={c.id} className="py-3 flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0"><Link2 className="w-4 h-4" /></span>
+                  <div className="flex-1 min-w-0">
                     <p className="font-medium">{c.name} <span className="text-xs text-secondary font-normal">· {c.prefix}…</span></p>
                     <p className="text-xs text-secondary">{c.lastUsedAt ? `Last sent items ${new Date(c.lastUsedAt).toLocaleString()}` : 'Not used yet'}</p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => revokeConnection.mutate(c.id)} disabled={revokeConnection.isPending}>Disconnect</Button>
+                  <Button size="sm" variant="outline" onClick={() => revokeConnection.mutate(c.id)} disabled={revokeConnection.isPending}>Disconnect</Button>
                 </li>
               ))}
             </ul>
-          </StateView>
+          )}
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -92,18 +95,17 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section className="glass-panel p-5">
+        <section className="glass-panel p-6">
           <h2 className="font-semibold mb-3">Recent activity</h2>
-          <StateView isLoading={activity.isLoading} error={activity.error} isEmpty={activity.data?.length === 0} emptyTitle="No activity yet">
-            <ul className="divide-y divide-border text-sm">
-              {activity.data?.slice(0, 20).map((a) => (
-                <li key={a.id} className="py-2 flex justify-between gap-3">
-                  <span>{a.action.toLowerCase().replace('_', ' ')} {a.entity}{a.summary ? ` · ${a.summary}` : ''}</span>
-                  <time className="text-xs text-secondary shrink-0">{new Date(a.at).toLocaleString()}</time>
-                </li>
-              ))}
-            </ul>
-          </StateView>
+          {activity.data?.length === 0 && <p className="text-sm text-secondary">No activity yet.</p>}
+          <ul className="divide-y divide-border text-sm">
+            {activity.data?.slice(0, 20).map((a) => (
+              <li key={a.id} className="py-2.5 flex justify-between gap-3">
+                <span className="capitalize">{a.action.toLowerCase().replace('_', ' ')} {a.entity}<span className="text-secondary normal-case">{a.summary ? ` · ${a.summary}` : ''}</span></span>
+                <time className="text-xs text-secondary shrink-0">{new Date(a.at).toLocaleString()}</time>
+              </li>
+            ))}
+          </ul>
         </section>
       </div>
       {created && <ConnectionCode secret={created.secret} endpoint={endpoint} onClose={() => setCreated(null)} />}

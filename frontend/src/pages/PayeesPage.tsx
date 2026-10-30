@@ -1,8 +1,10 @@
-import { Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { Payee } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
+import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -51,12 +53,13 @@ export default function PayeesPage() {
           <StateView isLoading={payees.isLoading} error={payees.error} onRetry={() => void payees.refetch()} isEmpty={(payees.data ?? []).length === 0} emptyTitle="No payees yet" emptyHint="They are created as you record transactions.">
             <ul className="glass-panel divide-y divide-border">
               {payees.data?.map((p) => (
-                <li key={p.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
+                <li key={p.id} className="px-5 py-3 flex items-center gap-3 group">
+                  <Avatar name={p.name} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
                     {p.defaultCategoryId && <p className="text-xs text-secondary">Defaults to {nameOf(p.defaultCategoryId)}</p>}
                   </div>
-                  {canEdit && <div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button><Button size="sm" variant="ghost" onClick={() => setDeleting(p)}><Trash2 className="w-4 h-4" /></Button></div>}
+                  {canEdit && <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity"><IconButton label="Edit" onClick={() => setEditing(p)}><Pencil className="w-4 h-4" /></IconButton><IconButton label="Delete" onClick={() => setDeleting(p)}><Trash2 className="w-4 h-4" /></IconButton></div>}
                 </li>
               ))}
             </ul>
@@ -64,10 +67,10 @@ export default function PayeesPage() {
         </section>
         <section>
           <h2 className="font-semibold mb-3">Tags</h2>
-          <div className="glass-panel p-4">
+          <div className="glass-panel p-5">
             <div className="flex flex-wrap gap-2 mb-3">
               {(tags.data ?? []).map((t) => (
-                <span key={t.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-border">
+                <span key={t.id} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-xs font-medium bg-primary/[0.06]">
                   {t.name}
                   {canEdit && <button aria-label={`Delete tag ${t.name}`} onClick={() => deleteTag.mutate(t.id)}><X className="w-3 h-3" /></button>}
                 </span>
@@ -88,7 +91,7 @@ export default function PayeesPage() {
           <div className="glass-panel p-4">
             <div className="flex flex-wrap gap-2 mb-3">
               {(people.data ?? []).map((p) => (
-                <span key={p.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-border">
+                <span key={p.id} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-xs font-medium bg-primary/[0.06]">
                   {p.name}
                   {canEdit && <button aria-label={`Remove ${p.name}`} onClick={() => deletePerson.mutate(p.id)}><X className="w-3 h-3" /></button>}
                 </span>

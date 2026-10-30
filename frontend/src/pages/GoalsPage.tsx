@@ -1,9 +1,12 @@
 import { format, parseISO } from 'date-fns';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { Goal } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
+import { Ring } from '../components/ui/Ring';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -38,27 +41,36 @@ export default function GoalsPage() {
         emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Create a goal</Button>}
       >
         <ul className="grid md:grid-cols-2 gap-4">
-          {list.map((g) => (
-            <li key={g.id} className="glass-panel p-5">
-              <div className="flex justify-between items-start mb-3">
-                <h2 className="font-semibold">{g.name}</h2>
-                <span className="text-sm font-medium tabular-nums">{g.percent}%</span>
-              </div>
-              <ProgressBar value={g.percent} tone="accent" label={g.name} />
-              <p className="text-sm mt-2 tabular-nums">{formatMoney(g.savedMinor, g.currency)} <span className="text-secondary">of {formatMoney(g.targetMinor, g.currency)}</span></p>
-              <p className="text-xs text-secondary mt-1">
-                {g.percent >= 100 ? 'Goal reached 🎉' : g.projectedDate ? `At your current pace: ${format(parseISO(g.projectedDate), 'd MMM yyyy')}` : 'Add contributions to see a projection'}
-                {g.targetDate ? ` · target ${format(parseISO(g.targetDate), 'd MMM yyyy')}` : ''}
-              </p>
-              {canEdit && (
-                <div className="flex gap-1 mt-3">
-                  <Button size="sm" onClick={() => setFunding(g)}>Add funds</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(g)}>Edit</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setDeleting(g)}>Delete</Button>
+          {list.map((g) => {
+            const done = g.percent >= 100;
+            return (
+              <li key={g.id} className="glass-panel p-5 group">
+                <div className="flex items-start gap-5">
+                  <Ring value={g.percent} size={84} stroke={8} color={done ? '#30A46C' : 'var(--accent-blue)'}>{g.percent}%</Ring>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="font-semibold truncate">{g.name}</h2>
+                      {canEdit && (
+                        <div className="flex gap-0.5 -mt-1 -mr-1 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          <IconButton label="Edit goal" onClick={() => setEditing(g)}><Pencil className="w-4 h-4" /></IconButton>
+                          <IconButton label="Delete goal" onClick={() => setDeleting(g)}><Trash2 className="w-4 h-4" /></IconButton>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[22px] font-semibold tabular-nums tracking-[-0.025em] mt-1">{formatMoney(g.savedMinor, g.currency)}</p>
+                    <p className="text-xs text-secondary tabular-nums">of {formatMoney(g.targetMinor, g.currency)}</p>
+                  </div>
                 </div>
-              )}
-            </li>
-          ))}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-secondary flex items-center gap-1.5 flex-wrap">
+                    {done ? <Badge tone="good">Goal reached</Badge> : g.projectedDate ? <Badge tone="accent">On pace for {format(parseISO(g.projectedDate), 'd MMM yyyy')}</Badge> : <Badge>No pace yet</Badge>}
+                    {g.targetDate && <span>Target {format(parseISO(g.targetDate), 'd MMM yyyy')}</span>}
+                  </p>
+                  {canEdit && !done && <Button size="sm" variant="outline" onClick={() => setFunding(g)}><Plus className="w-4 h-4 mr-1.5" />Add funds</Button>}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </StateView>
       {editing && <GoalModal goal={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}

@@ -1,10 +1,12 @@
 import { format, parseISO } from 'date-fns';
-import { Pause, Play, Plus, Zap } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Pause, Pencil, Play, Plus, Repeat, Trash2, Zap } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { Frequency, RecurringRule } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -45,27 +47,35 @@ export default function RecurringPage() {
         emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add recurring item</Button>}
       >
         <ul className="space-y-3">
-          {list.map((r) => (
-            <li key={r.id} className={`glass-panel p-4 flex flex-wrap items-center justify-between gap-3 ${r.status === 'PAUSED' ? 'opacity-60' : ''}`}>
-              <div className="min-w-0">
-                <p className="font-medium truncate">{r.name}</p>
-                <p className="text-xs text-secondary">{describe(r)} · next {format(parseISO(r.nextRunOn), 'd MMM yyyy')}{r.status === 'PAUSED' ? ' · paused' : ''}{!r.autoPost ? ' · manual' : ''}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Amount minor={r.type === 'INCOME' ? r.amountMinor : -r.amountMinor} currency={r.currency} signed className="font-semibold" />
+          {list.map((r) => {
+            const income = r.type === 'INCOME';
+            return (
+              <li key={r.id} className={`glass-panel p-4 sm:px-5 flex flex-wrap items-center gap-4 group ${r.status === 'PAUSED' ? 'opacity-60' : ''}`}>
+                <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${income ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-red-500/10 text-red-500'}`}>
+                  {income ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">{r.name}</p>
+                  <p className="text-xs text-secondary mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <Repeat className="w-3 h-3" />{describe(r)} <span>·</span> next {format(parseISO(r.nextRunOn), 'd MMM yyyy')}
+                    {r.status === 'PAUSED' && <Badge tone="warn">Paused</Badge>}
+                    {!r.autoPost && <Badge>Manual</Badge>}
+                  </p>
+                </div>
+                <Amount minor={income ? r.amountMinor : -r.amountMinor} currency={r.currency} signed className="text-lg font-semibold tracking-[-0.02em]" />
                 {canEdit && (
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" title="Post next occurrence now" onClick={() => post.mutate(r.id)}><Zap className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" title={r.status === 'ACTIVE' ? 'Pause' : 'Resume'} onClick={() => toggle.mutate({ id: r.id, pause: r.status === 'ACTIVE' })}>
+                  <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <IconButton label="Post next occurrence now" onClick={() => post.mutate(r.id)}><Zap className="w-4 h-4" /></IconButton>
+                    <IconButton label={r.status === 'ACTIVE' ? 'Pause' : 'Resume'} onClick={() => toggle.mutate({ id: r.id, pause: r.status === 'ACTIVE' })}>
                       {r.status === 'ACTIVE' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setDeleting(r)}>Delete</Button>
+                    </IconButton>
+                    <IconButton label="Edit" onClick={() => setEditing(r)}><Pencil className="w-4 h-4" /></IconButton>
+                    <IconButton label="Delete" onClick={() => setDeleting(r)}><Trash2 className="w-4 h-4" /></IconButton>
                   </div>
                 )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </StateView>
       {editing && <RuleModal rule={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

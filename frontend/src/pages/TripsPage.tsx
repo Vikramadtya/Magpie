@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Trip } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -39,27 +40,33 @@ export default function TripsPage() {
         emptyAction={canEdit && <Button onClick={() => setCreating(true)}>Plan a trip</Button>}
       >
         <ul className="grid md:grid-cols-2 gap-4">
-          {list.map((t) => (
-            <li key={t.id}>
-              <Link to={`/trips/${t.id}`} className="glass-panel p-5 block hover:border-accent transition-colors">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold flex items-center gap-2"><Plane className="w-4 h-4 text-accent" />{t.name}</p>
-                    <p className="text-xs text-secondary mt-0.5">{shortDate(t.startDate)} – {shortDate(t.endDate)} · {t.totalDays} day{t.totalDays === 1 ? '' : 's'}</p>
+          {list.map((t) => {
+            const pct = t.budgetMinor ? (t.spentMinor / t.budgetMinor) * 100 : 0;
+            return (
+              <li key={t.id}>
+                <Link to={`/trips/${t.id}`} className="glass-panel p-5 block">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0"><Plane className="w-5 h-5" /></span>
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{t.name}</p>
+                        <p className="text-xs text-secondary mt-0.5">{shortDate(t.startDate)} – {shortDate(t.endDate)} · {t.totalDays} day{t.totalDays === 1 ? '' : 's'}</p>
+                      </div>
+                    </div>
+                    <Badge tone={t.status === 'ONGOING' ? 'good' : t.status === 'UPCOMING' ? 'accent' : 'neutral'}>{STATUS[t.status]}</Badge>
                   </div>
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full', t.status === 'ONGOING' ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-black/5 dark:bg-white/10 text-secondary')}>{STATUS[t.status]}</span>
-                </div>
-                <p className="text-2xl font-bold mt-3 tabular-nums">{formatMoney(t.spentMinor, baseCurrency)}</p>
-                <p className="text-xs text-secondary">{t.expenseCount} expense{t.expenseCount === 1 ? '' : 's'}{t.perDayMinor > 0 ? ` · ${formatMoney(t.perDayMinor, baseCurrency)} a day` : ''}</p>
-                {t.budgetMinor && (
-                  <div className="mt-3">
-                    <ProgressBar value={(t.spentMinor / t.budgetMinor) * 100} label={`${t.name} budget`} />
-                    <p className="text-xs text-secondary mt-1 tabular-nums">of {formatMoney(t.budgetMinor, baseCurrency)} budget</p>
-                  </div>
-                )}
-              </Link>
-            </li>
-          ))}
+                  <p className="text-[28px] leading-tight font-semibold mt-5 tabular-nums tracking-[-0.025em]">{formatMoney(t.spentMinor, baseCurrency)}</p>
+                  <p className="text-xs text-secondary mt-1">{t.expenseCount} expense{t.expenseCount === 1 ? '' : 's'}{t.perDayMinor > 0 ? ` · ${formatMoney(t.perDayMinor, baseCurrency)} a day` : ''}</p>
+                  {t.budgetMinor && (
+                    <div className="mt-4">
+                      <ProgressBar value={pct} label={`${t.name} budget`} />
+                      <p className="text-xs text-secondary mt-1.5 tabular-nums flex justify-between"><span>{Math.round(pct)}% of budget</span><span>{formatMoney(t.budgetMinor, baseCurrency)}</span></p>
+                    </div>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </StateView>
       {creating && <TripForm onClose={() => setCreating(false)} onSaved={(t) => navigate(`/trips/${t.id}`)} />}

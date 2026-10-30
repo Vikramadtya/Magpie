@@ -1,14 +1,19 @@
-import { Plus, RefreshCw, Search } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Search, Tag, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
 import { marketApi } from '../api/endpoints';
 import { errorMessage } from '../lib/http';
+import { TOOLTIP_STYLE } from '../lib/chart';
+import { paletteColor } from '../lib/palette';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { Holding } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
+import { Avatar } from '../components/ui/Avatar';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -22,7 +27,6 @@ import { useAccounts } from '../hooks/useReference';
 import { useMarketSearch, useRefreshHoldings } from '../hooks/useExtras';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../lib/money';
 
-const COLORS = ['#0A84FF', '#32D74B', '#FF9F0A', '#BF5AF2', '#FF375F', '#64D2FF', '#FFD60A', '#AC8E68'];
 
 export default function InvestmentsPage() {
   const { canEdit, baseCurrency } = useWorkspace();
@@ -50,38 +54,65 @@ export default function InvestmentsPage() {
       <StateView isLoading={holdings.isLoading} error={holdings.error} onRetry={() => void holdings.refetch()} isEmpty={list.length === 0} emptyTitle="No holdings yet" emptyHint="Track stocks, funds or crypto by entering quantity, cost and the current price." emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add holding</Button>}>
         {s && (
           <div className="grid lg:grid-cols-3 gap-4 mb-6">
-            <div className="glass-panel p-5 lg:col-span-2 grid grid-cols-3 gap-4">
-              <Stat label="Market value" value={formatMoney(s.valueMinor, s.currency)} />
-              <Stat label="Cost basis" value={formatMoney(s.costMinor, s.currency)} />
-              <Stat label="Gain / loss" value={`${formatMoney(s.gainMinor, s.currency, { sign: true })} (${s.gainPercent}%)`} tone={s.gainMinor >= 0 ? 'up' : 'down'} />
+            <div className="hero-card p-6 lg:col-span-2 flex flex-col justify-between gap-6">
+              <div>
+                <p className="text-[13px] font-medium text-white/60">Market value</p>
+                <p className="text-4xl font-semibold mt-1.5 tabular-nums tracking-[-0.03em]">{formatMoney(s.valueMinor, s.currency)}</p>
+              </div>
+              <div className="flex flex-wrap gap-x-10 gap-y-3">
+                <div><p className="text-xs text-white/60">Gain / loss</p><p className={`text-lg font-semibold tabular-nums ${s.gainMinor >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatMoney(s.gainMinor, s.currency, { sign: true })} <span className="text-sm font-medium">({s.gainPercent}%)</span></p></div>
+                <div><p className="text-xs text-white/60">Cost basis</p><p className="text-lg font-semibold tabular-nums">{formatMoney(s.costMinor, s.currency)}</p></div>
+                <div><p className="text-xs text-white/60">Holdings</p><p className="text-lg font-semibold tabular-nums">{list.length}</p></div>
+              </div>
             </div>
-            <div className="glass-panel p-3 h-40" role="img" aria-label="Allocation">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={s.allocation} dataKey="valueMinor" nameKey="symbol" innerRadius="55%" outerRadius="90%" stroke="none">
-                    {s.allocation.map((a, i) => <Cell key={a.symbol} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v, n) => [formatMoney(Number(v), s.currency), n]} contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="glass-panel p-5 flex items-center gap-4" role="img" aria-label="Allocation">
+              <div className="h-32 w-32 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={s.allocation} dataKey="valueMinor" nameKey="symbol" innerRadius="62%" outerRadius="95%" paddingAngle={2} stroke="none">
+                      {s.allocation.map((a, i) => <Cell key={a.symbol} fill={paletteColor(i)} />)}
+                    </Pie>
+                    <Tooltip formatter={(v, n) => [formatMoney(Number(v), s.currency), n]} contentStyle={TOOLTIP_STYLE} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="flex-1 min-w-0 space-y-1.5 text-sm">
+                {s.allocation.slice(0, 5).map((a, i) => (
+                  <li key={a.symbol} className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 min-w-0"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: paletteColor(i) }} /><span className="truncate">{a.symbol}</span></span>
+                    <span className="tabular-nums text-secondary">{Math.round(a.percent)}%</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         )}
         <div className="glass-panel overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs text-secondary border-b border-border">
-              <tr><th className="p-3">Holding</th><th className="p-3 text-right">Qty</th><th className="p-3 text-right">Price</th><th className="p-3 text-right">Value</th><th className="p-3 text-right">Gain</th><th className="p-3" /></tr>
+            <thead className="text-left text-xs font-medium text-secondary border-b border-border">
+              <tr><th className="px-5 py-3.5">Holding</th><th className="px-3 py-3.5 text-right">Qty</th><th className="px-3 py-3.5 text-right">Price</th><th className="px-3 py-3.5 text-right">Value</th><th className="px-3 py-3.5 text-right">Gain</th><th className="px-3 py-3.5" /></tr>
             </thead>
             <tbody>
               {list.map((h) => (
-                <tr key={h.id} className="border-b border-border/60 last:border-0">
-                  <td className="p-3"><p className="font-medium">{h.symbol}</p><p className="text-xs text-secondary">{h.name}{h.exchange ? ` · ${h.exchange}` : ''}</p></td>
-                  <td className="p-3 text-right tabular-nums">{h.quantity}</td>
-                  <td className="p-3 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary">{h.priceSource === 'LIVE' ? `live${h.priceUpdatedAt ? ` · ${new Date(h.priceUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : h.priceAsOf ?? 'manual'}</p></td>
-                  <td className="p-3 text-right tabular-nums">{formatMoney(h.marketValueMinor, h.currency)}</td>
-                  <td className="p-3 text-right"><Amount minor={h.gainMinor} currency={h.currency} signed /></td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    {canEdit && <><Button size="sm" variant="ghost" onClick={() => setPricing(h)}>Price</Button><Button size="sm" variant="ghost" onClick={() => setEditing(h)}>Edit</Button><Button size="sm" variant="ghost" onClick={() => setDeleting(h)}>Delete</Button></>}
+                <tr key={h.id} className="border-b border-border/60 last:border-0 group hover:bg-primary/[0.02]">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={h.symbol} size={36} />
+                      <div className="min-w-0"><p className="font-semibold">{h.symbol}</p><p className="text-xs text-secondary truncate">{h.name}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary">{h.priceSource === 'LIVE' ? `live${h.priceUpdatedAt ? ` · ${new Date(h.priceUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : h.priceAsOf ?? 'manual'}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums font-medium">{formatMoney(h.marketValueMinor, h.currency)}</td>
+                  <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
+                  <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                    {canEdit && (
+                      <div className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <IconButton label="Update price" onClick={() => setPricing(h)}><Tag className="w-4 h-4" /></IconButton>
+                        <IconButton label="Edit" onClick={() => setEditing(h)}><Pencil className="w-4 h-4" /></IconButton>
+                        <IconButton label="Remove" onClick={() => setDeleting(h)}><Trash2 className="w-4 h-4" /></IconButton>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -93,15 +124,6 @@ export default function InvestmentsPage() {
       {pricing && <PriceModal holding={pricing} onClose={() => setPricing(null)} />}
       <ConfirmDialog open={!!deleting} title={`Remove ${deleting?.symbol}?`} message="This only removes the holding record." confirmLabel="Remove" onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />
     </>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' }) {
-  return (
-    <div>
-      <p className="text-xs text-secondary">{label}</p>
-      <p className={`text-lg font-bold tabular-nums mt-1 ${tone === 'up' ? 'text-green-600 dark:text-green-400' : tone === 'down' ? 'text-red-500' : ''}`}>{value}</p>
-    </div>
   );
 }
 

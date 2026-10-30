@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -8,6 +9,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Skeleton, StateView } from '../components/ui/StateView';
+import { Stat } from '../components/ui/Stat';
 import { TripForm } from '../features/trips/TripForm';
 import { useAssignRange, useClearTrip, useDeleteTrip, useTrip } from '../hooks/useTrips';
 import { cn } from '../lib/cn';
@@ -31,12 +33,12 @@ export default function TripDetailPage() {
 
   return (
     <>
+      <p className="text-sm mb-3"><Link to="/trips" className="text-secondary hover:text-primary inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" />All trips</Link></p>
       <PageHeader
         title={t?.name ?? 'Trip'}
         subtitle={t ? `${prettyDate(t.startDate)} – ${prettyDate(t.endDate)} · ${t.totalDays} day${t.totalDays === 1 ? '' : 's'}` : undefined}
         actions={t && canEdit && <><Button variant="outline" size="sm" onClick={() => setEditing(true)}>Edit</Button><Button variant="outline" size="sm" onClick={() => setConfirm('delete')}>Delete</Button></>}
       />
-      <p className="text-sm mb-4"><Link to="/trips" className="text-accent">← All trips</Link></p>
       <StateView isLoading={detail.isLoading} error={detail.error} onRetry={() => void detail.refetch()} skeleton={<Skeleton className="h-40" />}>
         {d && t && (
           <div className="space-y-6">
@@ -50,30 +52,20 @@ export default function TripDetailPage() {
             )}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="glass-panel p-4 col-span-2 lg:col-span-1">
-                <p className="text-xs text-secondary">Total cost</p>
-                <p className="text-2xl font-bold mt-1 tabular-nums">{formatMoney(t.spentMinor, d.currency)}</p>
-                <p className="text-xs text-secondary">{t.expenseCount} expense{t.expenseCount === 1 ? '' : 's'}</p>
+              <div className="hero-card p-6 col-span-2 flex flex-col justify-between gap-5">
+                <div>
+                  <p className="text-[13px] font-medium text-white/60">Total cost</p>
+                  <p className="text-4xl font-semibold mt-1.5 tabular-nums tracking-[-0.03em]">{formatMoney(t.spentMinor, d.currency)}</p>
+                </div>
+                <p className="text-xs text-white/60">{t.expenseCount} expense{t.expenseCount === 1 ? '' : 's'} · {formatMoney(t.perDayMinor, d.currency)} a day{d.normalDailyMinor > 0 ? `, ${(t.perDayMinor / d.normalDailyMinor).toFixed(1)}× your normal ${formatMoney(d.normalDailyMinor, d.currency)}` : ''}</p>
               </div>
-              <div className="glass-panel p-4">
-                <p className="text-xs text-secondary">Per day</p>
-                <p className="text-xl font-bold mt-1 tabular-nums">{formatMoney(t.perDayMinor, d.currency)}</p>
-                <p className="text-xs text-secondary">{d.normalDailyMinor > 0 ? `${(t.perDayMinor / d.normalDailyMinor).toFixed(1)}× your normal ${formatMoney(d.normalDailyMinor, d.currency)}` : 'no normal day to compare yet'}</p>
-              </div>
-              <div className="glass-panel p-4">
-                <p className="text-xs text-secondary">{t.status === 'ONGOING' ? 'On track for' : 'Final'}</p>
-                <p className="text-xl font-bold mt-1 tabular-nums">{formatMoney(d.projectedMinor, d.currency)}</p>
-                <p className="text-xs text-secondary">{t.status === 'ONGOING' ? `day ${t.daysSoFar} of ${t.totalDays}` : t.status === 'UPCOMING' ? 'not started' : 'trip finished'}</p>
-              </div>
-              <div className="glass-panel p-4">
-                <p className="text-xs text-secondary">Budget</p>
-                {t.budgetMinor && d.budgetRemainingMinor != null ? (
-                  <>
-                    <p className={cn('text-xl font-bold mt-1 tabular-nums', d.budgetRemainingMinor < 0 && 'text-red-500')}>{d.budgetRemainingMinor < 0 ? `${formatMoney(-d.budgetRemainingMinor, d.currency)} over` : `${formatMoney(d.budgetRemainingMinor, d.currency)} left`}</p>
-                    <div className="mt-2"><ProgressBar value={(t.spentMinor / t.budgetMinor) * 100} label="Budget used" /></div>
-                  </>
-                ) : <p className="text-sm text-secondary mt-2">No budget set</p>}
-              </div>
+              <Stat label={t.status === 'ONGOING' ? 'On track for' : 'Final'} value={formatMoney(d.projectedMinor, d.currency)} footer={t.status === 'ONGOING' ? `day ${t.daysSoFar} of ${t.totalDays}` : t.status === 'UPCOMING' ? 'not started' : 'trip finished'} />
+              <Stat
+                label="Budget"
+                value={t.budgetMinor && d.budgetRemainingMinor != null ? (d.budgetRemainingMinor < 0 ? `${formatMoney(-d.budgetRemainingMinor, d.currency)} over` : `${formatMoney(d.budgetRemainingMinor, d.currency)} left`) : 'None'}
+                tone={d.budgetRemainingMinor != null && d.budgetRemainingMinor < 0 ? 'expense' : undefined}
+                footer={t.budgetMinor ? <div className="w-full"><ProgressBar value={(t.spentMinor / t.budgetMinor) * 100} label="Budget used" /></div> : 'No budget set'}
+              />
             </div>
 
             {t.expenseCount === 0 ? (

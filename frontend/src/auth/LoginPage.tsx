@@ -35,47 +35,59 @@ export default function LoginPage() {
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-background flex flex-col justify-center py-10 px-4">
-      <div className="mx-auto w-full max-w-md">
-        <img src={logo} alt="Keeper" className="w-12 h-12 mx-auto mb-4" />
-        <h1 className="text-center text-2xl font-bold tracking-tight mb-6">
-          {mode === 'login' ? 'Log in to Keeper' : 'Create your account'}
-        </h1>
-        {params.get('error') && <p role="alert" className="mb-4 text-sm text-red-500 text-center">Sign-in failed. Please try again.</p>}
-
-        <div className="glass-panel p-6 space-y-4">
-          <a
-            href={`/oauth/login/google`}
-            className="w-full flex items-center justify-center gap-3 h-10 border border-border rounded-lg text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <GoogleIcon /> Continue with Google
-          </a>
-          <div className="flex items-center gap-3 text-xs text-secondary"><span className="flex-1 border-t border-border" />or<span className="flex-1 border-t border-border" /></div>
-
-          <form onSubmit={submit} className="space-y-4">
-            {mode === 'register' && (
-              <Field label="Name"><Input value={form.name} onChange={set('name')} required maxLength={120} autoComplete="name" /></Field>
-            )}
-            <Field label="Email"><Input type="email" value={form.email} onChange={set('email')} required autoComplete="email" /></Field>
-            <Field label="Password" hint={mode === 'register' ? 'At least 8 characters' : undefined}>
-              <Input type="password" value={form.password} onChange={set('password')} required minLength={mode === 'register' ? 8 : 1} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-            </Field>
-            {mode === 'register' && (
-              <Field label="Main currency">
-                <Select value={form.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select>
-              </Field>
-            )}
-            <Button type="submit" className="w-full" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</Button>
-          </form>
+    <div className="min-h-screen w-full overflow-y-auto grid lg:grid-cols-[1.05fr_1fr] bg-background">
+      <aside className="hero-card hidden lg:flex flex-col justify-between p-14 !rounded-none !border-0">
+        <span className="flex items-center gap-2.5 text-lg font-semibold"><img src={logo} alt="" className="w-7 h-7" />Keeper</span>
+        <div>
+          <h2 className="text-[44px] leading-[1.08] font-semibold tracking-[-0.035em] max-w-md">Know where your money goes.</h2>
+          <p className="mt-5 text-white/65 text-lg max-w-md">A private home for your budget, spending and savings, built to be fast and simple.</p>
+          <ul className="mt-10 space-y-4 text-[15px] text-white/80">
+            {['Every account, card and currency in one ledger', 'Budgets, goals and bills that run themselves', 'Share with your family without giving anything up'].map((t) => (
+              <li key={t} className="flex items-center gap-3"><span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-emerald-300 text-xs">✓</span>{t}</li>
+            ))}
+          </ul>
         </div>
+        <p className="text-xs text-white/40">Your data stays yours. Sign in is encrypted end to end.</p>
+      </aside>
 
-        <p className="text-center text-sm text-secondary mt-4">
-          {mode === 'login' ? "New to Keeper? " : 'Already have an account? '}
-          <button className="text-accent font-medium" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-            {mode === 'login' ? 'Create an account' : 'Log in'}
-          </button>
-        </p>
-      </div>
+      <main className="page-glow flex flex-col justify-center py-10 px-6">
+        <div className="mx-auto w-full max-w-sm">
+          <img src={logo} alt="Keeper" className="w-11 h-11 mb-6 lg:hidden" />
+          <h1 className="text-[28px] font-semibold tracking-[-0.025em]">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+          <p className="text-sm text-secondary mt-1.5 mb-7">{mode === 'login' ? 'Log in to pick up where you left off.' : 'It takes less than a minute.'}</p>
+          {params.get('error') && <p role="alert" className="mb-4 text-sm text-red-500">Sign-in failed. Please try again.</p>}
+
+          <div className="space-y-5">
+            <a href={`/oauth/login/google`} className="w-full flex items-center justify-center gap-3 h-11 bg-surface border border-border rounded-xl text-sm font-medium shadow-sm hover:bg-primary/[0.03] transition-colors">
+              <GoogleIcon /> Continue with Google
+            </a>
+            <div className="flex items-center gap-3 text-xs text-secondary"><span className="flex-1 border-t border-border" />or with email<span className="flex-1 border-t border-border" /></div>
+
+            <form onSubmit={submit} className="space-y-4">
+              {mode === 'register' && (
+                <Field label="Name"><Input value={form.name} onChange={set('name')} required maxLength={120} autoComplete="name" /></Field>
+              )}
+              <Field label="Email"><Input type="email" value={form.email} onChange={set('email')} required autoComplete="email" /></Field>
+              <Field label="Password" hint={mode === 'register' ? 'At least 8 characters' : undefined}>
+                <Input type="password" value={form.password} onChange={set('password')} required minLength={mode === 'register' ? 8 : 1} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+              </Field>
+              {mode === 'register' && (
+                <Field label="Main currency">
+                  <Select value={form.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select>
+                </Field>
+              )}
+              <Button type="submit" className="w-full" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</Button>
+            </form>
+          </div>
+
+          <p className="text-sm text-secondary mt-6">
+            {mode === 'login' ? 'New to Keeper? ' : 'Already have an account? '}
+            <button className="text-accent font-medium hover:underline" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+              {mode === 'login' ? 'Create an account' : 'Log in'}
+            </button>
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

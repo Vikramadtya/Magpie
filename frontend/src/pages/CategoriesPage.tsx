@@ -1,8 +1,10 @@
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import type { Category } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Button } from '../components/ui/Button';
+import { Segmented } from '../components/ui/Segmented';
+import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -30,31 +32,35 @@ export default function CategoriesPage() {
   return (
     <>
       <PageHeader title="Categories" subtitle="Group your spending and income" actions={canEdit && <Button onClick={() => setEditing({ category: null, parent: null, kind })}><Plus className="w-4 h-4 mr-2" />New category</Button>} />
-      <div className="inline-flex p-1 rounded-lg bg-black/5 dark:bg-white/10 mb-4" role="tablist">
-        {(['EXPENSE', 'INCOME'] as const).map((k) => (
-          <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)} className={cn('px-4 py-1.5 text-sm font-medium rounded-md', kind === k ? 'bg-surface shadow-sm' : 'text-secondary')}>{k === 'EXPENSE' ? 'Expenses' : 'Income'}</button>
-        ))}
-      </div>
+      <Segmented className="mb-6" value={kind} onChange={setKind} options={[['EXPENSE', 'Expenses'], ['INCOME', 'Income']] as const} />
       <StateView isLoading={categories.isLoading} error={categories.error} onRetry={() => void categories.refetch()} isEmpty={groups.length === 0} emptyTitle="No categories" emptyHint="Create one to start organizing.">
-        <ul className="space-y-3">
+        <ul className="grid md:grid-cols-2 gap-4 items-start">
           {groups.map(({ parent, children }) => (
-            <li key={parent.id} className="glass-panel p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold flex items-center gap-2"><span className="w-3 h-3 rounded-full" style={{ background: parent.color ?? 'var(--accent-blue)' }} />{parent.icon} {parent.name}</p>
+            <li key={parent.id} className="glass-panel p-5 group">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold flex items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${parent.color ?? '#5B6CF2'}22` }}>{parent.icon || <span className="w-2.5 h-2.5 rounded-full" style={{ background: parent.color ?? 'var(--accent-blue)' }} />}</span>
+                  <span className="truncate">{parent.name}</span>
+                </p>
                 {canEdit && (
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing({ category: null, parent, kind })}>+ Sub</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditing({ category: parent, parent: null, kind })}>Edit</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setDeleting(parent)}>Delete</Button>
+                  <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <IconButton label="Add subcategory" onClick={() => setEditing({ category: null, parent, kind })}><Plus className="w-4 h-4" /></IconButton>
+                    <IconButton label="Edit" onClick={() => setEditing({ category: parent, parent: null, kind })}><Pencil className="w-4 h-4" /></IconButton>
+                    <IconButton label="Delete" onClick={() => setDeleting(parent)}><Trash2 className="w-4 h-4" /></IconButton>
                   </div>
                 )}
               </div>
               {children.length > 0 && (
-                <ul className="mt-2 ml-5 divide-y divide-border">
+                <ul className="mt-3 divide-y divide-border">
                   {children.map((c) => (
-                    <li key={c.id} className="py-1.5 flex items-center justify-between text-sm">
+                    <li key={c.id} className="py-2 pl-12 flex items-center justify-between text-sm group/sub">
                       <span>{c.name}</span>
-                      {canEdit && <div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setEditing({ category: c, parent, kind })}>Edit</Button><Button size="sm" variant="ghost" onClick={() => setDeleting(c)}>Delete</Button></div>}
+                      {canEdit && (
+                        <div className="flex gap-0.5 sm:opacity-0 sm:group-hover/sub:opacity-100 focus-within:opacity-100 transition-opacity">
+                          <IconButton className="p-1.5" label="Edit" onClick={() => setEditing({ category: c, parent, kind })}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                          <IconButton className="p-1.5" label="Delete" onClick={() => setDeleting(c)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
