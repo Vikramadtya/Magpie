@@ -130,11 +130,12 @@ public class BudgetService {
       UUID ws, YearMonth month, FxConverter.Converter converter) {
     Map<UUID, Long> totals = new HashMap<>();
     db.list(
-        "SELECT t.category_id, c.parent_id, t.currency, SUM(t.amount_minor) FROM transactions t "
+        "SELECT t.category_id, c.parent_id, SUM(t.base_amount_minor) FROM transactions t "
             + "JOIN categories c ON c.id = t.category_id WHERE t.workspace_id = ? AND t.type = 'EXPENSE' "
-            + "AND t.deleted_at IS NULL AND t.occurred_on BETWEEN ? AND ? GROUP BY 1, 2, 3",
+            + "AND t.deleted_at IS NULL AND t.loan_id IS NULL AND t.base_amount_minor IS NOT NULL "
+            + "AND t.occurred_on BETWEEN ? AND ? GROUP BY 1, 2",
         rs -> {
-          long inBase = converter.toBase(rs.getLong(4), rs.getString(3));
+          long inBase = rs.getLong(3);
           totals.merge(rs.getObject(1, UUID.class), inBase, Long::sum);
           UUID parent = rs.getObject(2, UUID.class);
           if (parent != null) totals.merge(parent, inBase, Long::sum);

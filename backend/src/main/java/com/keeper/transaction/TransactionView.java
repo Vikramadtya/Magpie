@@ -1,6 +1,7 @@
 package com.keeper.transaction;
 
 import io.micronaut.serde.annotation.Serdeable;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -27,4 +28,15 @@ public record TransactionView(
     UUID createdBy,
     Instant createdAt,
     Long origAmountMinor,
-    String origCurrency) {}
+    String origCurrency,
+    UUID loanId,
+    String loanPerson,
+    /**
+     * Amount in the workspace base currency at that day's rate (null when no rate was available).
+     */
+    Long baseAmountMinor,
+    String baseCurrency,
+    BigDecimal baseFxRate,
+    boolean baseOverridden,
+    UUID sharedGroupId,
+    boolean sharedCopy) {}

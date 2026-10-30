@@ -30,6 +30,19 @@ public class FxRateService {
     return enabled;
   }
 
+  /** Rates for a past day, fetched once and stored under that day. Empty if unavailable. */
+  public Map<String, BigDecimal> fetchHistorical(LocalDate date) {
+    if (!enabled) return Map.of();
+    try {
+      Map<String, BigDecimal> rates = provider.historical(FxRateRepository.PIVOT, date);
+      if (!rates.isEmpty()) repository.save(rates, date);
+      return rates;
+    } catch (RuntimeException e) {
+      LOG.warn("FX history fetch failed for {}: {}", date, e.getMessage());
+      return Map.of();
+    }
+  }
+
   /** Returns true if fresh rates were stored. */
   public boolean refresh() {
     if (!enabled) return false;

@@ -28,46 +28,39 @@ public class TransferFactory {
       String idempotencyKey,
       UUID actor) {
     UUID transferId = UUID.randomUUID();
-    Insert out =
-        new Insert(
-            ws,
-            from.id(),
-            "TRANSFER",
-            -1,
-            amountOut,
-            from.currency(),
-            date,
-            null,
-            null,
-            note,
-            transferId,
-            null,
-            null,
-            null,
-            idempotencyKey,
-            actor,
-            null,
-            null);
-    Insert in =
-        new Insert(
-            ws,
-            to.id(),
-            "TRANSFER",
-            1,
-            amountIn,
-            to.currency(),
-            date,
-            null,
-            null,
-            note,
-            transferId,
-            null,
-            null,
-            null,
-            null,
-            actor,
-            null,
-            null);
-    return new Legs(transferId, out, in);
+    return new Legs(
+        transferId,
+        leg(ws, from, -1, amountOut, date, note, transferId, idempotencyKey, actor),
+        leg(ws, to, 1, amountIn, date, note, transferId, null, actor));
+  }
+
+  private static Insert leg(
+      UUID ws,
+      Account account,
+      int direction,
+      long amount,
+      LocalDate date,
+      String note,
+      UUID transferId,
+      String idempotencyKey,
+      UUID actor) {
+    return new Insert(
+        ws,
+        account.id(),
+        "TRANSFER",
+        direction,
+        amount,
+        account.currency(),
+        date,
+        null,
+        null,
+        note,
+        transferId,
+        EntryOrigin.NONE,
+        idempotencyKey,
+        actor,
+        null,
+        null,
+        Normalised.NONE);
   }
 }

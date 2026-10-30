@@ -34,10 +34,12 @@ public class AnalyticsService {
 
   private final Db db;
   private final FxConverter fx;
+  private final MissingRates missing;
 
-  public AnalyticsService(Db db, FxConverter fx) {
+  public AnalyticsService(Db db, FxConverter fx, MissingRates missing) {
     this.db = db;
     this.fx = fx;
+    this.missing = missing;
   }
 
   /** Expense totals rolled up to top-level categories. */
@@ -45,13 +47,13 @@ public class AnalyticsService {
     var converter = fx.forWorkspace(ws);
     Map<UUID, CategorySpend> byGroup = new LinkedHashMap<>();
     db.list(
-        "SELECT g.id, g.name, g.color, t.currency, SUM(t.amount_minor) FROM transactions t "
+        "SELECT g.id, g.name, g.color, SUM(t.base_amount_minor) FROM transactions t "
             + "JOIN categories c ON c.id = t.category_id JOIN categories g ON g.id = COALESCE(c.parent_id, c.id) "
-            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL "
-            + "AND t.occurred_on BETWEEN ? AND ? GROUP BY g.id, g.name, g.color, t.currency",
+            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL "
+            + "AND t.base_amount_minor IS NOT NULL AND t.occurred_on BETWEEN ? AND ? GROUP BY g.id, g.name, g.color",
         rs -> {
           UUID id = rs.getObject(1, UUID.class);
-          long v = converter.toBase(rs.getLong(5), rs.getString(4));
+          long v = rs.getLong(4);
           byGroup.merge(
               id,
               new CategorySpend(id, rs.getString(2), rs.getString(3), v),
@@ -65,19 +67,19 @@ public class AnalyticsService {
         to);
     List<CategorySpend> sorted = new ArrayList<>(byGroup.values());
     sorted.sort(Comparator.comparingLong(CategorySpend::totalMinor).reversed());
-    return new Report<>(converter.base(), sorted, List.copyOf(converter.missing()));
+    return new Report<>(converter.base(), sorted, missing.currencies(ws, from, to));
   }
 
   public Report<MonthFlow> cashFlow(UUID ws, LocalDate from, LocalDate to) {
     var converter = fx.forWorkspace(ws);
     Map<String, long[]> months = new TreeMap<>();
     db.list(
-        "SELECT to_char(date_trunc('month', occurred_on), 'YYYY-MM'), type, currency, SUM(amount_minor) FROM transactions "
-            + "WHERE workspace_id = ? AND type IN ('INCOME','EXPENSE') AND deleted_at IS NULL "
-            + "AND occurred_on BETWEEN ? AND ? GROUP BY 1, 2, 3",
+        "SELECT to_char(date_trunc('month', occurred_on), 'YYYY-MM'), type, SUM(base_amount_minor) FROM transactions "
+            + "WHERE workspace_id = ? AND type IN ('INCOME','EXPENSE') AND deleted_at IS NULL AND loan_id IS NULL "
+            + "AND base_amount_minor IS NOT NULL AND occurred_on BETWEEN ? AND ? GROUP BY 1, 2",
         rs -> {
           long[] slot = months.computeIfAbsent(rs.getString(1), k -> new long[2]);
-          long v = converter.toBase(rs.getLong(4), rs.getString(3));
+          long v = rs.getLong(3);
           slot["INCOME".equals(rs.getString(2)) ? 0 : 1] += v;
           return null;
         },
@@ -90,7 +92,7 @@ public class AnalyticsService {
     }
     List<MonthFlow> items = new ArrayList<>();
     months.forEach((m, v) -> items.add(new MonthFlow(m, v[0], v[1])));
-    return new Report<>(converter.base(), items, List.copyOf(converter.missing()));
+    return new Report<>(converter.base(), items, missing.currencies(ws, from, to));
   }
 
   /**
@@ -145,17 +147,12 @@ public class AnalyticsService {
     var converter = fx.forWorkspace(ws);
     Map<UUID, PayeeSpend> byPayee = new LinkedHashMap<>();
     db.list(
-        "SELECT p.id, p.name, t.currency, SUM(t.amount_minor), COUNT(*) FROM transactions t JOIN payees p ON p.id = t.payee_id "
-            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.occurred_on BETWEEN ? AND ? "
-            + "GROUP BY p.id, p.name, t.currency",
+        "SELECT p.id, p.name, SUM(t.base_amount_minor), COUNT(*) FROM transactions t JOIN payees p ON p.id = t.payee_id "
+            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL "
+            + "AND t.base_amount_minor IS NOT NULL AND t.occurred_on BETWEEN ? AND ? GROUP BY p.id, p.name",
         rs -> {
           UUID id = rs.getObject(1, UUID.class);
-          PayeeSpend add =
-              new PayeeSpend(
-                  id,
-                  rs.getString(2),
-                  converter.toBase(rs.getLong(4), rs.getString(3)),
-                  rs.getInt(5));
+          PayeeSpend add = new PayeeSpend(id, rs.getString(2), rs.getLong(3), rs.getInt(4));
           byPayee.merge(
               id,
               add,
@@ -172,6 +169,6 @@ public class AnalyticsService {
     return new Report<>(
         converter.base(),
         sorted.stream().limit(Math.min(Math.max(limit, 1), 50)).toList(),
-        List.copyOf(converter.missing()));
+        missing.currencies(ws, from, to));
   }
 }

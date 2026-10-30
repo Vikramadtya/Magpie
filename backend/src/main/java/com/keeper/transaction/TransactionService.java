@@ -31,6 +31,8 @@ public class TransactionService {
   private final PayeeRepository payees;
   private final TransferFactory transfers;
   private final FxConverter fx;
+  private final Normaliser normaliser;
+  private final RevisionService revisions;
   private final RefChecks refs;
   private final Audit audit;
   private final Db db;
@@ -42,6 +44,8 @@ public class TransactionService {
       PayeeRepository payees,
       TransferFactory transfers,
       FxConverter fx,
+      Normaliser normaliser,
+      RevisionService revisions,
       RefChecks refs,
       Audit audit,
       Db db) {
@@ -51,6 +55,8 @@ public class TransactionService {
     this.payees = payees;
     this.transfers = transfers;
     this.fx = fx;
+    this.normaliser = normaliser;
+    this.revisions = revisions;
     this.refs = refs;
     this.audit = audit;
     this.db = db;
@@ -100,20 +106,18 @@ public class TransactionService {
       var existing = transactions.findByIdempotencyKey(ws, idempotencyKey);
       if (existing.isPresent()) return existing.get();
     }
-    UUID id = db.tx(() -> insertEntry(ws, actor, idempotencyKey, r, null, null, null));
+    UUID id = db.tx(() -> insertEntry(ws, actor, idempotencyKey, r, EntryOrigin.NONE));
     audit.record(ws, actor, "transaction", id, "CREATE", r.type() + " " + r.amountMinor());
     return get(ws, id);
   }
 
-  /** Shared by manual entry, recurring postings and CSV import. */
+  /** Shared by manual entry, recurring postings, CSV import, loans and household copies. */
   public UUID insertEntry(
       UUID ws,
       UUID actor,
       String idempotencyKey,
       TransactionController.Request r,
-      UUID recurringRuleId,
-      String importHash,
-      UUID importBatchId) {
+      EntryOrigin origin) {
     Account account =
         accounts
             .find(ws, r.accountId())
@@ -121,6 +125,8 @@ public class TransactionService {
     UUID categoryId = validateCategoryAndPayee(ws, r);
     int direction = "INCOME".equals(r.type()) ? 1 : -1;
     Amounts amounts = resolveAmounts(account, r);
+    Normalised base =
+        normaliser.compute(ws, account.currency(), amounts.accountMinor(), r.occurredOn());
     UUID id =
         transactions.insert(
             new Insert(
@@ -135,13 +141,12 @@ public class TransactionService {
                 r.payeeId(),
                 clean(r.note()),
                 null,
-                recurringRuleId,
-                importHash,
-                importBatchId,
+                origin,
                 idempotencyKey,
                 actor,
                 amounts.origMinor(),
-                amounts.origCurrency()));
+                amounts.origCurrency(),
+                base));
     transactions.replaceTags(id, validTags(ws, r.tagIds()));
     accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
     return id;
@@ -196,14 +201,14 @@ public class TransactionService {
       UUID ws, UUID actor, UUID id, TransactionController.UpdateRequest r) {
     db.tx(
         () -> {
-          Raw cur =
-              transactions
-                  .lock(ws, id)
-                  .orElseThrow(() -> new ResourceNotFoundException("Transaction", id.toString()));
+          Raw cur = lockOrFail(ws, id);
+          guardNotSharedCopy(cur);
           if (r.expectedVersion() != null && r.expectedVersion() != cur.version()) {
             throw new ConflictException("This transaction was changed by someone else");
           }
+          TransactionView before = get(ws, id);
           if ("TRANSFER".equals(cur.type())) {
+            revisions.record(ws, actor, "UPDATE", before);
             transactions.updateTransferMeta(
                 ws, cur.transferId(), r.occurredOn(), clean(r.note()), actor);
             return;
@@ -218,6 +223,19 @@ public class TransactionService {
           UUID categoryId = validateCategoryAndPayee(ws, req);
           int direction = "INCOME".equals(r.type()) ? 1 : -1;
           Amounts amounts = resolveAmounts(account, req);
+          // A hand-set base amount survives edits that don't change what it was derived from.
+          boolean sameBasis =
+              before.baseOverridden()
+                  && before.accountId().equals(account.id())
+                  && before.amountMinor() == amounts.accountMinor()
+                  && before.occurredOn().equals(r.occurredOn());
+          Normalised base =
+              sameBasis
+                  ? new Normalised(
+                      before.baseAmountMinor(), before.baseCurrency(), before.baseFxRate(), true)
+                  : normaliser.compute(
+                      ws, account.currency(), amounts.accountMinor(), r.occurredOn());
+          revisions.record(ws, actor, "UPDATE", before);
           accounts.adjustBalance(ws, cur.accountId(), -cur.direction() * cur.amount());
           accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
           transactions.update(
@@ -234,7 +252,8 @@ public class TransactionService {
               clean(r.note()),
               actor,
               amounts.origMinor(),
-              amounts.origCurrency());
+              amounts.origCurrency(),
+              base);
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
@@ -242,12 +261,12 @@ public class TransactionService {
   }
 
   public void delete(UUID ws, UUID actor, UUID id) {
-    db.tx(() -> deleteOne(ws, id));
+    db.tx(() -> deleteOne(ws, actor, id, false));
     audit.record(ws, actor, "transaction", id, "DELETE", "");
   }
 
   public int bulkDelete(UUID ws, UUID actor, List<UUID> ids) {
-    db.tx(() -> ids.forEach(id -> deleteOne(ws, id)));
+    db.tx(() -> ids.forEach(id -> deleteOne(ws, actor, id, false)));
     audit.record(ws, actor, "transaction", null, "BULK_DELETE", ids.size() + " transactions");
     return ids.size();
   }
@@ -257,6 +276,119 @@ public class TransactionService {
     int n = transactions.recategorize(ws, ids, categoryId);
     audit.record(ws, actor, "transaction", null, "BULK_RECATEGORIZE", n + " transactions");
     return n;
+  }
+
+  // ---------- undo / restore ----------
+
+  @io.micronaut.serde.annotation.Serdeable
+  public record UndoResult(String action, TransactionView transaction) {}
+
+  /**
+   * Reverts the latest change to this transaction: puts a deleted one back, or restores the
+   * previous values.
+   */
+  public UndoResult undo(UUID ws, UUID actor, UUID id) {
+    UndoResult result =
+        db.tx(
+            () -> {
+              var rev =
+                  revisions
+                      .latestOpen(ws, id)
+                      .orElseThrow(
+                          () -> new ResourceNotFoundException("Change to undo", id.toString()));
+              if ("DELETE".equals(rev.action())) {
+                restoreRows(ws, id);
+                revisions.markUndone(rev.id());
+                return new UndoResult("RESTORED", get(ws, id));
+              }
+              revertUpdate(ws, actor, id, rev.snapshot());
+              revisions.markUndone(rev.id());
+              return new UndoResult("REVERTED", get(ws, id));
+            });
+    audit.record(ws, actor, "transaction", id, "UNDO", result.action());
+    return result;
+  }
+
+  /** Brings a deleted transaction (both legs for a transfer) back. */
+  public TransactionView restore(UUID ws, UUID actor, UUID id) {
+    db.tx(() -> restoreRows(ws, id));
+    audit.record(ws, actor, "transaction", id, "RESTORE", "");
+    return get(ws, id);
+  }
+
+  public List<TransactionView> deleted(UUID ws) {
+    return transactions.deleted(ws, 50);
+  }
+
+  private void restoreRows(UUID ws, UUID id) {
+    Raw row =
+        transactions
+            .lockDeleted(ws, id)
+            .orElseThrow(() -> new ConflictException("This transaction is not deleted"));
+    List<Raw> legs =
+        row.transferId() == null
+            ? List.of(row)
+            : transactions.lockDeletedTransferLegs(ws, row.transferId());
+    for (Raw leg : legs) {
+      accounts.adjustBalance(ws, leg.accountId(), leg.direction() * leg.amount());
+    }
+    List<UUID> ids = legs.stream().map(Raw::id).toList();
+    transactions.undelete(ws, ids);
+    revisions.markDeletesUndone(ids);
+  }
+
+  private void revertUpdate(UUID ws, UUID actor, UUID id, TransactionView old) {
+    Raw cur = lockOrFail(ws, id);
+    guardNotSharedCopy(cur);
+    if ("TRANSFER".equals(cur.type())) {
+      transactions.updateTransferMeta(ws, cur.transferId(), old.occurredOn(), old.note(), actor);
+      return;
+    }
+    accounts.adjustBalance(ws, cur.accountId(), -cur.direction() * cur.amount());
+    accounts.adjustBalance(ws, old.accountId(), old.direction() * old.amountMinor());
+    transactions.applySnapshot(ws, old, actor);
+    transactions.replaceTags(id, old.tagIds());
+  }
+
+  // ---------- normalised (base-currency) amount ----------
+
+  /** Lets the user set the base-currency value themselves instead of the day's rate. */
+  public TransactionView setNormalised(UUID ws, UUID actor, UUID id, long baseMinor) {
+    db.tx(
+        () -> {
+          TransactionView before = get(ws, id);
+          guardConvertible(before);
+          Normalised manual =
+              normaliser.manual(
+                  normaliser.baseCurrency(ws), before.currency(), before.amountMinor(), baseMinor);
+          revisions.record(ws, actor, "UPDATE", before);
+          transactions.setNormalised(ws, id, manual);
+        });
+    audit.record(ws, actor, "transaction", id, "NORMALISED", "manual " + baseMinor);
+    return get(ws, id);
+  }
+
+  /** Goes back to the rate of the transaction's day. */
+  public TransactionView resetNormalised(UUID ws, UUID actor, UUID id) {
+    db.tx(
+        () -> {
+          TransactionView before = get(ws, id);
+          guardConvertible(before);
+          Normalised computed =
+              normaliser.compute(ws, before.currency(), before.amountMinor(), before.occurredOn());
+          if (computed.amountMinor() == null) {
+            throw new BusinessRuleException("No exchange rate available for " + before.currency());
+          }
+          revisions.record(ws, actor, "UPDATE", before);
+          transactions.setNormalised(ws, id, computed);
+        });
+    return get(ws, id);
+  }
+
+  private static void guardConvertible(TransactionView v) {
+    if ("TRANSFER".equals(v.type())) {
+      throw new BadRequestException("Transfers are not part of income or spending reports");
+    }
   }
 
   // ---------- helpers ----------
@@ -289,14 +421,31 @@ public class TransactionService {
     return new Amounts(converted, r.amountMinor(), entered);
   }
 
-  private void deleteOne(UUID ws, UUID id) {
+  private Raw lockOrFail(UUID ws, UUID id) {
+    return transactions
+        .lock(ws, id)
+        .orElseThrow(() -> new ResourceNotFoundException("Transaction", id.toString()));
+  }
+
+  /** Household copies are managed from the personal ledger they came from. */
+  private static void guardNotSharedCopy(Raw row) {
+    if (row.sharedCopy()) {
+      throw new ConflictException(
+          "This entry is synced from a personal ledger. Change it there, or remove it from the household.");
+    }
+  }
+
+  /** {@code internal} lets the household sync remove its own copies. */
+  public void deleteOne(UUID ws, UUID actor, UUID id, boolean internal) {
     Raw cur = transactions.lock(ws, id).orElse(null);
     if (cur == null) return; // already gone: deletes are idempotent
+    if (!internal) guardNotSharedCopy(cur);
     List<Raw> legs =
         cur.transferId() == null
             ? List.of(cur)
             : transactions.lockTransferLegs(ws, cur.transferId());
     for (Raw leg : legs) {
+      transactions.find(ws, leg.id()).ifPresent(v -> revisions.record(ws, actor, "DELETE", v));
       accounts.adjustBalance(ws, leg.accountId(), -leg.direction() * leg.amount());
     }
     transactions.softDelete(ws, legs.stream().map(Raw::id).toList());

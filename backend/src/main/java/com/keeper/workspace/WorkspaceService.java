@@ -22,14 +22,20 @@ public class WorkspaceService {
   private final WorkspaceRepository workspaces;
   private final DefaultCategories defaults;
   private final MembershipCache cache;
+  private final com.keeper.transaction.NormalisationService normalisation;
   private final Db db;
   private final SecureRandom random = new SecureRandom();
 
   public WorkspaceService(
-      WorkspaceRepository workspaces, DefaultCategories defaults, MembershipCache cache, Db db) {
+      WorkspaceRepository workspaces,
+      DefaultCategories defaults,
+      MembershipCache cache,
+      com.keeper.transaction.NormalisationService normalisation,
+      Db db) {
     this.workspaces = workspaces;
     this.defaults = defaults;
     this.cache = cache;
+    this.normalisation = normalisation;
     this.db = db;
   }
 
@@ -49,7 +55,11 @@ public class WorkspaceService {
   }
 
   public Workspace rename(UUID ws, UUID userId, String name, String currency) {
+    String before = workspaces.find(ws, userId).map(Workspace::baseCurrency).orElse(null);
     workspaces.rename(ws, name, currency.toUpperCase());
+    if (before != null && !before.equalsIgnoreCase(currency)) {
+      normalisation.recompute(ws);
+    }
     return workspaces.find(ws, userId).orElseThrow();
   }
 

@@ -7,6 +7,7 @@ import com.keeper.common.db.Db;
 import com.keeper.common.exception.BadRequestException;
 import com.keeper.common.exception.ResourceNotFoundException;
 import com.keeper.fx.CurrencyUnits;
+import com.keeper.transaction.EntryOrigin;
 import com.keeper.transaction.TransactionController;
 import com.keeper.transaction.TransactionRepository;
 import com.keeper.transaction.TransactionService;
@@ -136,7 +137,7 @@ public class ImportService {
                     List.of(),
                     null,
                     null);
-            transactions.insertEntry(ws, actor, null, request, null, hash, batchId);
+            transactions.insertEntry(ws, actor, null, request, EntryOrigin.imported(hash, batchId));
             counts[0]++;
           }
         });

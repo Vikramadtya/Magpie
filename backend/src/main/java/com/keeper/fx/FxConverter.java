@@ -37,6 +37,30 @@ public class FxConverter {
     this.db = db;
   }
 
+  private final java.util.concurrent.ConcurrentHashMap<LocalDate, Map<String, BigDecimal>> byDate =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** The rate that applied on {@code date} (today and future dates use the current rate). */
+  public Optional<BigDecimal> rateOn(String from, String to, LocalDate date) {
+    if (from.equals(to)) return Optional.of(BigDecimal.ONE);
+    if (!date.isBefore(LocalDate.now())) return rate(from, to);
+    Map<String, BigDecimal> perUsd = ratesOn(date);
+    BigDecimal fromRate = perUsd.get(from);
+    BigDecimal toRate = perUsd.get(to);
+    if (fromRate == null || toRate == null) return rate(from, to);
+    return Optional.of(toRate.divide(fromRate, 12, RoundingMode.HALF_UP));
+  }
+
+  private Map<String, BigDecimal> ratesOn(LocalDate date) {
+    Map<String, BigDecimal> cached = byDate.get(date);
+    if (cached != null) return cached;
+    Map<String, BigDecimal> stored = repository.on(date);
+    if (stored.isEmpty()) stored = refresher.fetchHistorical(date);
+    if (stored.isEmpty()) stored = repository.nearest(date);
+    if (!stored.isEmpty()) byDate.put(date, stored);
+    return stored;
+  }
+
   /** Units of {@code to} per 1 {@code from}, or empty when either currency has no rate. */
   public Optional<BigDecimal> rate(String from, String to) {
     if (from.equals(to)) return Optional.of(BigDecimal.ONE);
@@ -93,6 +117,7 @@ public class FxConverter {
   /** Drops the in-memory snapshot (used after rates are written outside the normal refresh). */
   public void invalidate() {
     snapshot = new Snapshot(Map.of(), Instant.EPOCH);
+    byDate.clear();
   }
 
   public class Converter {

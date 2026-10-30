@@ -23,7 +23,10 @@ public class TransactionRepository {
       int direction,
       long amount,
       int version,
-      UUID transferId) {}
+      UUID transferId,
+      boolean sharedCopy,
+      UUID sharedGroupId,
+      UUID loanId) {}
 
   public record Insert(
       UUID workspaceId,
@@ -37,23 +40,27 @@ public class TransactionRepository {
       UUID payeeId,
       String note,
       UUID transferId,
-      UUID recurringRuleId,
-      String importHash,
-      UUID importBatchId,
+      EntryOrigin origin,
       String idempotencyKey,
       UUID actor,
       Long origAmountMinor,
-      String origCurrency) {}
+      String origCurrency,
+      Normalised base) {}
 
-  private static final String SELECT =
-      "SELECT t.id, t.account_id, a.name AS account_name, t.type, t.direction, t.amount_minor, t.currency, "
+  private static final String COLUMNS =
+      "t.id, t.account_id, a.name AS account_name, t.type, t.direction, t.amount_minor, t.currency, "
           + "t.occurred_on, t.category_id, c.name AS category_name, t.payee_id, p.name AS payee_name, t.note, "
           + "t.transfer_id, t.version, t.created_by, t.created_at, t.orig_amount_minor, t.orig_currency, "
-          + "COALESCE((SELECT array_agg(tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}') AS tag_ids "
-          + "FROM transactions t JOIN accounts a ON a.id = t.account_id "
-          + "LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN payees p ON p.id = t.payee_id ";
+          + "t.loan_id, l.person AS loan_person, t.base_amount_minor, t.base_currency, t.base_fx_rate, "
+          + "t.base_overridden, t.shared_group_id, t.shared_copy, "
+          + "COALESCE((SELECT array_agg(tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}') AS tag_ids";
+  private static final String FROM =
+      " FROM transactions t JOIN accounts a ON a.id = t.account_id "
+          + "LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN payees p ON p.id = t.payee_id "
+          + "LEFT JOIN loans l ON l.id = t.loan_id ";
+  private static final String SELECT = "SELECT " + COLUMNS + FROM;
 
-  private static final RowMapper<TransactionView> VIEW =
+  static final RowMapper<TransactionView> VIEW =
       rs ->
           new TransactionView(
               rs.getObject("id", UUID.class),
@@ -75,7 +82,15 @@ public class TransactionRepository {
               rs.getObject("created_by", UUID.class),
               rs.getObject("created_at", OffsetDateTime.class).toInstant(),
               rs.getObject("orig_amount_minor", Long.class),
-              rs.getString("orig_currency"));
+              rs.getString("orig_currency"),
+              rs.getObject("loan_id", UUID.class),
+              rs.getString("loan_person"),
+              rs.getObject("base_amount_minor", Long.class),
+              rs.getString("base_currency"),
+              rs.getBigDecimal("base_fx_rate"),
+              rs.getBoolean("base_overridden"),
+              rs.getObject("shared_group_id", UUID.class),
+              rs.getBoolean("shared_copy"));
 
   private static List<UUID> uuids(java.sql.ResultSet rs, String col) throws SQLException {
     Object[] arr = (Object[]) rs.getArray(col).getArray();
@@ -84,11 +99,29 @@ public class TransactionRepository {
     return ids;
   }
 
+  private static final String RAW_COLS =
+      "id, account_id, type, direction, amount_minor, version, transfer_id, shared_copy, shared_group_id, loan_id";
+  private static final RowMapper<Raw> RAW =
+      rs ->
+          new Raw(
+              rs.getObject("id", UUID.class),
+              rs.getObject("account_id", UUID.class),
+              rs.getString("type"),
+              rs.getInt("direction"),
+              rs.getLong("amount_minor"),
+              rs.getInt("version"),
+              rs.getObject("transfer_id", UUID.class),
+              rs.getBoolean("shared_copy"),
+              rs.getObject("shared_group_id", UUID.class),
+              rs.getObject("loan_id", UUID.class));
+
   private final Db db;
 
   public TransactionRepository(Db db) {
     this.db = db;
   }
+
+  // ---------- reads ----------
 
   /** Newest first; fetches one extra row so the caller knows whether another page exists. */
   public List<TransactionView> page(
@@ -117,46 +150,87 @@ public class TransactionRepository {
         transferId);
   }
 
+  public List<TransactionView> findByGroup(UUID groupId) {
+    return db.list(SELECT + "WHERE t.shared_group_id = ? AND t.deleted_at IS NULL", VIEW, groupId);
+  }
+
+  public List<TransactionView> findByLoan(UUID ws, UUID loanId) {
+    return db.list(
+        SELECT
+            + "WHERE t.workspace_id = ? AND t.loan_id = ? AND t.deleted_at IS NULL ORDER BY t.occurred_on, t.created_at",
+        VIEW,
+        ws,
+        loanId);
+  }
+
   public Optional<TransactionView> findByIdempotencyKey(UUID ws, String key) {
     return db.one(SELECT + "WHERE t.workspace_id = ? AND t.idempotency_key = ?", VIEW, ws, key);
+  }
+
+  /** Recently deleted rows (for the restore list). */
+  public List<TransactionView> deleted(UUID ws, int limit) {
+    return db.list(
+        SELECT
+            + "WHERE t.workspace_id = ? AND t.deleted_at IS NOT NULL AND t.deleted_at > NOW() - INTERVAL '30 days' "
+            + "AND t.shared_copy = FALSE ORDER BY t.deleted_at DESC LIMIT ?",
+        VIEW,
+        ws,
+        limit);
   }
 
   /** Row lock so concurrent edits of the same transaction serialize. */
   public Optional<Raw> lock(UUID ws, UUID id) {
     return db.one(
-        "SELECT id, account_id, type, direction, amount_minor, version, transfer_id FROM transactions "
-            + "WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL FOR UPDATE",
+        "SELECT "
+            + RAW_COLS
+            + " FROM transactions WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL FOR UPDATE",
         RAW,
         ws,
         id);
   }
 
-  private static final RowMapper<Raw> RAW =
-      rs ->
-          new Raw(
-              rs.getObject("id", UUID.class),
-              rs.getObject("account_id", UUID.class),
-              rs.getString("type"),
-              rs.getInt("direction"),
-              rs.getLong("amount_minor"),
-              rs.getInt("version"),
-              rs.getObject("transfer_id", UUID.class));
-
   public List<Raw> lockTransferLegs(UUID ws, UUID transferId) {
     return db.list(
-        "SELECT id, account_id, type, direction, amount_minor, version, transfer_id FROM transactions "
-            + "WHERE workspace_id = ? AND transfer_id = ? AND deleted_at IS NULL FOR UPDATE",
+        "SELECT "
+            + RAW_COLS
+            + " FROM transactions WHERE workspace_id = ? AND transfer_id = ? AND deleted_at IS NULL FOR UPDATE",
         RAW,
         ws,
         transferId);
   }
 
+  public Optional<Raw> lockDeleted(UUID ws, UUID id) {
+    return db.one(
+        "SELECT "
+            + RAW_COLS
+            + " FROM transactions WHERE workspace_id = ? AND id = ? AND deleted_at IS NOT NULL FOR UPDATE",
+        RAW,
+        ws,
+        id);
+  }
+
+  public List<Raw> lockDeletedTransferLegs(UUID ws, UUID transferId) {
+    return db.list(
+        "SELECT "
+            + RAW_COLS
+            + " FROM transactions WHERE workspace_id = ? AND transfer_id = ? AND deleted_at IS NOT NULL FOR UPDATE",
+        RAW,
+        ws,
+        transferId);
+  }
+
+  // ---------- writes ----------
+
   public UUID insert(Insert i) {
     UUID id = UUID.randomUUID();
+    EntryOrigin o = i.origin();
+    Normalised b = i.base();
     db.update(
         "INSERT INTO transactions(id, workspace_id, account_id, type, direction, amount_minor, currency, occurred_on, "
             + "category_id, payee_id, note, transfer_id, recurring_rule_id, import_hash, import_batch_id, "
-            + "idempotency_key, created_by, updated_by, orig_amount_minor, orig_currency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            + "idempotency_key, created_by, updated_by, orig_amount_minor, orig_currency, loan_id, "
+            + "base_amount_minor, base_currency, base_fx_rate, base_overridden, shared_group_id, shared_copy) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         i.workspaceId(),
         i.accountId(),
@@ -169,14 +243,21 @@ public class TransactionRepository {
         i.payeeId(),
         i.note(),
         i.transferId(),
-        i.recurringRuleId(),
-        i.importHash(),
-        i.importBatchId(),
+        o.recurringRuleId(),
+        o.importHash(),
+        o.importBatchId(),
         i.idempotencyKey(),
         i.actor(),
         i.actor(),
         i.origAmountMinor(),
-        i.origCurrency());
+        i.origCurrency(),
+        o.loanId(),
+        b.amountMinor(),
+        b.currency(),
+        b.rate(),
+        b.overridden(),
+        o.sharedGroupId(),
+        o.sharedCopy());
     return id;
   }
 
@@ -194,12 +275,13 @@ public class TransactionRepository {
       String note,
       UUID actor,
       Long origAmountMinor,
-      String origCurrency) {
+      String origCurrency,
+      Normalised base) {
     db.update(
         "UPDATE transactions SET account_id = ?, type = ?, direction = ?, amount_minor = ?, currency = ?, occurred_on = ?, "
             + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, orig_amount_minor = ?, orig_currency = ?, "
-            + "updated_at = NOW(), version = version + 1 "
-            + "WHERE workspace_id = ? AND id = ?",
+            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
+            + "updated_at = NOW(), version = version + 1 WHERE workspace_id = ? AND id = ?",
         accountId,
         type,
         direction,
@@ -212,6 +294,49 @@ public class TransactionRepository {
         actor,
         origAmountMinor,
         origCurrency,
+        base.amountMinor(),
+        base.currency(),
+        base.rate(),
+        base.overridden(),
+        ws,
+        id);
+  }
+
+  /** Puts a row back exactly as the snapshot describes (used by undo). */
+  public void applySnapshot(UUID ws, TransactionView v, UUID actor) {
+    db.update(
+        "UPDATE transactions SET account_id = ?, type = ?, direction = ?, amount_minor = ?, currency = ?, occurred_on = ?, "
+            + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, orig_amount_minor = ?, orig_currency = ?, "
+            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
+            + "updated_at = NOW(), version = version + 1 WHERE workspace_id = ? AND id = ?",
+        v.accountId(),
+        v.type(),
+        v.direction(),
+        v.amountMinor(),
+        v.currency(),
+        v.occurredOn(),
+        v.categoryId(),
+        v.payeeId(),
+        v.note(),
+        actor,
+        v.origAmountMinor(),
+        v.origCurrency(),
+        v.baseAmountMinor(),
+        v.baseCurrency(),
+        v.baseFxRate(),
+        v.baseOverridden(),
+        ws,
+        v.id());
+  }
+
+  public void setNormalised(UUID ws, UUID id, Normalised b) {
+    db.update(
+        "UPDATE transactions SET base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
+            + "updated_at = NOW(), version = version + 1 WHERE workspace_id = ? AND id = ?",
+        b.amountMinor(),
+        b.currency(),
+        b.rate(),
+        b.overridden(),
         ws,
         id);
   }
@@ -245,11 +370,19 @@ public class TransactionRepository {
         ids);
   }
 
+  public void undelete(UUID ws, List<UUID> ids) {
+    db.update(
+        "UPDATE transactions SET deleted_at = NULL, updated_at = NOW(), version = version + 1 "
+            + "WHERE workspace_id = ? AND id = ANY(?)",
+        ws,
+        ids);
+  }
+
   public int recategorize(UUID ws, List<UUID> ids, UUID categoryId) {
     return db.update(
         "UPDATE transactions t SET category_id = c.id, version = t.version + 1, updated_at = NOW() FROM categories c "
             + "WHERE c.id = ? AND c.workspace_id = ? AND t.workspace_id = ? AND t.id = ANY(?) AND t.type = c.kind "
-            + "AND t.deleted_at IS NULL",
+            + "AND t.deleted_at IS NULL AND t.shared_copy = FALSE",
         categoryId,
         ws,
         ws,
@@ -270,5 +403,53 @@ public class TransactionRepository {
             ruleId,
             date)
         > 0;
+  }
+
+  /**
+   * Rows (any workspace) still lacking a base amount, oldest first, for the background backfill.
+   */
+  public record Pending(
+      UUID id, UUID workspaceId, String currency, long amountMinor, LocalDate date) {}
+
+  public List<Pending> pendingNormalisation(int limit) {
+    return db.list(
+        "SELECT id, workspace_id, currency, amount_minor, occurred_on FROM transactions "
+            + "WHERE base_amount_minor IS NULL AND deleted_at IS NULL AND type <> 'TRANSFER' "
+            + "ORDER BY occurred_on DESC LIMIT ?",
+        rs ->
+            new Pending(
+                rs.getObject(1, UUID.class),
+                rs.getObject(2, UUID.class),
+                rs.getString(3),
+                rs.getLong(4),
+                rs.getObject(5, LocalDate.class)),
+        limit);
+  }
+
+  /**
+   * Rows of a workspace whose base amount is computed (not user-overridden), for a base-currency
+   * change.
+   */
+  public List<Pending> recomputable(UUID ws) {
+    return db.list(
+        "SELECT id, workspace_id, currency, amount_minor, occurred_on FROM transactions "
+            + "WHERE workspace_id = ? AND deleted_at IS NULL AND type <> 'TRANSFER' AND base_overridden = FALSE",
+        rs ->
+            new Pending(
+                rs.getObject(1, UUID.class),
+                rs.getObject(2, UUID.class),
+                rs.getString(3),
+                rs.getLong(4),
+                rs.getObject(5, LocalDate.class)),
+        ws);
+  }
+
+  public void writeNormalised(UUID id, Normalised b) {
+    db.update(
+        "UPDATE transactions SET base_amount_minor = ?, base_currency = ?, base_fx_rate = ? WHERE id = ?",
+        b.amountMinor(),
+        b.currency(),
+        b.rate(),
+        id);
   }
 }

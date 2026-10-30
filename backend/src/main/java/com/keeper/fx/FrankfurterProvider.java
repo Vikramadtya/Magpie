@@ -18,6 +18,16 @@ public class FrankfurterProvider implements FxRateProvider {
   }
 
   @Override
+  public Map<String, BigDecimal> historical(String base, java.time.LocalDate date) {
+    Map<?, ?> body =
+        client.toBlocking().retrieve(HttpRequest.GET("/v1/" + date + "?base=" + base), Map.class);
+    Map<String, BigDecimal> rates = new HashMap<>();
+    ((Map<?, ?>) body.get("rates"))
+        .forEach((k, v) -> rates.put(k.toString(), new BigDecimal(v.toString())));
+    return rates;
+  }
+
+  @Override
   public Map<String, BigDecimal> latest(String base) {
     Map<?, ?> body =
         client.toBlocking().retrieve(HttpRequest.GET("/v1/latest?base=" + base), Map.class);

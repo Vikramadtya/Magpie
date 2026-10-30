@@ -5,6 +5,7 @@ import com.keeper.common.RefChecks;
 import com.keeper.common.db.Db;
 import com.keeper.common.exception.BadRequestException;
 import com.keeper.common.exception.ResourceNotFoundException;
+import com.keeper.transaction.EntryOrigin;
 import com.keeper.transaction.TransactionController;
 import com.keeper.transaction.TransactionRepository;
 import com.keeper.transaction.TransactionService;
@@ -164,7 +165,7 @@ public class RecurringService {
                 null,
                 null);
         transactions.insertEntry(
-            ws, actor, "rule:" + rule.id() + ":" + date, request, rule.id(), null, null);
+            ws, actor, "rule:" + rule.id() + ":" + date, request, EntryOrigin.recurring(rule.id()));
       }
     }
     rules.advance(rule.id(), next, finished);

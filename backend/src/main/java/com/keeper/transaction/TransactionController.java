@@ -96,6 +96,9 @@ public class TransactionController {
   @Serdeable
   public record BulkResult(int affected) {}
 
+  @Serdeable
+  public record NormalisedRequest(@Positive @Max(MAX_MINOR) long baseAmountMinor) {}
+
   private final TransactionService service;
 
   public TransactionController(TransactionService service) {
@@ -148,6 +151,40 @@ public class TransactionController {
   @Delete("/transactions/{id}")
   public void delete(Authentication auth, @PathVariable UUID workspaceId, @PathVariable UUID id) {
     service.delete(workspaceId, Actor.id(auth), id);
+  }
+
+  @Get("/transactions/deleted")
+  public List<TransactionView> deleted(@PathVariable UUID workspaceId) {
+    return service.deleted(workspaceId);
+  }
+
+  @Post("/transactions/{id}/undo")
+  public TransactionService.UndoResult undo(
+      Authentication auth, @PathVariable UUID workspaceId, @PathVariable UUID id) {
+    return service.undo(workspaceId, Actor.id(auth), id);
+  }
+
+  @Post("/transactions/{id}/restore")
+  public TransactionView restore(
+      Authentication auth, @PathVariable UUID workspaceId, @PathVariable UUID id) {
+    return service.restore(workspaceId, Actor.id(auth), id);
+  }
+
+  /** Overrides the base-currency value that reports use for this transaction. */
+  @Put("/transactions/{id}/normalized")
+  public TransactionView setNormalised(
+      Authentication auth,
+      @PathVariable UUID workspaceId,
+      @PathVariable UUID id,
+      @Valid @Body NormalisedRequest body) {
+    return service.setNormalised(workspaceId, Actor.id(auth), id, body.baseAmountMinor());
+  }
+
+  /** Goes back to the exchange rate of the transaction's day. */
+  @Delete("/transactions/{id}/normalized")
+  public TransactionView resetNormalised(
+      Authentication auth, @PathVariable UUID workspaceId, @PathVariable UUID id) {
+    return service.resetNormalised(workspaceId, Actor.id(auth), id);
   }
 
   @Post("/transfers")

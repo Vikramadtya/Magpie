@@ -42,6 +42,7 @@ public class DashboardService {
   private final BudgetService budgets;
   private final RecurringService recurring;
   private final FxConverter fx;
+  private final com.keeper.analytics.MissingRates missingRates;
   private final Db db;
 
   public DashboardService(
@@ -50,12 +51,14 @@ public class DashboardService {
       BudgetService budgets,
       RecurringService recurring,
       FxConverter fx,
+      com.keeper.analytics.MissingRates missingRates,
       Db db) {
     this.accounts = accounts;
     this.transactions = transactions;
     this.budgets = budgets;
     this.recurring = recurring;
     this.fx = fx;
+    this.missingRates = missingRates;
     this.db = db;
   }
 
@@ -74,10 +77,11 @@ public class DashboardService {
     AtomicLong income = new AtomicLong();
     AtomicLong expense = new AtomicLong();
     db.list(
-        "SELECT type, currency, SUM(amount_minor) FROM transactions WHERE workspace_id = ? AND deleted_at IS NULL "
-            + "AND type IN ('INCOME','EXPENSE') AND occurred_on BETWEEN ? AND ? GROUP BY type, currency",
+        "SELECT type, SUM(base_amount_minor) FROM transactions WHERE workspace_id = ? AND deleted_at IS NULL "
+            + "AND loan_id IS NULL AND base_amount_minor IS NOT NULL "
+            + "AND type IN ('INCOME','EXPENSE') AND occurred_on BETWEEN ? AND ? GROUP BY type",
         rs -> {
-          long v = converter.toBase(rs.getLong(3), rs.getString(2));
+          long v = rs.getLong(2);
           ("INCOME".equals(rs.getString(1)) ? income : expense).addAndGet(v);
           return null;
         },
@@ -104,7 +108,15 @@ public class DashboardService {
         recent.items(),
         budgets.summary(ws, month),
         recurring.upcoming(ws, 14),
-        List.copyOf(converter.missing()));
+        mergeMissing(
+            converter.missing(),
+            missingRates.currencies(ws, month.atDay(1), month.atEndOfMonth())));
+  }
+
+  private static List<String> mergeMissing(java.util.Set<String> a, List<String> b) {
+    java.util.TreeSet<String> all = new java.util.TreeSet<>(a);
+    all.addAll(b);
+    return List.copyOf(all);
   }
 
   private static boolean isLiability(Account a) {

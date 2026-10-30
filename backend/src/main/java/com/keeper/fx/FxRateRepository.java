@@ -33,6 +33,42 @@ public class FxRateRepository {
     return rates;
   }
 
+  /** Rates stored for exactly this day. */
+  public Map<String, BigDecimal> on(LocalDate date) {
+    return load("SELECT quote, rate FROM exchange_rates WHERE base = ? AND as_of = ?", PIVOT, date);
+  }
+
+  /** Rates of the closest stored day on or before {@code date}, else the closest after it. */
+  public Map<String, BigDecimal> nearest(LocalDate date) {
+    Map<String, BigDecimal> before =
+        load(
+            "SELECT quote, rate FROM exchange_rates WHERE base = ? AND as_of = "
+                + "(SELECT max(as_of) FROM exchange_rates WHERE base = ? AND as_of <= ?)",
+            PIVOT,
+            PIVOT,
+            date);
+    if (!before.isEmpty()) return before;
+    return load(
+        "SELECT quote, rate FROM exchange_rates WHERE base = ? AND as_of = "
+            + "(SELECT min(as_of) FROM exchange_rates WHERE base = ? AND as_of >= ?)",
+        PIVOT,
+        PIVOT,
+        date);
+  }
+
+  private Map<String, BigDecimal> load(String sql, Object... args) {
+    Map<String, BigDecimal> rates = new HashMap<>();
+    db.list(
+        sql,
+        rs -> {
+          rates.put(rs.getString("quote"), rs.getBigDecimal("rate"));
+          return null;
+        },
+        args);
+    if (!rates.isEmpty()) rates.put(PIVOT, BigDecimal.ONE);
+    return rates;
+  }
+
   public Optional<LocalDate> newestDate() {
     return db.one(
         "SELECT max(as_of) FROM exchange_rates WHERE base = ?",
