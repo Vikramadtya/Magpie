@@ -44,10 +44,14 @@ public class WorkspaceService {
   }
 
   public Workspace create(UUID userId, String name, String currency) {
+    return create(userId, name, currency, "PERSONAL");
+  }
+
+  public Workspace create(UUID userId, String name, String currency, String kind) {
     UUID id =
         db.tx(
             () -> {
-              UUID created = workspaces.insert(name, currency.toUpperCase(), userId);
+              UUID created = workspaces.insert(name, currency.toUpperCase(), userId, kind);
               defaults.seed(created);
               return created;
             });

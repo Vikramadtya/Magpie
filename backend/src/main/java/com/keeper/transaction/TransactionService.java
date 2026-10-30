@@ -33,6 +33,7 @@ public class TransactionService {
   private final FxConverter fx;
   private final Normaliser normaliser;
   private final RevisionService revisions;
+  private final io.micronaut.context.event.ApplicationEventPublisher<TransactionChanged> changes;
   private final RefChecks refs;
   private final Audit audit;
   private final Db db;
@@ -46,6 +47,7 @@ public class TransactionService {
       FxConverter fx,
       Normaliser normaliser,
       RevisionService revisions,
+      io.micronaut.context.event.ApplicationEventPublisher<TransactionChanged> changes,
       RefChecks refs,
       Audit audit,
       Db db) {
@@ -57,6 +59,7 @@ public class TransactionService {
     this.fx = fx;
     this.normaliser = normaliser;
     this.revisions = revisions;
+    this.changes = changes;
     this.refs = refs;
     this.audit = audit;
     this.db = db;
@@ -257,16 +260,19 @@ public class TransactionService {
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
+    changes.publishEvent(new TransactionChanged(ws, id));
     return get(ws, id);
   }
 
   public void delete(UUID ws, UUID actor, UUID id) {
     db.tx(() -> deleteOne(ws, actor, id, false));
     audit.record(ws, actor, "transaction", id, "DELETE", "");
+    changes.publishEvent(new TransactionChanged(ws, id));
   }
 
   public int bulkDelete(UUID ws, UUID actor, List<UUID> ids) {
     db.tx(() -> ids.forEach(id -> deleteOne(ws, actor, id, false)));
+    ids.forEach(id -> changes.publishEvent(new TransactionChanged(ws, id)));
     audit.record(ws, actor, "transaction", null, "BULK_DELETE", ids.size() + " transactions");
     return ids.size();
   }
@@ -306,6 +312,7 @@ public class TransactionService {
               return new UndoResult("REVERTED", get(ws, id));
             });
     audit.record(ws, actor, "transaction", id, "UNDO", result.action());
+    changes.publishEvent(new TransactionChanged(ws, id));
     return result;
   }
 
@@ -313,6 +320,7 @@ public class TransactionService {
   public TransactionView restore(UUID ws, UUID actor, UUID id) {
     db.tx(() -> restoreRows(ws, id));
     audit.record(ws, actor, "transaction", id, "RESTORE", "");
+    changes.publishEvent(new TransactionChanged(ws, id));
     return get(ws, id);
   }
 

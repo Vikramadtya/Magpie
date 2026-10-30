@@ -23,7 +23,10 @@ public class WorkspaceController {
 
   @Serdeable
   public record WorkspaceRequest(
-      @NotBlank @Size(max = 120) String name, @Pattern(regexp = "^[A-Za-z]{3}$") String currency) {}
+      @NotBlank @Size(max = 120) String name,
+      @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
+      /** PERSONAL (default) or HOUSEHOLD (a ledger shared by the people who live together). */
+      @Pattern(regexp = "^(PERSONAL|HOUSEHOLD)$") String kind) {}
 
   private final WorkspaceService service;
 
@@ -39,7 +42,10 @@ public class WorkspaceController {
   @Post
   public Workspace create(Authentication auth, @Valid @Body WorkspaceRequest body) {
     return service.create(
-        Actor.id(auth), body.name(), body.currency() == null ? "USD" : body.currency());
+        Actor.id(auth),
+        body.name(),
+        body.currency() == null ? "USD" : body.currency(),
+        body.kind() == null ? "PERSONAL" : body.kind());
   }
 
   @Patch("/{workspaceId}")

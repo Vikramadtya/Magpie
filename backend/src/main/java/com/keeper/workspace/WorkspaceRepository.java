@@ -23,7 +23,8 @@ public class WorkspaceRepository {
               rs.getObject("id", UUID.class),
               rs.getString("name"),
               rs.getString("base_currency"),
-              Role.valueOf(rs.getString("role")));
+              Role.valueOf(rs.getString("role")),
+              rs.getString("kind"));
 
   private final Db db;
 
@@ -33,7 +34,7 @@ public class WorkspaceRepository {
 
   public List<Workspace> findForUser(UUID userId) {
     return db.list(
-        "SELECT w.id, w.name, w.base_currency, m.role FROM workspaces w "
+        "SELECT w.id, w.name, w.base_currency, m.role, w.kind FROM workspaces w "
             + "JOIN workspace_members m ON m.workspace_id = w.id WHERE m.user_id = ? ORDER BY w.created_at",
         WS,
         userId);
@@ -41,21 +42,22 @@ public class WorkspaceRepository {
 
   public Optional<Workspace> find(UUID workspaceId, UUID userId) {
     return db.one(
-        "SELECT w.id, w.name, w.base_currency, m.role FROM workspaces w "
+        "SELECT w.id, w.name, w.base_currency, m.role, w.kind FROM workspaces w "
             + "JOIN workspace_members m ON m.workspace_id = w.id WHERE w.id = ? AND m.user_id = ?",
         WS,
         workspaceId,
         userId);
   }
 
-  public UUID insert(String name, String currency, UUID owner) {
+  public UUID insert(String name, String currency, UUID owner, String kind) {
     UUID id = UUID.randomUUID();
     db.update(
-        "INSERT INTO workspaces(id, created_by, name, base_currency) VALUES (?, ?, ?, ?)",
+        "INSERT INTO workspaces(id, created_by, name, base_currency, kind) VALUES (?, ?, ?, ?, ?)",
         id,
         owner,
         name,
-        currency);
+        currency,
+        kind);
     addMember(id, owner, Role.OWNER);
     return id;
   }

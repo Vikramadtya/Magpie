@@ -329,6 +329,41 @@ public class TransactionRepository {
         v.id());
   }
 
+  /** A household copy and where it lives. */
+  public record CopyRef(
+      UUID id, UUID workspaceId, UUID accountId, long amount, int direction, boolean deleted) {}
+
+  public Optional<CopyRef> copyOf(UUID groupId) {
+    return db.one(
+        "SELECT id, workspace_id, account_id, amount_minor, direction, deleted_at IS NOT NULL FROM transactions "
+            + "WHERE shared_group_id = ? AND shared_copy ORDER BY (deleted_at IS NULL) DESC, created_at DESC LIMIT 1",
+        rs ->
+            new CopyRef(
+                rs.getObject(1, UUID.class),
+                rs.getObject(2, UUID.class),
+                rs.getObject(3, UUID.class),
+                rs.getLong(4),
+                rs.getInt(5),
+                rs.getBoolean(6)),
+        groupId);
+  }
+
+  public Optional<UUID> groupIdOf(UUID ws, UUID id) {
+    return db.one(
+        "SELECT shared_group_id FROM transactions WHERE workspace_id = ? AND id = ? AND shared_group_id IS NOT NULL AND NOT shared_copy",
+        rs -> rs.getObject(1, UUID.class),
+        ws,
+        id);
+  }
+
+  public void setSharedGroup(UUID ws, UUID id, UUID groupId) {
+    db.update(
+        "UPDATE transactions SET shared_group_id = ? WHERE workspace_id = ? AND id = ? AND NOT shared_copy",
+        groupId,
+        ws,
+        id);
+  }
+
   public void setNormalised(UUID ws, UUID id, Normalised b) {
     db.update(
         "UPDATE transactions SET base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
