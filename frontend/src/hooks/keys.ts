@@ -24,9 +24,12 @@ export const qk = {
   forecast: (ws: string) => ['ws', ws, 'forecast'] as const,
   insights: (ws: string) => ['ws', ws, 'insights'] as const,
   trips: (ws: string) => ['ws', ws, 'trips'] as const,
+  inbox: (ws: string, scope: string) => ['ws', ws, 'inbox', scope] as const,
+  inboxCount: (ws: string) => ['ws', ws, 'inbox', 'count'] as const,
+  connections: (ws: string) => ['ws', ws, 'connections'] as const,
 };
 
-const MONEY_KEYS = new Set(['accounts', 'transactions', 'budgets', 'goals', 'recurring', 'upcoming', 'dashboard', 'analytics', 'investments', 'activity', 'deleted', 'loans', 'forecast', 'insights', 'trips']);
+const MONEY_KEYS = new Set(['accounts', 'transactions', 'budgets', 'goals', 'recurring', 'upcoming', 'dashboard', 'analytics', 'investments', 'activity', 'deleted', 'loans', 'forecast', 'insights', 'trips', 'inbox']);
 
 /** Anything derived from transactions: refetch after a money change. */
 export function invalidateMoney(qc: QueryClient, ws: string) {

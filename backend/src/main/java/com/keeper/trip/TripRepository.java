@@ -87,6 +87,54 @@ public class TripRepository {
     return db.update("DELETE FROM trips WHERE workspace_id = ? AND id = ?", ws, id);
   }
 
+  // ---------- trips that come from a split-app group ----------
+
+  public Optional<UUID> findIdByExternalRef(UUID ws, String ref) {
+    return db.one(
+        "SELECT id FROM trips WHERE workspace_id = ? AND external_ref = ?",
+        rs -> rs.getObject(1, UUID.class),
+        ws,
+        ref);
+  }
+
+  public Optional<UUID> findIdByName(UUID ws, String name) {
+    return db.one(
+        "SELECT id FROM trips WHERE workspace_id = ? AND lower(name) = lower(?) ORDER BY start_date DESC LIMIT 1",
+        rs -> rs.getObject(1, UUID.class),
+        ws,
+        name.trim());
+  }
+
+  public UUID insertFromGroup(UUID ws, String name, LocalDate date, String ref) {
+    UUID id = UUID.randomUUID();
+    db.update(
+        "INSERT INTO trips(id, workspace_id, name, start_date, end_date, external_ref) VALUES (?,?,?,?,?,?)",
+        id,
+        ws,
+        name.trim(),
+        date,
+        date,
+        ref);
+    return id;
+  }
+
+  /** Stretches a group trip's dates to cover a new expense. */
+  public void extendToCover(UUID id, LocalDate date) {
+    db.update(
+        "UPDATE trips SET start_date = LEAST(start_date, ?), end_date = GREATEST(end_date, ?) WHERE id = ?",
+        date,
+        date,
+        id);
+  }
+
+  public Optional<String> externalRef(UUID ws, UUID id) {
+    return db.one(
+        "SELECT external_ref FROM trips WHERE workspace_id = ? AND id = ? AND external_ref IS NOT NULL",
+        rs -> rs.getString(1),
+        ws,
+        id);
+  }
+
   // ---------- assignment ----------
 
   public int assign(UUID ws, UUID tripId, List<UUID> ids) {

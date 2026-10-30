@@ -107,6 +107,19 @@ public class LoanService {
     return new Overview(converter.base(), owedToMe, iOwe, people, all);
   }
 
+  /**
+   * Open loans you lent to a person (oldest first), in one currency: where an incoming repayment
+   * goes.
+   */
+  public List<Loan> openLentTo(UUID ws, String person, String currency) {
+    return loans.findAll(ws).stream()
+        .map(LoanService::toLoan)
+        .filter(l -> "LENT".equals(l.direction()) && l.outstandingMinor() > 0)
+        .filter(l -> l.person().equalsIgnoreCase(person.trim()) && l.currency().equals(currency))
+        .sorted(java.util.Comparator.comparing(Loan::occurredOn))
+        .toList();
+  }
+
   public Detail detail(UUID ws, UUID id) {
     return new Detail(get(ws, id), transactionRepo.findByLoan(ws, id));
   }
@@ -154,6 +167,12 @@ public class LoanService {
 
   /** A repayment: you paying back what you borrowed, or them paying back what you lent. */
   public Loan repay(UUID ws, UUID actor, UUID loanId, LoanController.PaymentRequest r) {
+    repayTx(ws, actor, loanId, r);
+    return get(ws, loanId);
+  }
+
+  /** Records a repayment and returns the id of the transaction it created. */
+  public UUID repayTx(UUID ws, UUID actor, UUID loanId, LoanController.PaymentRequest r) {
     Loan loan = get(ws, loanId);
     Account account =
         accounts
@@ -167,25 +186,26 @@ public class LoanService {
       throw new BusinessRuleException("That is more than the outstanding amount");
     }
     boolean borrowed = "BORROWED".equals(loan.direction());
-    db.tx(
-        () ->
-            transactions.insertEntry(
-                ws,
-                actor,
-                null,
-                entry(
-                    account,
-                    borrowed ? "EXPENSE" : "INCOME",
-                    r.amountMinor(),
-                    r.occurredOn(),
-                    clean(r.note()) != null
-                        ? clean(r.note())
-                        : (borrowed ? "Repaid " : "Repayment from ") + loan.person(),
-                    loan.person(),
-                    ws),
-                EntryOrigin.loan(loanId)));
+    UUID txId =
+        db.tx(
+            () ->
+                transactions.insertEntry(
+                    ws,
+                    actor,
+                    null,
+                    entry(
+                        account,
+                        borrowed ? "EXPENSE" : "INCOME",
+                        r.amountMinor(),
+                        r.occurredOn(),
+                        clean(r.note()) != null
+                            ? clean(r.note())
+                            : (borrowed ? "Repaid " : "Repayment from ") + loan.person(),
+                        loan.person(),
+                        ws),
+                    EntryOrigin.loan(loanId)));
     audit.record(ws, actor, "loan", loanId, "REPAYMENT", loan.person());
-    return get(ws, loanId);
+    return txId;
   }
 
   /** Removes the loan and every transaction linked to it (each stays individually undoable). */

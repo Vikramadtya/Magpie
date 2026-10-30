@@ -9,6 +9,7 @@ import { cn } from '../../lib/cn';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { Skeleton } from '../ui/StateView';
 import { CommandPalette } from './CommandPalette';
+import { useInboxCount } from '../../hooks/useInbox';
 import { NAV_ITEMS } from './nav';
 
 export default function AppLayout() {
@@ -72,6 +73,7 @@ function Shell() {
 function SidebarContent() {
   const { workspaces, workspace, selectWorkspace, user, logout } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
+  const waiting = useInboxCount().data ?? 0;
   return (
     <>
       <div className="px-5 mb-4 flex items-center justify-between">
@@ -123,6 +125,9 @@ function SidebarContent() {
               <>
                 <item.icon className={cn('w-[18px] h-[18px]', isActive ? 'text-white' : 'text-accent')} strokeWidth={isActive ? 2.5 : 2} />
                 {item.label}
+                {item.path === '/inbox' && waiting > 0 && (
+                  <span className={cn('ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5', isActive ? 'bg-white/25 text-white' : 'bg-accent text-white')} aria-label={`${waiting} to review`}>{waiting}</span>
+                )}
               </>
             )}
           </NavLink>

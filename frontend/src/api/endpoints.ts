@@ -167,3 +167,19 @@ export const tripsApi = {
   unassign: (ws: string, ids: string[]) => api.post<{ affected: number }>(ws, '/trips/unassign', { ids }),
   clear: (ws: string, id: string) => api.post<{ affected: number }>(ws, `/trips/${id}/clear`),
 };
+
+export const inboxApi = {
+  list: (ws: string, scope: 'todo' | 'done') => api.get<T.InboxItem[]>(ws, '/inbox', { scope }),
+  count: (ws: string) => api.get<{ count: number }>(ws, '/inbox/count'),
+  accept: (ws: string, id: string, b: T.AcceptInput) => api.post<T.InboxItem>(ws, `/inbox/${id}/accept`, b),
+  dismiss: (ws: string, id: string) => api.post<T.InboxItem>(ws, `/inbox/${id}/dismiss`),
+  applyUpdate: (ws: string, id: string, b: T.AcceptInput) => api.post<T.InboxItem>(ws, `/inbox/${id}/apply-update`, b),
+  removeRecords: (ws: string, id: string) => api.post<T.InboxItem>(ws, `/inbox/${id}/remove-records`),
+  keep: (ws: string, id: string) => api.post<T.InboxItem>(ws, `/inbox/${id}/keep`),
+};
+
+export const connectionsApi = {
+  list: (ws: string) => api.get<T.ApiToken[]>(ws, '/api-tokens'),
+  create: (ws: string, name: string) => api.post<{ token: T.ApiToken; secret: string }>(ws, '/api-tokens', { name }),
+  revoke: (ws: string, id: string) => api.del(ws, `/api-tokens/${id}`),
+};

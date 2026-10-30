@@ -166,3 +166,14 @@ export interface TripDetail {
   missingCurrencies: string[];
 }
 export interface TripInput { name: string; startDate: string; endDate: string; budgetMinor?: number | null; notes?: string | null }
+
+// ---------- split app inbox ----------
+export interface InboxShare { name: string; shareMinor: number }
+export interface InboxItem {
+  id: string; kind: 'EXPENSE' | 'SETTLEMENT'; externalId: string; groupId: string | null; groupName: string | null;
+  occurredOn: string; currency: string; totalMinor: number; paidByMe: boolean | null; myShareMinor: number | null;
+  title: string | null; counterparty: string | null; direction: 'RECEIVED' | 'PAID' | null; shares: InboxShare[];
+  status: 'PENDING' | 'ACCEPTED' | 'DISMISSED' | 'CHANGED' | 'REMOVED'; accountId: string | null; tripId: string | null; receivedAt: string;
+}
+export interface AcceptInput { accountId?: string | null; categoryId?: string | null; tripId?: string | null; noTrip?: boolean; accountAmountMinor?: number | null }
+export interface ApiToken { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }

@@ -1,9 +1,10 @@
 import {
-  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane,
+  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane, Inbox,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/inbox', label: 'To review', icon: Inbox },
   { path: '/transactions', label: 'Transactions', icon: Receipt },
   { path: '/accounts', label: 'Accounts', icon: Wallet },
   { path: '/budgets', label: 'Budgets', icon: PiggyBank },

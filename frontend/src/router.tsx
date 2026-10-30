@@ -18,6 +18,7 @@ const RecurringPage = lazyPage(() => import('./pages/RecurringPage'));
 const InvestmentsPage = lazyPage(() => import('./pages/InvestmentsPage'));
 const AnalyticsPage = lazyPage(() => import('./pages/AnalyticsPage'));
 const LoansPage = lazyPage(() => import('./pages/LoansPage'));
+const InboxPage = lazyPage(() => import('./pages/InboxPage'));
 const TripsPage = lazyPage(() => import('./pages/TripsPage'));
 const TripDetailPage = lazyPage(() => import('./pages/TripDetailPage'));
 const CategoriesPage = lazyPage(() => import('./pages/CategoriesPage'));
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
       { path: '/goals', element: <GoalsPage /> },
       { path: '/recurring', element: <RecurringPage /> },
       { path: '/loans', element: <LoansPage /> },
+      { path: '/inbox', element: <InboxPage /> },
       { path: '/trips', element: <TripsPage /> },
       { path: '/trips/:id', element: <TripDetailPage /> },
       { path: '/investments', element: <InvestmentsPage /> },
