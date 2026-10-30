@@ -8,6 +8,7 @@ import io.micronaut.http.HttpStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class HouseholdTest extends ApiTestBase {
@@ -99,12 +100,45 @@ class HouseholdTest extends ApiTestBase {
                     Map.of("householdId", hhId))
                 .bearerAuth(alice.token())));
 
-    // bob records 20.00 directly in the household
+    // a household is view-only: nobody can type entries into it directly, not even an editor
+    assertEquals(
+        HttpStatus.FORBIDDEN,
+        statusOf(
+            HttpRequest.POST(
+                    ws(hhId) + "/accounts",
+                    Map.of(
+                        "name",
+                        "Nope",
+                        "type",
+                        "CASH",
+                        "currency",
+                        "USD",
+                        "openingBalanceMinor",
+                        0))
+                .bearerAuth(alice.token())));
+    assertEquals(
+        HttpStatus.FORBIDDEN,
+        statusOf(
+            HttpRequest.POST(
+                    ws(hhId) + "/transactions",
+                    Map.of(
+                        "accountId",
+                        UUID.randomUUID().toString(),
+                        "type",
+                        "EXPENSE",
+                        "amountMinor",
+                        100,
+                        "occurredOn",
+                        LocalDate.now().toString()))
+                .bearerAuth(bob.token())));
+
+    // bob (a read-only member) records 20.00 in HIS ledger and shares it
+    String bobPersonal = ws(bob.workspaceId().toString());
     String bobAcc =
         (String)
             post(
                     bob.token(),
-                    ws(hhId) + "/accounts",
+                    bobPersonal + "/accounts",
                     Map.of(
                         "name",
                         "Bob cash",
@@ -113,21 +147,27 @@ class HouseholdTest extends ApiTestBase {
                         "currency",
                         "USD",
                         "openingBalanceMinor",
-                        0),
+                        50_000),
                     Map.class)
                 .get("id");
+    Map<?, ?> bobTx =
+        post(
+            bob.token(),
+            bobPersonal + "/transactions",
+            Map.of(
+                "accountId",
+                bobAcc,
+                "type",
+                "EXPENSE",
+                "amountMinor",
+                2_000,
+                "occurredOn",
+                LocalDate.now().toString()),
+            Map.class);
     post(
         bob.token(),
-        ws(hhId) + "/transactions",
-        Map.of(
-            "accountId",
-            bobAcc,
-            "type",
-            "EXPENSE",
-            "amountMinor",
-            2_000,
-            "occurredOn",
-            LocalDate.now().toString()),
+        bobPersonal + "/transactions/" + bobTx.get("id") + "/share",
+        Map.of("householdId", hhId),
         Map.class);
 
     Map<?, ?> sum = get(bob.token(), ws(hhId) + "/household/summary", Map.class);
@@ -157,10 +197,17 @@ class HouseholdTest extends ApiTestBase {
                 .findFirst()
                 .orElseThrow();
     assertEquals(
-        HttpStatus.CONFLICT,
+        HttpStatus.FORBIDDEN,
         statusOf(
             HttpRequest.DELETE(ws(hhId) + "/transactions/" + copy.get("id"))
                 .bearerAuth(bob.token())));
+
+    // read-only members can still comment on a shared expense
+    post(
+        bob.token(),
+        ws(hhId) + "/transactions/" + copy.get("id") + "/comments",
+        Map.of("body", "thanks!"),
+        Map.class);
 
     // bob settles up: balances clear
     post(

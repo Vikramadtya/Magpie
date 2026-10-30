@@ -50,21 +50,49 @@ public class WorkspaceAccessFilter implements Ordered {
     } catch (IllegalArgumentException e) {
       return problem(HttpStatus.NOT_FOUND, "Workspace not found");
     }
-    Optional<Role> role = memberships.roleOf(Actor.id(auth), workspaceId);
-    if (role.isEmpty()) {
+    Optional<MembershipCache.Membership> membership =
+        memberships.membership(Actor.id(auth), workspaceId);
+    if (membership.isEmpty()) {
       return problem(HttpStatus.NOT_FOUND, "Workspace not found");
     }
+    Role role = membership.get().role();
+    boolean household = "HOUSEHOLD".equals(membership.get().kind());
     String rest = m.group(2) == null ? "" : m.group(2);
-    if (!role.get().atLeast(required(request.getMethod(), rest))) {
+    boolean read = request.getMethod() == HttpMethod.GET || request.getMethod() == HttpMethod.HEAD;
+    if (household && !read && !householdWritable(rest)) {
+      return problem(
+          HttpStatus.FORBIDDEN,
+          "A household is view-only. Record the expense in your own ledger and share it here.");
+    }
+    if (!role.atLeast(required(request.getMethod(), rest, household))) {
       return problem(HttpStatus.FORBIDDEN, "Your role does not allow this action");
     }
-    request.setAttribute(ROLE_ATTRIBUTE, role.get());
+    request.setAttribute(ROLE_ATTRIBUTE, role);
     return null;
   }
 
-  static Role required(HttpMethod method, String rest) {
+  /**
+   * What a household still accepts: membership management, settling up and comments on shared
+   * expenses.
+   */
+  static boolean householdWritable(String rest) {
+    return rest.isEmpty()
+        || rest.equals("/leave")
+        || rest.startsWith("/members")
+        || rest.startsWith("/invites")
+        || rest.startsWith("/household/settlements")
+        || rest.matches("^/transactions/[0-9a-fA-F-]{36}/comments$");
+  }
+
+  static Role required(HttpMethod method, String rest, boolean household) {
     boolean read = method == HttpMethod.GET || method == HttpMethod.HEAD;
     if (rest.equals("/leave")) return Role.VIEWER;
+    // every household member can settle up and comment, whatever their invite role
+    if (household
+        && !read
+        && (rest.startsWith("/household/settlements") || rest.contains("/comments"))) {
+      return Role.VIEWER;
+    }
     boolean ownerOnly =
         rest.isEmpty() && !read // rename / delete workspace
             || (rest.startsWith("/members") || rest.startsWith("/invites")) && !read;

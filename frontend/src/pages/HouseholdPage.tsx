@@ -19,7 +19,7 @@ import { formatMoney, parseMoney, toInputValue } from '../lib/money';
 const StackedBars = lazy(() => import('../components/charts/StackedBars'));
 
 export default function HouseholdPage() {
-  const { kind, baseCurrency, canEdit } = useWorkspace();
+  const { kind, baseCurrency } = useWorkspace();
   const { user } = useAuth();
   const isHousehold = kind === 'HOUSEHOLD';
   const [month, setMonth] = useState(() => monthKey(new Date()));
@@ -45,7 +45,7 @@ export default function HouseholdPage() {
         <div className="glass-panel p-8 text-center max-w-xl">
           <p className="font-medium mb-2">This is a personal ledger</p>
           <p className="text-sm text-secondary mb-4">
-            Create a household workspace in Settings, invite your partner or family, then tick “Household” when you record a shared expense. It appears in both ledgers and shows who spent what.
+            A household is a view-only workspace for analytics on shared spending. Create one in Settings, invite your partner or family, then tick “Household” when you record an expense in your own ledger (or use the share icon on an existing one). It appears in the household and shows who spent what.
           </p>
           <Link to="/settings"><Button>Go to Settings</Button></Link>
         </div>
@@ -57,8 +57,8 @@ export default function HouseholdPage() {
     <>
       <PageHeader
         title="Household"
-        subtitle="Shared spending, who paid what, and who owes whom"
-        actions={<><MonthPicker month={month} onChange={setMonth} />{canEdit && <Button size="sm" onClick={() => setSettling({})}>Settle up</Button>}</>}
+        subtitle="Shared spending from everyone's own ledgers: who paid what and who owes whom"
+        actions={<><MonthPicker month={month} onChange={setMonth} /><Button size="sm" onClick={() => setSettling({})}>Settle up</Button></>}
       />
       <StateView isLoading={summary.isLoading} error={summary.error} onRetry={() => void summary.refetch()} skeleton={<Skeleton className="h-40" />}>
         {s && (
@@ -95,7 +95,7 @@ export default function HouseholdPage() {
                   {s.suggested.map((p) => (
                     <li key={`${p.fromUserId}-${p.toUserId}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                       <span><strong>{p.fromName}</strong> pays <strong>{p.toName}</strong> {formatMoney(p.amountMinor, s.currency)}</span>
-                      {p.fromUserId === user?.id && canEdit && <Button size="sm" onClick={() => setSettling({ toUserId: p.toUserId, amountMinor: p.amountMinor })}>Record payment</Button>}
+                      {p.fromUserId === user?.id && <Button size="sm" onClick={() => setSettling({ toUserId: p.toUserId, amountMinor: p.amountMinor })}>Record payment</Button>}
                     </li>
                   ))}
                 </ul>

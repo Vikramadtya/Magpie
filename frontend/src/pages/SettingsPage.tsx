@@ -29,7 +29,8 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState(ws.baseCurrency);
   const [newName, setNewName] = useState('');
   const [newKind, setNewKind] = useState<'PERSONAL' | 'HOUSEHOLD'>('PERSONAL');
-  const [inviteRole, setInviteRole] = useState<'EDITOR' | 'VIEWER'>('EDITOR');
+  // household members only need to share and settle up, so viewer is the sensible default there
+  const [inviteRole, setInviteRole] = useState<'EDITOR' | 'VIEWER'>(ws.kind === 'HOUSEHOLD' ? 'VIEWER' : 'EDITOR');
   const [inviteLink, setInviteLink] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);

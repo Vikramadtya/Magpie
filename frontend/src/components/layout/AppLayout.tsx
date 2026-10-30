@@ -20,6 +20,7 @@ export default function AppLayout() {
 }
 
 function Shell() {
+  const { workspace } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const online = useOnline();
@@ -52,6 +53,11 @@ function Shell() {
         {!online && (
           <div role="status" className="flex items-center justify-center gap-2 py-1.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300">
             <WifiOff className="w-3.5 h-3.5" /> You're offline. Showing saved data; changes need a connection.
+          </div>
+        )}
+        {workspace?.kind === 'HOUSEHOLD' && (
+          <div role="status" className="px-4 py-1.5 text-xs text-center bg-accent/10 text-accent">
+            Household ledger · view-only. Members add spending by sharing expenses from their own ledgers.
           </div>
         )}
         <main id="main" className="flex-1 overflow-y-auto">
@@ -138,6 +144,8 @@ function SidebarContent() {
 
 function AddButton({ compact }: { compact?: boolean }) {
   const dialog = useTransactionDialog();
+  const { workspace } = useAuth();
+  if (workspace?.kind === 'HOUSEHOLD') return null; // households are view-only
   return (
     <button
       onClick={() => dialog.open()}

@@ -32,11 +32,17 @@ export function useTransactionDialog() {
 }
 
 export function TransactionDialogProvider({ children }: { children: ReactNode }) {
-  const { canEdit } = useWorkspace();
+  const { canEdit, kind } = useWorkspace();
   const [state, setState] = useState<{ tx: Transaction | null; preset?: { type?: TxType; accountId?: string } } | null>(null);
   const open = useCallback<DialogApi['open']>(
     (tx, preset) => {
-      if (!canEdit) return toast.info('You have view-only access to this workspace');
+      if (!canEdit) {
+        return toast.info(
+          kind === 'HOUSEHOLD'
+            ? 'A household is view-only. Record the expense in your own ledger and share it here.'
+            : 'You have view-only access to this workspace',
+        );
+      }
       setState({ tx: tx ?? null, preset });
     },
     [canEdit],

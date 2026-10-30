@@ -11,7 +11,6 @@ import com.keeper.common.exception.ConflictException;
 import com.keeper.common.exception.ForbiddenException;
 import com.keeper.common.exception.ResourceNotFoundException;
 import com.keeper.payee.PayeeRepository;
-import com.keeper.security.Role;
 import com.keeper.transaction.EntryOrigin;
 import com.keeper.transaction.Normalised;
 import com.keeper.transaction.Normaliser;
@@ -69,7 +68,7 @@ public class HouseholdService {
 
   public TransactionView share(UUID personalWs, UUID actor, UUID txId, UUID householdWs) {
     if (personalWs.equals(householdWs)) throw new BadRequestException("Choose a household");
-    requireHouseholdEditor(householdWs, actor);
+    requireHouseholdMember(householdWs, actor);
     TransactionView src =
         transactions
             .find(personalWs, txId)
@@ -214,13 +213,13 @@ public class HouseholdService {
         .orElseGet(() -> accounts.insert(householdWs, POOL_ACCOUNT, "OTHER", currency, 0));
   }
 
-  private void requireHouseholdEditor(UUID householdWs, UUID actor) {
-    Role role =
-        workspaces
-            .roleOf(householdWs, actor)
-            .orElseThrow(() -> new ForbiddenException("You are not a member of that household"));
-    if (!role.atLeast(Role.EDITOR))
-      throw new ForbiddenException("You can only view that household");
+  /**
+   * Any member can share into a household: they add their own spending, they don't edit the ledger.
+   */
+  private void requireHouseholdMember(UUID householdWs, UUID actor) {
+    workspaces
+        .roleOf(householdWs, actor)
+        .orElseThrow(() -> new ForbiddenException("You are not a member of that household"));
     String kind =
         db.one("SELECT kind FROM workspaces WHERE id = ?", rs -> rs.getString(1), householdWs)
             .orElse("PERSONAL");
