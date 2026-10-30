@@ -15,3 +15,5 @@ keeper:
     secure: false
   fx:
     auto-refresh: false
+  market:
+    enabled: false

@@ -44,7 +44,12 @@ public class InvestmentController {
       String currency,
       LocalDate priceAsOf,
       long marketValueMinor,
-      long gainMinor) {}
+      long gainMinor,
+      String providerSymbol,
+      String exchange,
+      String assetType,
+      String priceSource,
+      java.time.Instant priceUpdatedAt) {}
 
   @Serdeable
   public record Request(
@@ -54,7 +59,11 @@ public class InvestmentController {
       @DecimalMin("0") BigDecimal quantity,
       @Min(0) @Max(1_000_000_000_000L) long costBasisMinor,
       @Min(0) @Max(1_000_000_000_000L) long priceMinor,
-      @Pattern(regexp = "^[A-Za-z]{3}$") String currency) {}
+      @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
+      /** Exact instrument chosen from market search; makes the price live. */
+      @Size(max = 40) String providerSymbol,
+      @Size(max = 40) String exchange,
+      @Size(max = 20) String assetType) {}
 
   @Serdeable
   public record PriceRequest(@Min(0) @Max(1_000_000_000_000L) long priceMinor) {}
@@ -73,16 +82,26 @@ public class InvestmentController {
 
   private static final String SELECT =
       "SELECT id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of, "
-          + "ROUND(quantity * price_minor) AS value FROM holdings WHERE workspace_id = ? ";
+          + "ROUND(quantity * price_minor) AS value, provider_symbol, exchange, asset_type, price_source, price_updated_at "
+          + "FROM holdings WHERE workspace_id = ? ";
 
   private final Db db;
   private final RefChecks refs;
   private final FxConverter fx;
+  private final com.keeper.market.MarketDataService market;
+  private final HoldingRefresher refresher;
 
-  public InvestmentController(Db db, RefChecks refs, FxConverter fx) {
+  public InvestmentController(
+      Db db,
+      RefChecks refs,
+      FxConverter fx,
+      com.keeper.market.MarketDataService market,
+      HoldingRefresher refresher) {
     this.db = db;
     this.refs = refs;
     this.fx = fx;
+    this.market = market;
+    this.refresher = refresher;
   }
 
   private static Holding map(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -99,21 +118,46 @@ public class InvestmentController {
         rs.getString("currency"),
         rs.getObject("price_as_of", LocalDate.class),
         value,
-        value - cost);
+        value - cost,
+        rs.getString("provider_symbol"),
+        rs.getString("exchange"),
+        rs.getString("asset_type"),
+        rs.getString("price_source"),
+        rs.getObject("price_updated_at", java.time.OffsetDateTime.class) == null
+            ? null
+            : rs.getObject("price_updated_at", java.time.OffsetDateTime.class).toInstant());
   }
 
   @Get("/holdings")
   public List<Holding> list(@PathVariable UUID workspaceId) {
+    refresher.refreshInBackgroundIfStale(workspaceId);
     return db.list(SELECT + "ORDER BY symbol", InvestmentController::map, workspaceId);
+  }
+
+  /** The price and currency a holding should start with: live if an exact instrument was chosen. */
+  private record Resolved(long priceMinor, String currency, boolean live, boolean fetched) {}
+
+  private Resolved resolve(Request body) {
+    String currency = body.currency() == null ? "USD" : body.currency().toUpperCase();
+    if (body.providerSymbol() == null || body.providerSymbol().isBlank()) {
+      return new Resolved(body.priceMinor(), currency, false, false);
+    }
+    var quote = market.quote(body.providerSymbol());
+    if (quote.isEmpty()) return new Resolved(body.priceMinor(), currency, true, false);
+    String quoteCurrency = quote.get().currency() == null ? currency : quote.get().currency();
+    long minor = refresher.priceIn(quote.get(), quoteCurrency).orElse(body.priceMinor());
+    return new Resolved(minor, quoteCurrency, true, true);
   }
 
   @Post("/holdings")
   public Holding create(@PathVariable UUID workspaceId, @Valid @Body Request body) {
     refs.account(workspaceId, body.accountId());
+    Resolved r = resolve(body);
     UUID id = UUID.randomUUID();
     db.update(
-        "INSERT INTO holdings(id, workspace_id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of) "
-            + "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO holdings(id, workspace_id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of, "
+            + "provider_symbol, exchange, asset_type, price_source, price_updated_at) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         workspaceId,
         body.accountId(),
@@ -121,9 +165,14 @@ public class InvestmentController {
         body.name().trim(),
         body.quantity() == null ? BigDecimal.ZERO : body.quantity(),
         body.costBasisMinor(),
-        body.priceMinor(),
-        body.currency() == null ? "USD" : body.currency().toUpperCase(),
-        LocalDate.now());
+        r.priceMinor(),
+        r.currency(),
+        LocalDate.now(),
+        blank(body.providerSymbol()),
+        blank(body.exchange()),
+        blank(body.assetType()),
+        r.live() ? "LIVE" : "MANUAL",
+        r.fetched() ? java.time.Instant.now() : null);
     return get(workspaceId, id);
   }
 
@@ -131,19 +180,51 @@ public class InvestmentController {
   public Holding update(
       @PathVariable UUID workspaceId, @PathVariable UUID id, @Valid @Body Request body) {
     refs.account(workspaceId, body.accountId());
-    get(workspaceId, id);
+    Holding current = get(workspaceId, id);
+    // keep the holding's currency: its cost basis is expressed in it
+    Request keep =
+        new Request(
+            body.accountId(),
+            body.symbol(),
+            body.name(),
+            body.quantity(),
+            body.costBasisMinor(),
+            body.priceMinor(),
+            current.currency(),
+            body.providerSymbol(),
+            body.exchange(),
+            body.assetType());
+    Resolved r = resolve(keep);
+    long price = r.fetched() ? r.priceMinor() : body.priceMinor();
     db.update(
-        "UPDATE holdings SET account_id = ?, symbol = ?, name = ?, quantity = ?, cost_basis_minor = ?, price_minor = ? "
-            + "WHERE workspace_id = ? AND id = ?",
+        "UPDATE holdings SET account_id = ?, symbol = ?, name = ?, quantity = ?, cost_basis_minor = ?, price_minor = ?, "
+            + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, "
+            + "price_updated_at = CASE WHEN ? THEN NOW() ELSE price_updated_at END WHERE workspace_id = ? AND id = ?",
         body.accountId(),
         body.symbol().toUpperCase().trim(),
         body.name().trim(),
         body.quantity() == null ? BigDecimal.ZERO : body.quantity(),
         body.costBasisMinor(),
-        body.priceMinor(),
+        price,
+        blank(body.providerSymbol()),
+        blank(body.exchange()),
+        blank(body.assetType()),
+        r.live() ? "LIVE" : "MANUAL",
+        r.fetched(),
         workspaceId,
         id);
     return get(workspaceId, id);
+  }
+
+  /** Re-fetches live prices for every linked holding right now. */
+  @Post("/holdings/refresh")
+  public List<Holding> refresh(@PathVariable UUID workspaceId) {
+    refresher.refreshWorkspace(workspaceId);
+    return list(workspaceId);
+  }
+
+  private static String blank(String s) {
+    return s == null || s.isBlank() ? null : s.trim();
   }
 
   @Put("/holdings/{id}/price")
@@ -151,7 +232,8 @@ public class InvestmentController {
       @PathVariable UUID workspaceId, @PathVariable UUID id, @Valid @Body PriceRequest body) {
     get(workspaceId, id);
     db.update(
-        "UPDATE holdings SET price_minor = ?, price_as_of = CURRENT_DATE WHERE workspace_id = ? AND id = ?",
+        "UPDATE holdings SET price_minor = ?, price_as_of = CURRENT_DATE, price_source = 'MANUAL', price_updated_at = NOW() "
+            + "WHERE workspace_id = ? AND id = ?",
         body.priceMinor(),
         workspaceId,
         id);
