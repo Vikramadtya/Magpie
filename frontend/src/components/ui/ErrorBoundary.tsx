@@ -2,7 +2,7 @@ import React from 'react';
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
 import type { FallbackProps } from 'react-error-boundary';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/cn';
 
 // million-ignore
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {

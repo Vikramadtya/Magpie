@@ -1,41 +1,24 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import './index.css'
-import App from './App.tsx'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import * as Sentry from '@sentry/react';
+import './index.css';
+import App from './App';
+import { env } from './lib/env';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    tracesSampleRate: 0.1,
+    // Financial data must never leave the browser in error reports.
+    beforeSend: (event) => {
+      delete event.request?.data;
+      return event;
     },
-  },
-})
-
-import log from './utils/logger';
-import { env } from './config/env';
-import * as Sentry from "@sentry/react";
-
-Sentry.init({
-  dsn: env.SENTRY_DSN,
-  integrations: [
-    Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration(),
-  ],
-  tracesSampleRate: 1.0,
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
-  beforeSend(event) {
-    log.error('Sentry captured an event:', event);
-    return event;
-  }
-});
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <App />
   </StrictMode>,
-)
+);
