@@ -11,7 +11,11 @@ export interface Me { user: User; workspaces: Workspace[] }
 export interface Account {
   id: string; name: string; type: AccountType; currency: string;
   openingBalanceMinor: number; balanceMinor: number; archived: boolean; sortOrder: number; version: number;
+  /** Someone else's account that you may spend from; kept out of your net worth. */
+  memo: boolean; shareStatus: 'PENDING' | 'ACTIVE' | 'REVOKED' | 'DECLINED' | null;
 }
+export interface Share { id: string; accountId: string; guestEmail: string; guestName: string | null; status: 'PENDING' | 'ACTIVE' }
+export interface Invitation { id: string; ownerName: string; accountName: string; currency: string }
 export interface Category {
   id: string; parentId: string | null; name: string; kind: 'INCOME' | 'EXPENSE';
   icon: string | null; color: string | null; archived: boolean;

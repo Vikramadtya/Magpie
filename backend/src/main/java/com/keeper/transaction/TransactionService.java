@@ -36,6 +36,7 @@ public class TransactionService {
   private final RefChecks refs;
   private final Audit audit;
   private final Db db;
+  private final List<EntryListener> listeners;
 
   public TransactionService(
       TransactionRepository transactions,
@@ -48,7 +49,8 @@ public class TransactionService {
       RevisionService revisions,
       RefChecks refs,
       Audit audit,
-      Db db) {
+      Db db,
+      List<EntryListener> listeners) {
     this.transactions = transactions;
     this.accounts = accounts;
     this.categories = categories;
@@ -60,6 +62,7 @@ public class TransactionService {
     this.refs = refs;
     this.audit = audit;
     this.db = db;
+    this.listeners = listeners;
   }
 
   // ---------- reads ----------
@@ -122,6 +125,7 @@ public class TransactionService {
         accounts
             .find(ws, r.accountId())
             .orElseThrow(() -> new BadRequestException("Unknown account"));
+    requireSpendable(account, r.type());
     UUID categoryId = validateCategoryAndPayee(ws, r);
     int direction = "INCOME".equals(r.type()) ? 1 : -1;
     Amounts amounts = resolveAmounts(account, r);
@@ -150,7 +154,20 @@ public class TransactionService {
                 spentBy(ws, r.spentById())));
     transactions.replaceTags(id, validTags(ws, r.tagIds()));
     accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
+    TransactionView created = get(ws, id);
+    listeners.forEach(l -> l.created(ws, actor, created));
     return id;
+  }
+
+  /** A lent (memo) account takes spending only, and only while the loan is active. */
+  private static void requireSpendable(Account account, String type) {
+    if (!account.memo()) return;
+    if (!"ACTIVE".equals(account.shareStatus())) {
+      throw new BusinessRuleException("This account is no longer shared with you");
+    }
+    if (!"EXPENSE".equals(type)) {
+      throw new BadRequestException("A lent account only takes spending");
+    }
   }
 
   public List<TransactionView> transfer(
@@ -163,6 +180,9 @@ public class TransactionService {
     }
     if (r.fromAccountId().equals(r.toAccountId())) {
       throw new BadRequestException("Choose two different accounts");
+    }
+    if (isMemo(ws, r.fromAccountId()) || isMemo(ws, r.toAccountId())) {
+      throw new BadRequestException("A lent account cannot take part in a transfer");
     }
     Account from =
         accounts
@@ -220,6 +240,7 @@ public class TransactionService {
               accounts
                   .find(ws, r.accountId())
                   .orElseThrow(() -> new BadRequestException("Unknown account"));
+          requireSpendable(account, r.type());
           UUID categoryId = validateCategoryAndPayee(ws, req);
           int direction = "INCOME".equals(r.type()) ? 1 : -1;
           Amounts amounts = resolveAmounts(account, req);
@@ -256,6 +277,8 @@ public class TransactionService {
               base,
               spentBy(ws, req.spentById()));
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
+          TransactionView after = get(ws, id);
+          listeners.forEach(l -> l.updated(ws, actor, after));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
     return get(ws, id);
@@ -349,6 +372,7 @@ public class TransactionService {
     List<UUID> ids = legs.stream().map(Raw::id).toList();
     transactions.undelete(ws, ids);
     revisions.markDeletesUndone(ids);
+    ids.forEach(legId -> listeners.forEach(l -> l.restored(ws, legId)));
   }
 
   private void revertUpdate(UUID ws, UUID actor, UUID id, TransactionView old) {
@@ -361,6 +385,8 @@ public class TransactionService {
     accounts.adjustBalance(ws, old.accountId(), old.direction() * old.amountMinor());
     transactions.applySnapshot(ws, old, actor);
     transactions.replaceTags(id, old.tagIds());
+    TransactionView after = get(ws, id);
+    listeners.forEach(l -> l.updated(ws, actor, after));
   }
 
   // ---------- normalised (base-currency) amount ----------
@@ -452,6 +478,11 @@ public class TransactionService {
       accounts.adjustBalance(ws, leg.accountId(), -leg.direction() * leg.amount());
     }
     transactions.softDelete(ws, legs.stream().map(Raw::id).toList());
+    legs.forEach(leg -> listeners.forEach(l -> l.deleted(ws, leg.id())));
+  }
+
+  private boolean isMemo(UUID ws, UUID accountId) {
+    return accounts.find(ws, accountId).map(Account::memo).orElse(false);
   }
 
   /** Returns the category to store: the given one, or the payee's default when none was chosen. */

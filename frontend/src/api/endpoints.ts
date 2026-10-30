@@ -46,6 +46,15 @@ export const payeesApi = {
   remove: (ws: string, id: string) => api.del(ws, `/payees/${id}`),
 };
 
+export const lendingApi = {
+  shares: (ws: string, accountId: string) => api.get<T.Share[]>(ws, `/accounts/${accountId}/shares`),
+  lend: (ws: string, accountId: string, email: string) => api.post<T.Share>(ws, `/accounts/${accountId}/shares`, { email }),
+  revoke: (ws: string, shareId: string) => api.del(ws, `/shares/${shareId}`),
+  invitations: () => http.get<T.Invitation[]>('/api/v1/lending/invitations').then((r) => r.data),
+  accept: (id: string) => http.post<T.Account>(`/api/v1/lending/invitations/${id}/accept`, {}).then((r) => r.data),
+  decline: (id: string) => http.post(`/api/v1/lending/invitations/${id}/decline`, {}).then(() => undefined),
+};
+
 export const peopleApi = {
   list: (ws: string) => api.get<T.Person[]>(ws, '/people'),
   create: (ws: string, name: string) => api.post<T.Person>(ws, '/people', { name }),

@@ -247,11 +247,12 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
                 type="button"
                 role="tab"
                 aria-selected={type === t}
+                disabled={!!account?.memo && t !== 'EXPENSE'}
                 onClick={() => {
                   setType(t);
                   setCategoryId('');
                 }}
-                className={cn('py-1.5 text-sm font-medium rounded-md transition-colors', type === t ? 'bg-surface shadow-sm' : 'text-secondary')}
+                className={cn('py-1.5 text-sm font-medium rounded-md transition-colors disabled:opacity-40', type === t ? 'bg-surface shadow-sm' : 'text-secondary')}
               >
                 {t[0] + t.slice(1).toLowerCase()}
               </button>
@@ -282,8 +283,8 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
         </div>
 
         <Field label={type === 'TRANSFER' ? 'From account' : 'Account'} error={errors.account}>
-          <Select value={accountId} onChange={(e) => { setAccountId(e.target.value); setEntryCurrency(''); setAccountAmountTouched(false); setAccountAmount(''); }} disabled={isTransferLeg}>
-            {accounts.map((a) => (
+          <Select value={accountId} onChange={(e) => { setAccountId(e.target.value); if (accounts.find((a) => a.id === e.target.value)?.memo) setType('EXPENSE'); setEntryCurrency(''); setAccountAmountTouched(false); setAccountAmount(''); }} disabled={isTransferLeg}>
+            {accounts.filter((a) => !a.memo || a.shareStatus === 'ACTIVE' || a.id === accountId).map((a) => (
               <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
             ))}
           </Select>

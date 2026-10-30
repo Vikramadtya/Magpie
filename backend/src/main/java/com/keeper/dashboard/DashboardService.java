@@ -74,6 +74,7 @@ public class DashboardService {
     long assets = 0;
     long liabilities = 0;
     for (Account a : all) {
+      if (a.memo()) continue; // someone else's money, not part of your net worth
       long inBase = converter.toBase(a.balanceMinor(), a.currency());
       if (a.balanceMinor() >= 0 && !isLiability(a)) assets += inBase;
       else liabilities += inBase;

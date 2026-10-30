@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Share2, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Account, AccountType } from '../api/types';
@@ -13,6 +13,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { useAccounts, useCreateAccount, useDeleteAccount, useUpdateAccount } from '../hooks/useReference';
+import { useLend, useRevokeShare, useShares } from '../hooks/useLending';
 import { CURRENCIES, parseSignedMoney, toInputValue } from '../lib/money';
 
 const TYPE_LABELS: Record<AccountType, string> = {
@@ -24,6 +25,7 @@ export default function AccountsPage() {
   const accounts = useAccounts();
   const [editing, setEditing] = useState<Account | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Account | null>(null);
+  const [sharing, setSharing] = useState<Account | null>(null);
   const remove = useDeleteAccount();
   const navigate = useNavigate();
   const list = accounts.data ?? [];
@@ -58,10 +60,12 @@ export default function AccountsPage() {
                     <button className="w-full text-left" onClick={() => navigate(`/transactions?account=${a.id}`)}>
                       <p className="font-medium truncate">{a.name}</p>
                       <p className="text-2xl font-bold mt-1 tabular-nums"><Amount minor={a.balanceMinor} currency={a.currency} /></p>
+                      {a.memo && <p className="text-[11px] text-accent mt-0.5">{a.shareStatus === 'ACTIVE' ? 'Lent to you · not in your net worth' : 'No longer shared with you'}</p>}
                       <p className="text-xs text-secondary mt-0.5">{a.currency}{a.currency !== baseCurrency ? ` · converted to ${baseCurrency} in reports` : ''}</p>
                     </button>
                     {canEdit && (
                       <div className="flex gap-1 mt-3 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        {!a.memo && <Button variant="ghost" size="sm" onClick={() => setSharing(a)}><Share2 className="w-3.5 h-3.5 mr-1.5" />Lend</Button>}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(a)}><Pencil className="w-3.5 h-3.5 mr-1.5" />Edit</Button>
                         <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
                       </div>
@@ -74,6 +78,7 @@ export default function AccountsPage() {
         </div>
       </StateView>
 
+      {sharing && <LendModal account={sharing} onClose={() => setSharing(null)} />}
       {editing && <AccountModal account={editing === 'new' ? null : editing} defaultCurrency={baseCurrency} onClose={() => setEditing(null)} />}
       <ConfirmDialog
         open={!!deleting}
@@ -137,6 +142,46 @@ function AccountModal({ account, defaultCurrency, onClose }: { account: Account 
           <Button type="submit" disabled={create.isPending || update.isPending}>Save</Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function LendModal({ account, onClose }: { account: Account; onClose: () => void }) {
+  const shares = useShares(account.id);
+  const lend = useLend(account.id);
+  const revoke = useRevokeShare(account.id);
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    lend.mutate(email.trim(), {
+      onSuccess: () => setEmail(''),
+      onError: () => setError('Could not share with that email. Is it already shared?'),
+    });
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Lend ${account.name}`}>
+      <div className="space-y-4">
+        <p className="text-sm text-secondary">
+          Invite someone who uses Keeper. They get a copy of this account in their own ledger. What they spend on it appears in yours as spending by them, and in theirs as their own. They never see your balance or your other transactions.
+        </p>
+        <ul className="divide-y divide-border">
+          {(shares.data ?? []).map((s) => (
+            <li key={s.id} className="py-2 flex items-center justify-between text-sm">
+              <span>{s.guestName ?? s.guestEmail} <span className="text-xs text-secondary">· {s.status === 'ACTIVE' ? 'active' : 'waiting for them to accept'}</span></span>
+              <button aria-label={`Stop sharing with ${s.guestEmail}`} onClick={() => revoke.mutate(s.id)}><X className="w-4 h-4" /></button>
+            </li>
+          ))}
+          {shares.data?.length === 0 && <li className="py-2 text-sm text-secondary">Not shared with anyone.</li>}
+        </ul>
+        <form onSubmit={submit} className="flex gap-2">
+          <Field label="" error={error}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="their@email.com" aria-label="Their email" maxLength={255} /></Field>
+          <Button type="submit" disabled={lend.isPending || !email.trim()}>Invite</Button>
+        </form>
+      </div>
     </Modal>
   );
 }

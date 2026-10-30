@@ -109,7 +109,7 @@ public class AnalyticsService {
     db.list(
         "SELECT a.currency, SUM(a.opening_balance_minor) + COALESCE(SUM((SELECT SUM(t.direction * t.amount_minor) "
             + "FROM transactions t WHERE t.account_id = a.id AND t.deleted_at IS NULL AND t.occurred_on < ?)), 0) "
-            + "FROM accounts a WHERE a.workspace_id = ? GROUP BY a.currency",
+            + "FROM accounts a WHERE a.workspace_id = ? AND NOT a.memo GROUP BY a.currency",
         rs -> {
           startByCurrency.put(rs.getString(1), rs.getLong(2));
           return null;
@@ -120,7 +120,8 @@ public class AnalyticsService {
     Map<String, Map<String, Long>> deltas = new TreeMap<>();
     db.list(
         "SELECT to_char(date_trunc('month', occurred_on), 'YYYY-MM'), currency, SUM(direction * amount_minor) FROM transactions "
-            + "WHERE workspace_id = ? AND deleted_at IS NULL AND occurred_on >= ? GROUP BY 1, 2",
+            + "WHERE workspace_id = ? AND deleted_at IS NULL AND occurred_on >= ? "
+            + "AND account_id NOT IN (SELECT id FROM accounts WHERE workspace_id = ? AND memo) GROUP BY 1, 2",
         rs -> {
           deltas
               .computeIfAbsent(rs.getString(1), k -> new LinkedHashMap<>())
@@ -128,7 +129,8 @@ public class AnalyticsService {
           return null;
         },
         ws,
-        first.atDay(1));
+        first.atDay(1),
+        ws);
 
     Map<String, Long> running = new LinkedHashMap<>(startByCurrency);
     List<NetWorthPoint> points = new ArrayList<>();

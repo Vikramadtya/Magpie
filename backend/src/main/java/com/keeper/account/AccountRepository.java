@@ -10,7 +10,8 @@ import java.util.UUID;
 @Singleton
 public class AccountRepository {
   private static final String COLS =
-      "id, name, type, currency, opening_balance_minor, balance_minor, is_archived, sort_order, version";
+      "id, name, type, currency, opening_balance_minor, balance_minor, is_archived, sort_order, version, memo, "
+          + "(SELECT s.status FROM account_shares s WHERE s.id = accounts.share_id) AS share_status";
   private static final RowMapper<Account> MAPPER =
       rs ->
           new Account(
@@ -22,7 +23,9 @@ public class AccountRepository {
               rs.getLong("balance_minor"),
               rs.getBoolean("is_archived"),
               rs.getInt("sort_order"),
-              rs.getInt("version"));
+              rs.getInt("version"),
+              rs.getBoolean("memo"),
+              rs.getString("share_status"));
 
   private final Db db;
 
@@ -58,6 +61,20 @@ public class AccountRepository {
         currency,
         opening,
         opening);
+    return id;
+  }
+
+  /** The guest's copy of a lent account. */
+  public UUID insertMemo(UUID ws, String name, String currency, UUID shareId) {
+    UUID id = UUID.randomUUID();
+    db.update(
+        "INSERT INTO accounts(id, workspace_id, name, type, currency, opening_balance_minor, balance_minor, memo, share_id) "
+            + "VALUES (?,?,?,'OTHER',?,0,0,TRUE,?)",
+        id,
+        ws,
+        name,
+        currency,
+        shareId);
     return id;
   }
 

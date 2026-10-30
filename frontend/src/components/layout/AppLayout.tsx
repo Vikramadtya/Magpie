@@ -9,6 +9,7 @@ import { cn } from '../../lib/cn';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { Skeleton } from '../ui/StateView';
 import { CommandPalette } from './CommandPalette';
+import { InvitationBanner } from './InvitationBanner';
 import { useInboxCount } from '../../hooks/useInbox';
 import { NAV_ITEMS } from './nav';
 
@@ -57,6 +58,7 @@ function Shell() {
         )}
         <main id="main" className="flex-1 overflow-y-auto">
           <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10">
+            <InvitationBanner />
             <ErrorBoundary>
               <Suspense fallback={<div className="space-y-3"><Skeleton className="h-10 w-48" /><Skeleton className="h-40" /></div>}>
                 <Outlet />
