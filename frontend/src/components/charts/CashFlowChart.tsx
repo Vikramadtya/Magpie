@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { MonthFlow } from '../../api/types';
 import { formatMoney } from '../../lib/money';
@@ -8,7 +9,7 @@ export default function CashFlowChart({ months, currency }: { months: MonthFlow[
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={months} margin={{ left: 8, right: 8, top: 8 }}>
           <CartesianGrid stroke="var(--border-color)" vertical={false} />
-          <XAxis dataKey="month" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} tickLine={false} axisLine={false} />
+          <XAxis dataKey="month" tickFormatter={(m: string) => format(parseISO(`${m}-01`), 'MMM yy')} tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} tickLine={false} axisLine={false} />
           <YAxis hide />
           <Tooltip
             formatter={(v, name) => [formatMoney(Number(v), currency), name]}

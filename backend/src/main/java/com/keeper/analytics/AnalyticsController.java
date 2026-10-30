@@ -16,8 +16,21 @@ import java.util.UUID;
 public class AnalyticsController {
   private final AnalyticsService service;
 
-  public AnalyticsController(AnalyticsService service) {
+  private final OverviewService overview;
+
+  public AnalyticsController(AnalyticsService service, OverviewService overview) {
     this.service = service;
+    this.overview = overview;
+  }
+
+  /** Period vs the one before, category changes, biggest purchases and the monthly mix. */
+  @Get("/overview")
+  public OverviewService.Overview overview(
+      @PathVariable UUID workspaceId,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to) {
+    LocalDate[] range = range(from, to);
+    return overview.overview(workspaceId, range[0], range[1]);
   }
 
   @Get("/spending-by-category")

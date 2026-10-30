@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { NetWorthPoint } from '../../api/types';
 import { formatMoney } from '../../lib/money';
@@ -14,7 +15,7 @@ export default function NetWorthChart({ points, currency }: { points: NetWorthPo
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border-color)" vertical={false} />
-          <XAxis dataKey="month" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} tickLine={false} axisLine={false} />
+          <XAxis dataKey="month" tickFormatter={(m: string) => format(parseISO(`${m}-01`), 'MMM yy')} tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} tickLine={false} axisLine={false} />
           <YAxis hide domain={['auto', 'auto']} />
           <Tooltip
             formatter={(v) => [formatMoney(Number(v), currency), 'Net worth']}

@@ -11,7 +11,7 @@ import { Skeleton } from '../ui/StateView';
 import { CommandPalette } from './CommandPalette';
 import { InvitationBanner } from './InvitationBanner';
 import { useInboxCount } from '../../hooks/useInbox';
-import { NAV_ITEMS } from './nav';
+import { NAV_GROUPS } from './nav';
 
 export default function AppLayout() {
   return (
@@ -111,28 +111,29 @@ function SidebarContent() {
 
       <div className="px-4 mb-3 hidden md:block"><AddButton /></div>
 
-      <nav className="flex-1 px-4 flex flex-col gap-0.5 overflow-y-auto" aria-label="Main">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-1.5 text-[14px] font-medium rounded-lg transition-colors',
-                isActive ? 'bg-accent text-white shadow-sm' : 'hover:bg-black/5 dark:hover:bg-white/5',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <item.icon className={cn('w-[18px] h-[18px]', isActive ? 'text-white' : 'text-accent')} strokeWidth={isActive ? 2.5 : 2} />
+      <nav className="flex-1 px-4 flex flex-col gap-4 overflow-y-auto" aria-label="Main">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi} className="flex flex-col gap-0.5">
+            {group.label && <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-secondary">{group.label}</p>}
+            {group.items.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-1.5 text-[14px] font-medium rounded-lg transition-colors',
+                    isActive ? 'bg-accent/10 text-accent' : 'text-primary/80 hover:bg-black/5 dark:hover:bg-white/5',
+                  )
+                }
+              >
+                <item.icon className="w-[18px] h-[18px]" strokeWidth={2} />
                 {item.label}
                 {item.path === '/inbox' && waiting > 0 && (
-                  <span className={cn('ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5', isActive ? 'bg-white/25 text-white' : 'bg-accent text-white')} aria-label={`${waiting} to review`}>{waiting}</span>
+                  <span className="ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 bg-accent text-white" aria-label={`${waiting} to review`}>{waiting}</span>
                 )}
-              </>
-            )}
-          </NavLink>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 

@@ -2,7 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { CategorySpend } from '../../api/types';
 import { formatMoney } from '../../lib/money';
 
-const FALLBACK = ['#0A84FF', '#32D74B', '#FF9F0A', '#BF5AF2', '#FF375F', '#64D2FF', '#FFD60A', '#AC8E68'];
+import { PALETTE as FALLBACK } from '../../lib/palette';
 
 export default function SpendingDonut({ items, currency }: { items: CategorySpend[]; currency: string }) {
   return (

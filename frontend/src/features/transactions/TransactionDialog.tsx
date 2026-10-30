@@ -80,6 +80,8 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const trips = useTrips().data ?? [];
   const assign = useAssignToTrip();
   const [tripId, setTripId] = useState(tx?.tripId ?? '');
+  // Tags, trip and who spent it are rarely needed, so they stay folded away unless already in use.
+  const [showMore, setShowMore] = useState(!!(tx?.tripId || tx?.spentById || tx?.tagIds?.length || tripId));
 
   const editing = tx !== null;
   const isTransferLeg = tx?.type === 'TRANSFER';
@@ -337,7 +339,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
                 ))}
               </Select>
             </Field>
-            {tags.length > 0 && (
+            {showMore && tags.length > 0 && (
               <Field label="Tags">
                 <div className="flex flex-wrap gap-1.5">
                   {tags.map((t) => (
@@ -359,7 +361,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
 
         {editing && tx && <NormalisedBox tx={tx} />}
 
-        {type === 'EXPENSE' && trips.length > 0 && !isTransferLeg && (
+        {showMore && type === 'EXPENSE' && trips.length > 0 && !isTransferLeg && (
           <Field label="Trip" hint="Counts this towards a trip's total.">
             <Select value={tripId} onChange={(e) => setTripId(e.target.value)}>
               <option value="">Not part of a trip</option>
@@ -368,7 +370,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           </Field>
         )}
 
-        {type === 'EXPENSE' && !isTransferLeg && (people.length > 0 || spentBy) && (
+        {showMore && type === 'EXPENSE' && !isTransferLeg && (people.length > 0 || spentBy) && (
           <Field label="Spent by" hint="Someone else using your account. Their spending stays out of your totals.">
             <Select value={spentBy} onChange={(e) => setSpentBy(e.target.value)}>
               <option value="">Me</option>
@@ -377,6 +379,10 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
             </Select>
             {spentBy === NEW_PERSON && <Input className="mt-2" value={newPerson} onChange={(e) => setNewPerson(e.target.value)} placeholder="Name" maxLength={120} />}
           </Field>
+        )}
+
+        {!showMore && type !== 'TRANSFER' && (tags.length > 0 || trips.length > 0 || people.length > 0) && (
+          <button type="button" onClick={() => setShowMore(true)} className="text-sm text-accent">More options (tags{trips.length > 0 ? ', trip' : ''}{people.length > 0 ? ', spent by' : ''})</button>
         )}
 
         <Field label="Note">

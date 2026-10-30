@@ -91,12 +91,15 @@ export interface Upcoming {
 
 export interface Dashboard {
   month: string; currency: string; netWorthMinor: number; assetsMinor: number; liabilitiesMinor: number;
-  incomeMinor: number; expenseMinor: number; savingsRatePercent: number;
+  incomeMinor: number; expenseMinor: number; previousIncomeMinor: number; previousExpenseMinor: number; savingsRatePercent: number;
   accounts: Account[]; recent: Transaction[]; budgets: BudgetSummary; upcoming: Upcoming[];
   /** Currencies with no exchange rate yet; their amounts were not converted. */
   missingCurrencies: string[];
   /** What other people spent from your accounts this month. */
   spentByOthers: { personId: string; name: string; expenseMinor: number }[];
+  topCategories: { categoryId: string; name: string; color: string | null; totalMinor: number }[];
+  /** Your spending per day of the month, and of the month before (index 0 = the 1st). */
+  dailySpend: number[]; previousDailySpend: number[];
 }
 export interface Report<T> { currency: string; items: T[]; missingCurrencies: string[] }
 export interface FxQuote { available: boolean; rate: number | null; convertedMinor: number | null }
@@ -213,4 +216,15 @@ export interface HouseholdWealth {
   investmentValueMinor: number; investmentCostMinor: number;
   holdings: { owner: string; symbol: string; name: string; valueMinor: number; costMinor: number }[];
   notSharingNetWorth: string[]; notSharingInvestments: string[]; missingCurrencies: string[];
+}
+
+export interface PeriodTotals {
+  incomeMinor: number; expenseMinor: number; savingsMinor: number; savingsRatePercent: number; expenseCount: number; avgPerDayMinor: number;
+}
+export interface Overview {
+  currency: string; from: string; to: string; current: PeriodTotals; previous: PeriodTotals;
+  categoryChanges: { categoryId: string; name: string; color: string | null; currentMinor: number; previousMinor: number }[];
+  largest: { id: string; date: string; title: string; category: string | null; amountMinor: number }[];
+  stackCategories: string[]; monthly: { month: string; byCategory: Record<string, number> }[];
+  dailySpend: number[]; missingCurrencies: string[];
 }
