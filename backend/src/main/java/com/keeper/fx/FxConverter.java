@@ -3,22 +3,57 @@ package com.keeper.fx;
 import com.keeper.common.db.Db;
 import jakarta.inject.Singleton;
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * Converts amounts into a workspace's base currency using the latest stored rates. A currency with
- * no stored rate is passed through unchanged and reported in {@link Converter#missing()}.
+ * The only place the app converts between currencies. Any pair is derived from rates stored against
+ * a USD pivot. Rates are kept in memory, reloaded hourly, and refreshed from the provider on demand
+ * when the stored ones are older than today (so a sleeping host still gets fresh rates).
  */
 @Singleton
 public class FxConverter {
-  private final Db db;
+  private static final Duration RELOAD_EVERY = Duration.ofHours(1);
 
-  public FxConverter(Db db) {
+  private record Snapshot(Map<String, BigDecimal> perUsd, Instant loadedAt) {}
+
+  private final FxRateRepository repository;
+  private final FxRateService refresher;
+  private final Db db;
+  private volatile Snapshot snapshot = new Snapshot(Map.of(), Instant.EPOCH);
+  private volatile Instant lastRefreshAttempt = Instant.EPOCH;
+
+  public FxConverter(FxRateRepository repository, FxRateService refresher, Db db) {
+    this.repository = repository;
+    this.refresher = refresher;
     this.db = db;
   }
 
+  /** Units of {@code to} per 1 {@code from}, or empty when either currency has no rate. */
+  public Optional<BigDecimal> rate(String from, String to) {
+    if (from.equals(to)) return Optional.of(BigDecimal.ONE);
+    Map<String, BigDecimal> perUsd = rates();
+    BigDecimal fromRate = perUsd.get(from);
+    BigDecimal toRate = perUsd.get(to);
+    if (fromRate == null || toRate == null) return Optional.empty();
+    return Optional.of(toRate.divide(fromRate, 12, RoundingMode.HALF_UP));
+  }
+
+  public OptionalLong convert(long minor, String from, String to) {
+    return rate(from, to)
+        .map(r -> OptionalLong.of(CurrencyUnits.convert(minor, from, to, r)))
+        .orElse(OptionalLong.empty());
+  }
+
+  /** Converter bound to a workspace's base currency; collects currencies it could not convert. */
   public Converter forWorkspace(UUID workspaceId) {
     String base =
         db.one(
@@ -26,42 +61,66 @@ public class FxConverter {
                 rs -> rs.getString(1),
                 workspaceId)
             .orElse("USD");
-    Map<String, BigDecimal> rates = new HashMap<>();
-    db.list(
-        "SELECT DISTINCT ON (quote) quote, rate FROM exchange_rates WHERE base = ? ORDER BY quote, as_of DESC",
-        rs -> {
-          rates.put(rs.getString("quote"), rs.getBigDecimal("rate"));
-          return null;
-        },
-        base);
-    return new Converter(base, rates);
+    return new Converter(base);
   }
 
-  public static class Converter {
-    private final String base;
-    private final Map<String, BigDecimal> rates;
-    private final java.util.Set<String> missing = new java.util.TreeSet<>();
+  private Map<String, BigDecimal> rates() {
+    Snapshot current = snapshot;
+    if (Instant.now().isBefore(current.loadedAt.plus(RELOAD_EVERY)) && !current.perUsd.isEmpty()) {
+      return current.perUsd;
+    }
+    synchronized (this) {
+      current = snapshot;
+      if (Instant.now().isBefore(current.loadedAt.plus(RELOAD_EVERY))
+          && !current.perUsd.isEmpty()) {
+        return current.perUsd;
+      }
+      refreshIfStale();
+      snapshot = new Snapshot(repository.latest(), Instant.now());
+      return snapshot.perUsd;
+    }
+  }
 
-    Converter(String base, Map<String, BigDecimal> rates) {
+  private void refreshIfStale() {
+    boolean stale = repository.newestDate().map(d -> d.isBefore(LocalDate.now())).orElse(true);
+    boolean mayAttempt = Instant.now().isAfter(lastRefreshAttempt.plus(RELOAD_EVERY));
+    if (stale && mayAttempt && refresher.isEnabled()) {
+      lastRefreshAttempt = Instant.now();
+      refresher.refresh();
+    }
+  }
+
+  /** Drops the in-memory snapshot (used after rates are written outside the normal refresh). */
+  public void invalidate() {
+    snapshot = new Snapshot(Map.of(), Instant.EPOCH);
+  }
+
+  public class Converter {
+    private final String base;
+    private final Set<String> missing = new TreeSet<>();
+
+    Converter(String base) {
       this.base = base;
-      this.rates = rates;
     }
 
     public String base() {
       return base;
     }
 
+    /**
+     * Amount in the base currency. Without a rate the amount is returned as-is and flagged in
+     * {@link #missing()}.
+     */
     public long toBase(long minor, String currency) {
-      if (currency.equals(base)) return minor;
-      BigDecimal rate = rates.get(currency);
-      if (rate == null) {
+      OptionalLong converted = convert(minor, currency, base);
+      if (converted.isEmpty()) {
         missing.add(currency);
         return minor;
       }
-      return CurrencyUnits.convert(minor, currency, base, rate);
+      return converted.getAsLong();
     }
 
-    public java.util.Set<String> missing() {
+    public Set<String> missing() {
       return missing;
     }
   }

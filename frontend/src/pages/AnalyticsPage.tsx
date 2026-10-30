@@ -1,6 +1,7 @@
 import { endOfMonth, format, startOfMonth, startOfYear, subMonths } from 'date-fns';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FxWarning } from '../components/FxWarning';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
@@ -35,6 +36,7 @@ export default function AnalyticsPage() {
           {Object.entries(RANGES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </Select>
       } />
+      <FxWarning currencies={[...new Set([...(spending.data?.missingCurrencies ?? []), ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={spending.data?.currency ?? ''} />
       <div className="grid lg:grid-cols-2 gap-6">
         <section className="glass-panel p-5">
           <h2 className="font-semibold mb-3">Spending by category</h2>

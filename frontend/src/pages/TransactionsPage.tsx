@@ -17,6 +17,7 @@ import { groupCategories, useTransactionDialog } from '../features/transactions/
 import { useAccounts, useCategories } from '../hooks/useReference';
 import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useTransactionList } from '../hooks/useTransactions';
 import { prettyDate } from '../lib/dates';
+import { formatMoney } from '../lib/money';
 import { cn } from '../lib/cn';
 
 export default function TransactionsPage() {
@@ -202,7 +203,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, onToggle, onEdit, onD
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
-          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}</p>
+          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
         </div>
         <Amount minor={tx.direction * tx.amountMinor} currency={tx.currency} signed={tx.type !== 'TRANSFER'} className="text-sm font-semibold" />
         {!pending && !selecting && (

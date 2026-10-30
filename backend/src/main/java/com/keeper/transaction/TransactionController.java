@@ -39,7 +39,14 @@ public class TransactionController {
       UUID categoryId,
       UUID payeeId,
       @Size(max = 1000) String note,
-      @Size(max = 20) List<UUID> tagIds) {}
+      @Size(max = 20) List<UUID> tagIds,
+      /** Currency the amount was entered in; defaults to the account's. */
+      @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
+      /**
+       * Exact amount in the account's currency when the entered currency differs (overrides the
+       * rate).
+       */
+      @Positive @Max(MAX_MINOR) Long accountAmountMinor) {}
 
   /** Same fields as Request plus the version the client last saw (optimistic locking). */
   @Serdeable
@@ -52,11 +59,22 @@ public class TransactionController {
       UUID categoryId,
       UUID payeeId,
       @Size(max = 1000) String note,
-      @Size(max = 20) List<UUID> tagIds) {
+      @Size(max = 20) List<UUID> tagIds,
+      @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
+      @Positive @Max(MAX_MINOR) Long accountAmountMinor) {
 
     Request toRequest() {
       return new Request(
-          accountId, type, amountMinor, occurredOn, categoryId, payeeId, note, tagIds);
+          accountId,
+          type,
+          amountMinor,
+          occurredOn,
+          categoryId,
+          payeeId,
+          note,
+          tagIds,
+          currency,
+          accountAmountMinor);
     }
   }
 

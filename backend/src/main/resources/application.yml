@@ -3,6 +3,8 @@ micronaut:
     serialization:
       inclusion: ALWAYS
   server:
+    # Run blocking controller methods (JDBC, HTTP) on the IO pool, never on Netty's event loop.
+    thread-selection: AUTO
     max-request-size: 6MB
     multipart:
       max-file-size: 5MB

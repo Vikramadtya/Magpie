@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Currency;
 
-/** Converts between currencies' minor units (JPY has none, USD has 2, KWD has 3). */
+/** Minor-unit arithmetic (JPY has none, USD has 2, KWD has 3). */
 public final class CurrencyUnits {
   private CurrencyUnits() {}
 
@@ -17,13 +17,16 @@ public final class CurrencyUnits {
   }
 
   /**
-   * Converts {@code minor} of {@code from} into {@code to}, where rate = units of {@code from} per
-   * 1 {@code to}.
+   * Converts {@code minor} of {@code from} into {@code to}; rate = units of {@code to} per 1 {@code
+   * from}.
    */
-  public static long convert(long minor, String from, String to, BigDecimal ratePerTo) {
+  public static long convert(long minor, String from, String to, BigDecimal rate) {
     if (from.equals(to)) return minor;
     BigDecimal major = BigDecimal.valueOf(minor).movePointLeft(exponent(from));
-    BigDecimal toMajor = major.divide(ratePerTo, 12, RoundingMode.HALF_UP);
-    return toMajor.movePointRight(exponent(to)).setScale(0, RoundingMode.HALF_UP).longValueExact();
+    return major
+        .multiply(rate)
+        .movePointRight(exponent(to))
+        .setScale(0, RoundingMode.HALF_UP)
+        .longValueExact();
   }
 }

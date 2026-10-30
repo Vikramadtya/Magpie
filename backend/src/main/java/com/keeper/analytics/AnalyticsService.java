@@ -30,7 +30,7 @@ public class AnalyticsService {
   public record PayeeSpend(UUID payeeId, String name, long totalMinor, int count) {}
 
   @io.micronaut.serde.annotation.Serdeable
-  public record Report<T>(String currency, List<T> items) {}
+  public record Report<T>(String currency, List<T> items, List<String> missingCurrencies) {}
 
   private final Db db;
   private final FxConverter fx;
@@ -65,7 +65,7 @@ public class AnalyticsService {
         to);
     List<CategorySpend> sorted = new ArrayList<>(byGroup.values());
     sorted.sort(Comparator.comparingLong(CategorySpend::totalMinor).reversed());
-    return new Report<>(converter.base(), sorted);
+    return new Report<>(converter.base(), sorted, List.copyOf(converter.missing()));
   }
 
   public Report<MonthFlow> cashFlow(UUID ws, LocalDate from, LocalDate to) {
@@ -90,7 +90,7 @@ public class AnalyticsService {
     }
     List<MonthFlow> items = new ArrayList<>();
     months.forEach((m, v) -> items.add(new MonthFlow(m, v[0], v[1])));
-    return new Report<>(converter.base(), items);
+    return new Report<>(converter.base(), items, List.copyOf(converter.missing()));
   }
 
   /**
@@ -138,7 +138,7 @@ public class AnalyticsService {
       for (var e : running.entrySet()) total += converter.toBase(e.getValue(), e.getKey());
       points.add(new NetWorthPoint(m.toString(), total));
     }
-    return new Report<>(converter.base(), points);
+    return new Report<>(converter.base(), points, List.copyOf(converter.missing()));
   }
 
   public Report<PayeeSpend> topPayees(UUID ws, LocalDate from, LocalDate to, int limit) {
@@ -170,6 +170,8 @@ public class AnalyticsService {
     List<PayeeSpend> sorted = new ArrayList<>(byPayee.values());
     sorted.sort(Comparator.comparingLong(PayeeSpend::totalMinor).reversed());
     return new Report<>(
-        converter.base(), sorted.stream().limit(Math.min(Math.max(limit, 1), 50)).toList());
+        converter.base(),
+        sorted.stream().limit(Math.min(Math.max(limit, 1), 50)).toList(),
+        List.copyOf(converter.missing()));
   }
 }

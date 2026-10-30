@@ -13,3 +13,5 @@ micronaut:
 keeper:
   cookie:
     secure: false
+  fx:
+    auto-refresh: false

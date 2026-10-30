@@ -24,6 +24,11 @@ export const workspaceApi = {
   activity: (ws: string) => api.get<T.Activity[]>(ws, '/activity', { limit: 50 }),
 };
 
+export const fxApi = {
+  quote: (from: string, to: string, amountMinor: number) =>
+    http.get<T.FxQuote>('/api/v1/fx/convert', { params: { from, to, amountMinor } }).then((r) => r.data),
+};
+
 export const accountsApi = {
   list: (ws: string) => api.get<T.Account[]>(ws, '/accounts'),
   create: (ws: string, b: { name: string; type: T.AccountType; currency: string; openingBalanceMinor: number }) =>

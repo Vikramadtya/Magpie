@@ -41,12 +41,14 @@ public class TransactionRepository {
       String importHash,
       UUID importBatchId,
       String idempotencyKey,
-      UUID actor) {}
+      UUID actor,
+      Long origAmountMinor,
+      String origCurrency) {}
 
   private static final String SELECT =
       "SELECT t.id, t.account_id, a.name AS account_name, t.type, t.direction, t.amount_minor, t.currency, "
           + "t.occurred_on, t.category_id, c.name AS category_name, t.payee_id, p.name AS payee_name, t.note, "
-          + "t.transfer_id, t.version, t.created_by, t.created_at, "
+          + "t.transfer_id, t.version, t.created_by, t.created_at, t.orig_amount_minor, t.orig_currency, "
           + "COALESCE((SELECT array_agg(tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}') AS tag_ids "
           + "FROM transactions t JOIN accounts a ON a.id = t.account_id "
           + "LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN payees p ON p.id = t.payee_id ";
@@ -71,7 +73,9 @@ public class TransactionRepository {
               rs.getObject("transfer_id", UUID.class),
               rs.getInt("version"),
               rs.getObject("created_by", UUID.class),
-              rs.getObject("created_at", OffsetDateTime.class).toInstant());
+              rs.getObject("created_at", OffsetDateTime.class).toInstant(),
+              rs.getObject("orig_amount_minor", Long.class),
+              rs.getString("orig_currency"));
 
   private static List<UUID> uuids(java.sql.ResultSet rs, String col) throws SQLException {
     Object[] arr = (Object[]) rs.getArray(col).getArray();
@@ -152,7 +156,7 @@ public class TransactionRepository {
     db.update(
         "INSERT INTO transactions(id, workspace_id, account_id, type, direction, amount_minor, currency, occurred_on, "
             + "category_id, payee_id, note, transfer_id, recurring_rule_id, import_hash, import_batch_id, "
-            + "idempotency_key, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            + "idempotency_key, created_by, updated_by, orig_amount_minor, orig_currency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         i.workspaceId(),
         i.accountId(),
@@ -170,7 +174,9 @@ public class TransactionRepository {
         i.importBatchId(),
         i.idempotencyKey(),
         i.actor(),
-        i.actor());
+        i.actor(),
+        i.origAmountMinor(),
+        i.origCurrency());
     return id;
   }
 
@@ -186,10 +192,13 @@ public class TransactionRepository {
       UUID categoryId,
       UUID payeeId,
       String note,
-      UUID actor) {
+      UUID actor,
+      Long origAmountMinor,
+      String origCurrency) {
     db.update(
         "UPDATE transactions SET account_id = ?, type = ?, direction = ?, amount_minor = ?, currency = ?, occurred_on = ?, "
-            + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, updated_at = NOW(), version = version + 1 "
+            + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, orig_amount_minor = ?, orig_currency = ?, "
+            + "updated_at = NOW(), version = version + 1 "
             + "WHERE workspace_id = ? AND id = ?",
         accountId,
         type,
@@ -201,6 +210,8 @@ public class TransactionRepository {
         payeeId,
         note,
         actor,
+        origAmountMinor,
+        origCurrency,
         ws,
         id);
   }

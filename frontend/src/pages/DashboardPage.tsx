@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { MonthPicker } from '../components/ui/MonthPicker';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { FxWarning } from '../components/FxWarning';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { useDashboard, useNetWorth } from '../hooks/useInsights';
@@ -37,6 +38,7 @@ export default function DashboardPage() {
       >
         {d && (
           <div className="space-y-6">
+            <FxWarning currencies={d.missingCurrencies} base={d.currency} />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Metric label="Net worth" minor={d.netWorthMinor} currency={d.currency} />
               <Metric label="Income" minor={d.incomeMinor} currency={d.currency} tone="income" />

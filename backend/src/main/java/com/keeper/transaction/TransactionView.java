@@ -25,4 +25,6 @@ public record TransactionView(
     UUID transferId,
     int version,
     UUID createdBy,
-    Instant createdAt) {}
+    Instant createdAt,
+    Long origAmountMinor,
+    String origCurrency) {}

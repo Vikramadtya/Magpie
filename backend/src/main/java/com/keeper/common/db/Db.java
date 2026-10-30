@@ -67,7 +67,7 @@ public class Db {
         status -> {
           try (PreparedStatement ps = prepare(status.getConnection(), sql, args);
               var rs = ps.executeQuery()) {
-            return rs.next() ? Optional.of(mapper.map(rs)) : Optional.<T>empty();
+            return rs.next() ? Optional.ofNullable(mapper.map(rs)) : Optional.<T>empty();
           } catch (SQLException e) {
             throw translate(e);
           }
@@ -76,7 +76,7 @@ public class Db {
 
   public <T> Optional<T> one(String sql, RowMapper<T> mapper, Object... args) {
     List<T> rows = list(sql, mapper, args);
-    return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
   }
 
   public long count(String sql, Object... args) {

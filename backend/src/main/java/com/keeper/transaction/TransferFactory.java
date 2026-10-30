@@ -45,7 +45,9 @@ public class TransferFactory {
             null,
             null,
             idempotencyKey,
-            actor);
+            actor,
+            null,
+            null);
     Insert in =
         new Insert(
             ws,
@@ -63,7 +65,9 @@ public class TransferFactory {
             null,
             null,
             null,
-            actor);
+            actor,
+            null,
+            null);
     return new Legs(transferId, out, in);
   }
 }

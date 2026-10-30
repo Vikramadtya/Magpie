@@ -27,6 +27,8 @@ export interface Transaction {
   amountMinor: number; currency: string; occurredOn: string;
   categoryId: string | null; categoryName: string | null; payeeId: string | null; payeeName: string | null;
   note: string | null; tagIds: string[]; transferId: string | null; version: number; createdBy: string; createdAt: string;
+  /** The amount as entered, when it was in a currency other than the account's. */
+  origAmountMinor: number | null; origCurrency: string | null;
 }
 export interface CursorPage<T> { items: T[]; nextCursor: string | null }
 export interface TransactionFilters {
@@ -36,6 +38,10 @@ export interface TransactionFilters {
 export interface TransactionInput {
   accountId: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; occurredOn: string;
   categoryId?: string | null; payeeId?: string | null; note?: string | null; tagIds?: string[];
+  /** Currency of amountMinor; omitted = the account's currency. */
+  currency?: string;
+  /** Exact amount in the account's currency when `currency` differs (overrides the rate). */
+  accountAmountMinor?: number | null;
 }
 export interface TransferInput {
   fromAccountId: string; toAccountId: string; amountMinor: number; destAmountMinor?: number | null;
@@ -70,8 +76,11 @@ export interface Dashboard {
   month: string; currency: string; netWorthMinor: number; assetsMinor: number; liabilitiesMinor: number;
   incomeMinor: number; expenseMinor: number; savingsRatePercent: number;
   accounts: Account[]; recent: Transaction[]; budgets: BudgetSummary; upcoming: Upcoming[];
+  /** Currencies with no exchange rate yet; their amounts were not converted. */
+  missingCurrencies: string[];
 }
-export interface Report<T> { currency: string; items: T[] }
+export interface Report<T> { currency: string; items: T[]; missingCurrencies: string[] }
+export interface FxQuote { available: boolean; rate: number | null; convertedMinor: number | null }
 export interface CategorySpend { categoryId: string; name: string; color: string | null; totalMinor: number }
 export interface MonthFlow { month: string; incomeMinor: number; expenseMinor: number }
 export interface NetWorthPoint { month: string; netWorthMinor: number }

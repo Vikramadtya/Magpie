@@ -34,7 +34,8 @@ public class DashboardService {
       List<Account> accounts,
       List<TransactionView> recent,
       BudgetService.Summary budgets,
-      List<RecurringService.Upcoming> upcoming) {}
+      List<RecurringService.Upcoming> upcoming,
+      List<String> missingCurrencies) {}
 
   private final AccountRepository accounts;
   private final TransactionService transactions;
@@ -102,7 +103,8 @@ public class DashboardService {
         all,
         recent.items(),
         budgets.summary(ws, month),
-        recurring.upcoming(ws, 14));
+        recurring.upcoming(ws, 14),
+        List.copyOf(converter.missing()));
   }
 
   private static boolean isLiability(Account a) {

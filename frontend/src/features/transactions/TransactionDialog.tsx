@@ -12,11 +12,12 @@ import { MoneyInput } from '../../components/ui/MoneyInput';
 import { Select } from '../../components/ui/Select';
 import { today } from '../../lib/dates';
 import { errorMessage } from '../../lib/http';
-import { parseMoney, toInputValue } from '../../lib/money';
+import { CURRENCIES, parseMoney, toInputValue } from '../../lib/money';
 import { cn } from '../../lib/cn';
 import { qk } from '../../hooks/keys';
 import { useAccounts, useCategories, usePayees, useTags } from '../../hooks/useReference';
 import { useCreateTransaction, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
+import { useFxQuote } from '../../hooks/useInsights';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface DialogApi {
@@ -82,6 +83,11 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [destAmount, setDestAmount] = useState('');
+  // '' means "the account's currency"; picking another currency converts server-side.
+  const [entryCurrency, setEntryCurrency] = useState(tx?.origCurrency ?? '');
+  const [accountAmount, setAccountAmount] = useState('');
+  const [accountAmountTouched, setAccountAmountTouched] = useState(!!tx?.origCurrency);
+  const [destTouched, setDestTouched] = useState(false);
   const [date, setDate] = useState(tx?.occurredOn ?? today());
   const [categoryId, setCategoryId] = useState(tx?.categoryId ?? '');
   const [payeeName, setPayeeName] = useState(tx?.payeeName ?? '');
@@ -94,16 +100,43 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
 
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
   const toAccount = accounts.find((a) => a.id === toAccountId);
-  const currency = tx?.currency ?? account?.currency ?? 'USD';
+  const accountCurrency = account?.currency ?? tx?.currency ?? 'USD';
+  const currency = type === 'TRANSFER' ? accountCurrency : entryCurrency || accountCurrency;
+  const foreign = type !== 'TRANSFER' && currency !== accountCurrency;
   const crossCurrency = type === 'TRANSFER' && !!toAccount && !!account && toAccount.currency !== account.currency;
+  const typedMinor = parseMoney(amount, currency);
+  const quote = useFxQuote(foreign ? typedMinor : null, currency, accountCurrency);
+  const transferQuote = useFxQuote(crossCurrency ? typedMinor : null, accountCurrency, toAccount?.currency ?? accountCurrency);
+  const currencyOptions = [...new Set([accountCurrency, ...CURRENCIES, currency])];
 
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
   }, [accounts, accountId]);
 
   useEffect(() => {
-    if (tx) setAmount(toInputValue(tx.amountMinor, tx.currency));
+    if (!tx) return;
+    if (tx.origCurrency && tx.origAmountMinor) {
+      setAmount(toInputValue(tx.origAmountMinor, tx.origCurrency));
+      setAccountAmount(toInputValue(tx.amountMinor, tx.currency));
+    } else {
+      setAmount(toInputValue(tx.amountMinor, tx.currency));
+    }
   }, [tx]);
+
+  // Prefill the converted amounts from the server's rates until the user types their own.
+  const convertedForAccount = quote.data?.convertedMinor;
+  useEffect(() => {
+    if (foreign && !accountAmountTouched && convertedForAccount != null) {
+      setAccountAmount(toInputValue(convertedForAccount, accountCurrency));
+    }
+  }, [foreign, accountAmountTouched, convertedForAccount, accountCurrency]);
+
+  const convertedForTransfer = transferQuote.data?.convertedMinor;
+  useEffect(() => {
+    if (crossCurrency && !destTouched && convertedForTransfer != null) {
+      setDestAmount(toInputValue(convertedForTransfer, toAccount!.currency));
+    }
+  }, [crossCurrency, destTouched, convertedForTransfer, toAccount]);
 
   const kind = type === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const categoryOptions = useMemo(() => groupCategories(categories, kind), [categories, kind]);
@@ -124,6 +157,8 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
       if (!toAccountId) next.toAccount = 'Choose a destination';
       else if (toAccountId === accountId) next.toAccount = 'Pick a different account';
     }
+    const accountMinor = foreign && accountAmount ? parseMoney(accountAmount, accountCurrency) : null;
+    if (foreign && !accountMinor && quote.data?.available === false) next.accountAmount = `No rate available: enter the amount in ${accountCurrency}`;
     const destMinor = crossCurrency ? parseMoney(destAmount, toAccount!.currency) : null;
     if (crossCurrency && (!destMinor || destMinor <= 0)) next.destAmount = 'Enter the received amount';
     if (!date) next.date = 'Pick a date';
@@ -152,6 +187,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
         const input = {
           accountId, type: (type === 'INCOME' ? 'INCOME' : 'EXPENSE') as 'INCOME' | 'EXPENSE', amountMinor: amountMinor!,
           occurredOn: date, categoryId: categoryId || null, payeeId, note: note || null, tagIds,
+          currency: foreign ? currency : undefined, accountAmountMinor: foreign ? accountMinor : null,
         };
         if (editing) await update.mutateAsync({ tx: tx!, input });
         else create.mutate({ input, key: idempotencyKey }); // optimistic: don't wait for the server
@@ -199,7 +235,20 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Amount" error={errors.amount}>
-            <MoneyInput autoFocus value={amount} currency={currency} onChange={setAmount} disabled={isTransferLeg} aria-label="Amount" />
+            <div className="flex gap-2">
+              <MoneyInput autoFocus value={amount} currency={currency} onChange={(v) => { setAmount(v); }} disabled={isTransferLeg} aria-label="Amount" />
+              {type !== 'TRANSFER' && (
+                <Select
+                  className="w-24 shrink-0"
+                  value={currency}
+                  aria-label="Currency"
+                  disabled={isTransferLeg}
+                  onChange={(e) => { setEntryCurrency(e.target.value === accountCurrency ? '' : e.target.value); setAccountAmountTouched(false); setAccountAmount(''); }}
+                >
+                  {currencyOptions.map((c) => <option key={c}>{c}</option>)}
+                </Select>
+              )}
+            </div>
           </Field>
           <Field label="Date" error={errors.date}>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -207,12 +256,22 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
         </div>
 
         <Field label={type === 'TRANSFER' ? 'From account' : 'Account'} error={errors.account}>
-          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isTransferLeg}>
+          <Select value={accountId} onChange={(e) => { setAccountId(e.target.value); setEntryCurrency(''); setAccountAmountTouched(false); setAccountAmount(''); }} disabled={isTransferLeg}>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
             ))}
           </Select>
         </Field>
+
+        {foreign && (
+          <Field
+            label={`Charged to account (${accountCurrency})`}
+            error={errors.accountAmount}
+            hint={quote.data?.available && quote.data.rate ? `Rate: 1 ${currency} = ${quote.data.rate.toFixed(4)} ${accountCurrency}. Edit if your bank charged differently.` : quote.isFetching ? 'Getting rate…' : undefined}
+          >
+            <MoneyInput value={accountAmount} currency={accountCurrency} onChange={(v) => { setAccountAmount(v); setAccountAmountTouched(true); }} aria-label="Amount charged to account" />
+          </Field>
+        )}
 
         {type === 'TRANSFER' && !editing && (
           <>
@@ -226,7 +285,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
             </Field>
             {crossCurrency && (
               <Field label={`Amount received (${toAccount!.currency})`} error={errors.destAmount}>
-                <MoneyInput value={destAmount} currency={toAccount!.currency} onChange={setDestAmount} />
+                <MoneyInput value={destAmount} currency={toAccount!.currency} onChange={(v) => { setDestAmount(v); setDestTouched(true); }} />
               </Field>
             )}
           </>

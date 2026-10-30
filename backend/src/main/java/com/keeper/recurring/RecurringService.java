@@ -160,7 +160,9 @@ public class RecurringService {
                 rule.categoryId(),
                 rule.payeeId(),
                 rule.name(),
-                List.of());
+                List.of(),
+                null,
+                null);
         transactions.insertEntry(
             ws, actor, "rule:" + rule.id() + ":" + date, request, rule.id(), null, null);
       }

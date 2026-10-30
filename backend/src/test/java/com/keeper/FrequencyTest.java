@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.keeper.fx.CurrencyUnits;
 import com.keeper.recurring.Frequency;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
@@ -40,17 +41,16 @@ class FrequencyTest {
 
   @Test
   void currencyConversionRespectsMinorUnits() {
-    // 100.00 USD at 150 JPY per USD = 15000 JPY (no minor units)
+    // 100.00 USD at 150 JPY per USD = 15000 JPY (JPY has no minor units)
+    assertEquals(15_000, CurrencyUnits.convert(10_000, "USD", "JPY", BigDecimal.valueOf(150)));
+    // and back: 15000 JPY at 1/150 USD per JPY = 100.00 USD
     assertEquals(
-        15_000,
+        10_000,
         CurrencyUnits.convert(
-            10_000,
-            "USD",
+            15_000,
             "JPY",
-            BigDecimal.valueOf(1.0 / 150.0 == 0 ? 1 : 1)
-                .divide(BigDecimal.valueOf(150), 12, java.math.RoundingMode.HALF_UP)));
-    // 15000 JPY back into USD where 150 JPY = 1 USD
-    assertEquals(10_000, CurrencyUnits.convert(15_000, "JPY", "USD", BigDecimal.valueOf(150)));
+            "USD",
+            BigDecimal.ONE.divide(BigDecimal.valueOf(150), 12, RoundingMode.HALF_UP)));
     assertEquals(500, CurrencyUnits.convert(500, "USD", "USD", BigDecimal.ONE));
   }
 }

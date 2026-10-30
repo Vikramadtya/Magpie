@@ -66,12 +66,14 @@ export function useCreateTransaction() {
       await qc.cancelQueries({ queryKey: qk.transactions(ws) });
       const prev = snapshot(qc, ws);
       const account = prev.accounts?.find((a) => a.id === input.accountId);
+      // The server converts across currencies; don't guess the balance effect, just refetch afterwards.
+      if (input.currency && account && input.currency !== account.currency) return prev;
       const direction = input.type === 'INCOME' ? 1 : -1;
       const optimistic: Transaction = {
         id: `pending-${key}`, accountId: input.accountId, accountName: account?.name ?? '', type: input.type, direction,
         amountMinor: input.amountMinor, currency: account?.currency ?? 'USD', occurredOn: input.occurredOn,
         categoryId: input.categoryId ?? null, categoryName: null, payeeId: input.payeeId ?? null, payeeName: null,
-        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(),
+        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null,
       };
       prev.lists.forEach(([queryKey, data]) => {
         const filters = (queryKey[3] ?? {}) as TransactionFilters;

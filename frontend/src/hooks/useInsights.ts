@@ -1,8 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { holdingsApi, importApi, insightsApi, workspaceApi } from '../api/endpoints';
+import { fxApi, holdingsApi, importApi, insightsApi, workspaceApi } from '../api/endpoints';
 import type { HoldingInput, ParsedRow } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
+
+/** Server-side conversion preview: the same rates the server applies when saving. */
+export function useFxQuote(amountMinor: number | null, from: string, to: string) {
+  return useQuery({
+    queryKey: ['fx', from, to, amountMinor],
+    queryFn: () => fxApi.quote(from, to, amountMinor ?? 0),
+    enabled: !!amountMinor && amountMinor > 0 && from !== to,
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useDashboard(month: string) {
   const { id } = useWorkspace();

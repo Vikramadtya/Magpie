@@ -9,8 +9,10 @@ import com.keeper.common.CursorPage;
 import com.keeper.common.RefChecks;
 import com.keeper.common.db.Db;
 import com.keeper.common.exception.BadRequestException;
+import com.keeper.common.exception.BusinessRuleException;
 import com.keeper.common.exception.ConflictException;
 import com.keeper.common.exception.ResourceNotFoundException;
+import com.keeper.fx.FxConverter;
 import com.keeper.payee.PayeeRepository;
 import com.keeper.transaction.TransactionRepository.Insert;
 import com.keeper.transaction.TransactionRepository.Raw;
@@ -28,6 +30,7 @@ public class TransactionService {
   private final CategoryRepository categories;
   private final PayeeRepository payees;
   private final TransferFactory transfers;
+  private final FxConverter fx;
   private final RefChecks refs;
   private final Audit audit;
   private final Db db;
@@ -38,6 +41,7 @@ public class TransactionService {
       CategoryRepository categories,
       PayeeRepository payees,
       TransferFactory transfers,
+      FxConverter fx,
       RefChecks refs,
       Audit audit,
       Db db) {
@@ -46,6 +50,7 @@ public class TransactionService {
     this.categories = categories;
     this.payees = payees;
     this.transfers = transfers;
+    this.fx = fx;
     this.refs = refs;
     this.audit = audit;
     this.db = db;
@@ -115,6 +120,7 @@ public class TransactionService {
             .orElseThrow(() -> new BadRequestException("Unknown account"));
     UUID categoryId = validateCategoryAndPayee(ws, r);
     int direction = "INCOME".equals(r.type()) ? 1 : -1;
+    Amounts amounts = resolveAmounts(account, r);
     UUID id =
         transactions.insert(
             new Insert(
@@ -122,7 +128,7 @@ public class TransactionService {
                 account.id(),
                 r.type(),
                 direction,
-                r.amountMinor(),
+                amounts.accountMinor(),
                 account.currency(),
                 r.occurredOn(),
                 categoryId,
@@ -133,9 +139,11 @@ public class TransactionService {
                 importHash,
                 importBatchId,
                 idempotencyKey,
-                actor));
+                actor,
+                amounts.origMinor(),
+                amounts.origCurrency()));
     transactions.replaceTags(id, validTags(ws, r.tagIds()));
-    accounts.adjustBalance(ws, account.id(), direction * r.amountMinor());
+    accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
     return id;
   }
 
@@ -209,21 +217,24 @@ public class TransactionService {
                   .orElseThrow(() -> new BadRequestException("Unknown account"));
           UUID categoryId = validateCategoryAndPayee(ws, req);
           int direction = "INCOME".equals(r.type()) ? 1 : -1;
+          Amounts amounts = resolveAmounts(account, req);
           accounts.adjustBalance(ws, cur.accountId(), -cur.direction() * cur.amount());
-          accounts.adjustBalance(ws, account.id(), direction * r.amountMinor());
+          accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
           transactions.update(
               ws,
               id,
               account.id(),
               r.type(),
               direction,
-              r.amountMinor(),
+              amounts.accountMinor(),
               account.currency(),
               r.occurredOn(),
               categoryId,
               r.payeeId(),
               clean(r.note()),
-              actor);
+              actor,
+              amounts.origMinor(),
+              amounts.origCurrency());
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
@@ -249,6 +260,34 @@ public class TransactionService {
   }
 
   // ---------- helpers ----------
+
+  /**
+   * What moves the balance (account currency) plus the amount as the user entered it, if different.
+   */
+  private record Amounts(long accountMinor, Long origMinor, String origCurrency) {}
+
+  private Amounts resolveAmounts(Account account, TransactionController.Request r) {
+    String entered = r.currency() == null ? account.currency() : r.currency().toUpperCase();
+    if (entered.equals(account.currency())) {
+      return new Amounts(r.amountMinor(), null, null);
+    }
+    if (r.accountAmountMinor() != null) {
+      return new Amounts(r.accountAmountMinor(), r.amountMinor(), entered);
+    }
+    long converted =
+        fx.convert(r.amountMinor(), entered, account.currency())
+            .orElseThrow(
+                () ->
+                    new BusinessRuleException(
+                        "No exchange rate for "
+                            + entered
+                            + " to "
+                            + account.currency()
+                            + " yet. Enter the amount in "
+                            + account.currency()
+                            + " instead."));
+    return new Amounts(converted, r.amountMinor(), entered);
+  }
 
   private void deleteOne(UUID ws, UUID id) {
     Raw cur = transactions.lock(ws, id).orElse(null);
