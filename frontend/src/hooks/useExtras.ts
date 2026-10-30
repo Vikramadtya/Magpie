@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { forecastApi, holdingsApi, householdApi, loansApi, marketApi } from '../api/endpoints';
+import { forecastApi, holdingsApi, loansApi, marketApi } from '../api/endpoints';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
 
@@ -58,11 +58,3 @@ export function useRefreshHoldings() {
     },
   });
 }
-
-// ---------- shared ledger ----------
-export function useHouseholdSummary(month: string, enabled: boolean) {
-  const { id } = useWorkspace();
-  return useQuery({ queryKey: qk.household(id, month), queryFn: () => householdApi.summary(id, month), enabled });
-}
-export const useSettle = () => useMoney((ws, b: Parameters<typeof householdApi.settle>[1]) => householdApi.settle(ws, b));
-export const useRemoveSettlement = () => useMoney((ws, id: string) => householdApi.removeSettlement(ws, id));

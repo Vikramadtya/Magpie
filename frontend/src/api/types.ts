@@ -4,7 +4,7 @@ export type AccountType = 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'CASH' | 'LOA
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
 export interface User { id: string; email: string; name: string }
-export interface Workspace { id: string; name: string; baseCurrency: string; role: Role; kind: 'PERSONAL' | 'SHARED' }
+export interface Workspace { id: string; name: string; baseCurrency: string; role: Role }
 export interface Session { accessToken: string; expiresIn: number; user: User }
 export interface Me { user: User; workspaces: Workspace[] }
 
@@ -32,12 +32,12 @@ export interface Transaction {
   loanId: string | null; loanPerson: string | null;
   /** Amount in the workspace base currency at that day's rate (editable); null when no rate was available. */
   baseAmountMinor: number | null; baseCurrency: string | null; baseFxRate: number | null; baseOverridden: boolean;
-  sharedGroupId: string | null; sharedCopy: boolean;
+  tripId: string | null; tripName: string | null;
 }
 export interface CursorPage<T> { items: T[]; nextCursor: string | null }
 export interface TransactionFilters {
   from?: string; to?: string; accountId?: string; categoryId?: string; payeeId?: string; tagId?: string;
-  type?: TxType; q?: string;
+  type?: TxType; q?: string; tripId?: string;
 }
 export interface TransactionInput {
   accountId: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; occurredOn: string;
@@ -90,7 +90,6 @@ export interface MonthFlow { month: string; incomeMinor: number; expenseMinor: n
 export interface NetWorthPoint { month: string; netWorthMinor: number }
 export interface PayeeSpend { payeeId: string; name: string; totalMinor: number; count: number }
 
-export interface Member { userId: string; name: string; email: string; role: Role; joinedAt: string }
 export interface Activity { id: number; userName: string | null; entity: string; entityId: string | null; action: string; summary: string | null; at: string }
 
 export interface ParsedRow { date: string; amountMinor: number; description: string; duplicate: boolean }
@@ -151,13 +150,19 @@ export interface Insights {
 export interface SecurityHit { symbol: string; name: string; exchange: string | null; type: string | null; currency: string | null }
 export interface PricedQuote { available: boolean; symbol: string; name: string | null; currency: string | null; exchange: string | null; priceMinor: number | null; source: string | null }
 
-// ---------- household ----------
-export interface MemberStat { userId: string; name: string; paidMinor: number; sharePercent: number; fairShareMinor: number; balanceMinor: number }
-export interface MemberAmount { userId: string; name: string; amountMinor: number }
-export interface HouseholdSummary {
-  month: string; currency: string; totalMinor: number; members: MemberStat[]; balances: MemberStat[];
-  categories: { categoryId: string | null; name: string; color: string | null; totalMinor: number; byMember: MemberAmount[] }[];
-  trend: { month: string; byMember: MemberAmount[] }[];
-  suggested: { fromUserId: string; fromName: string; toUserId: string; toName: string; amountMinor: number }[];
-  settlements: { id: string; fromUserId: string; fromName: string; toUserId: string; toName: string; amountMinor: number; occurredOn: string; note: string | null }[];
+// ---------- trips ----------
+export interface Trip {
+  id: string; name: string; startDate: string; endDate: string; budgetMinor: number | null; notes: string | null;
+  spentMinor: number; expenseCount: number; totalDays: number; daysSoFar: number;
+  status: 'UPCOMING' | 'ONGOING' | 'PAST'; perDayMinor: number;
 }
+export interface TripDetail {
+  trip: Trip; currency: string; normalDailyMinor: number; projectedMinor: number; budgetRemainingMinor: number | null;
+  unassignedInRange: number;
+  categories: { categoryId: string | null; name: string; color: string | null; totalMinor: number; percent: number }[];
+  days: { date: string; totalMinor: number }[];
+  currencies: { currency: string; localMinor: number; baseMinor: number; count: number }[];
+  largest: { id: string; date: string; name: string; category: string; baseMinor: number; localMinor: number; localCurrency: string }[];
+  missingCurrencies: string[];
+}
+export interface TripInput { name: string; startDate: string; endDate: string; budgetMinor?: number | null; notes?: string | null }

@@ -100,7 +100,7 @@ export function useCreateTransaction() {
         id: `pending-${key}`, accountId: input.accountId, accountName: account?.name ?? '', type: input.type, direction,
         amountMinor: input.amountMinor, currency: account?.currency ?? 'USD', occurredOn: input.occurredOn,
         categoryId: input.categoryId ?? null, categoryName: null, payeeId: input.payeeId ?? null, payeeName: null,
-        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null, loanId: null, loanPerson: null, baseAmountMinor: null, baseCurrency: null, baseFxRate: null, baseOverridden: false, sharedGroupId: null, sharedCopy: false,
+        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null, loanId: null, loanPerson: null, baseAmountMinor: null, baseCurrency: null, baseFxRate: null, baseOverridden: false, tripId: null, tripName: null,
       };
       prev.lists.forEach(([queryKey, data]) => {
         const filters = (queryKey[3] ?? {}) as TransactionFilters;
@@ -216,17 +216,6 @@ export function useSetNormalised() {
   return useMutation({
     mutationFn: ({ id, baseAmountMinor }: { id: string; baseAmountMinor: number | null }) =>
       baseAmountMinor === null ? transactionsApi.resetNormalised(ws, id) : transactionsApi.setNormalised(ws, id, baseAmountMinor),
-    onSettled: () => void invalidateMoney(qc, ws),
-  });
-}
-
-export function useShareTransaction() {
-  const { id: ws } = useWorkspace();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, householdId }: { id: string; householdId: string | null }) =>
-      householdId ? transactionsApi.share(ws, id, householdId) : transactionsApi.unshare(ws, id),
-    onSuccess: (_d, { householdId }) => toast.success(householdId ? 'Shared to the ledger' : 'No longer shared'),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }

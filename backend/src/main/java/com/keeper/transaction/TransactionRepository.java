@@ -24,8 +24,6 @@ public class TransactionRepository {
       long amount,
       int version,
       UUID transferId,
-      boolean sharedCopy,
-      UUID sharedGroupId,
       UUID loanId) {}
 
   public record Insert(
@@ -52,12 +50,12 @@ public class TransactionRepository {
           + "t.occurred_on, t.category_id, c.name AS category_name, t.payee_id, p.name AS payee_name, t.note, "
           + "t.transfer_id, t.version, t.created_by, t.created_at, t.orig_amount_minor, t.orig_currency, "
           + "t.loan_id, l.person AS loan_person, t.base_amount_minor, t.base_currency, t.base_fx_rate, "
-          + "t.base_overridden, t.shared_group_id, t.shared_copy, "
+          + "t.base_overridden, t.trip_id, tr.name AS trip_name, "
           + "COALESCE((SELECT array_agg(tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}') AS tag_ids";
   private static final String FROM =
       " FROM transactions t JOIN accounts a ON a.id = t.account_id "
           + "LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN payees p ON p.id = t.payee_id "
-          + "LEFT JOIN loans l ON l.id = t.loan_id ";
+          + "LEFT JOIN loans l ON l.id = t.loan_id LEFT JOIN trips tr ON tr.id = t.trip_id ";
   private static final String SELECT = "SELECT " + COLUMNS + FROM;
 
   static final RowMapper<TransactionView> VIEW =
@@ -89,8 +87,8 @@ public class TransactionRepository {
               rs.getString("base_currency"),
               rs.getBigDecimal("base_fx_rate"),
               rs.getBoolean("base_overridden"),
-              rs.getObject("shared_group_id", UUID.class),
-              rs.getBoolean("shared_copy"));
+              rs.getObject("trip_id", UUID.class),
+              rs.getString("trip_name"));
 
   private static List<UUID> uuids(java.sql.ResultSet rs, String col) throws SQLException {
     Object[] arr = (Object[]) rs.getArray(col).getArray();
@@ -100,7 +98,7 @@ public class TransactionRepository {
   }
 
   private static final String RAW_COLS =
-      "id, account_id, type, direction, amount_minor, version, transfer_id, shared_copy, shared_group_id, loan_id";
+      "id, account_id, type, direction, amount_minor, version, transfer_id, loan_id";
   private static final RowMapper<Raw> RAW =
       rs ->
           new Raw(
@@ -111,8 +109,6 @@ public class TransactionRepository {
               rs.getLong("amount_minor"),
               rs.getInt("version"),
               rs.getObject("transfer_id", UUID.class),
-              rs.getBoolean("shared_copy"),
-              rs.getObject("shared_group_id", UUID.class),
               rs.getObject("loan_id", UUID.class));
 
   private final Db db;
@@ -150,10 +146,6 @@ public class TransactionRepository {
         transferId);
   }
 
-  public List<TransactionView> findByGroup(UUID groupId) {
-    return db.list(SELECT + "WHERE t.shared_group_id = ? AND t.deleted_at IS NULL", VIEW, groupId);
-  }
-
   public List<TransactionView> findByLoan(UUID ws, UUID loanId) {
     return db.list(
         SELECT
@@ -172,7 +164,7 @@ public class TransactionRepository {
     return db.list(
         SELECT
             + "WHERE t.workspace_id = ? AND t.deleted_at IS NOT NULL AND t.deleted_at > NOW() - INTERVAL '30 days' "
-            + "AND t.shared_copy = FALSE ORDER BY t.deleted_at DESC LIMIT ?",
+            + "ORDER BY t.deleted_at DESC LIMIT ?",
         VIEW,
         ws,
         limit);
@@ -229,8 +221,8 @@ public class TransactionRepository {
         "INSERT INTO transactions(id, workspace_id, account_id, type, direction, amount_minor, currency, occurred_on, "
             + "category_id, payee_id, note, transfer_id, recurring_rule_id, import_hash, import_batch_id, "
             + "idempotency_key, created_by, updated_by, orig_amount_minor, orig_currency, loan_id, "
-            + "base_amount_minor, base_currency, base_fx_rate, base_overridden, shared_group_id, shared_copy) "
-            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            + "base_amount_minor, base_currency, base_fx_rate, base_overridden) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         i.workspaceId(),
         i.accountId(),
@@ -255,9 +247,7 @@ public class TransactionRepository {
         b.amountMinor(),
         b.currency(),
         b.rate(),
-        b.overridden(),
-        o.sharedGroupId(),
-        o.sharedCopy());
+        b.overridden());
     return id;
   }
 
@@ -329,41 +319,6 @@ public class TransactionRepository {
         v.id());
   }
 
-  /** A household copy and where it lives. */
-  public record CopyRef(
-      UUID id, UUID workspaceId, UUID accountId, long amount, int direction, boolean deleted) {}
-
-  public Optional<CopyRef> copyOf(UUID groupId) {
-    return db.one(
-        "SELECT id, workspace_id, account_id, amount_minor, direction, deleted_at IS NOT NULL FROM transactions "
-            + "WHERE shared_group_id = ? AND shared_copy ORDER BY (deleted_at IS NULL) DESC, created_at DESC LIMIT 1",
-        rs ->
-            new CopyRef(
-                rs.getObject(1, UUID.class),
-                rs.getObject(2, UUID.class),
-                rs.getObject(3, UUID.class),
-                rs.getLong(4),
-                rs.getInt(5),
-                rs.getBoolean(6)),
-        groupId);
-  }
-
-  public Optional<UUID> groupIdOf(UUID ws, UUID id) {
-    return db.one(
-        "SELECT shared_group_id FROM transactions WHERE workspace_id = ? AND id = ? AND shared_group_id IS NOT NULL AND NOT shared_copy",
-        rs -> rs.getObject(1, UUID.class),
-        ws,
-        id);
-  }
-
-  public void setSharedGroup(UUID ws, UUID id, UUID groupId) {
-    db.update(
-        "UPDATE transactions SET shared_group_id = ? WHERE workspace_id = ? AND id = ? AND NOT shared_copy",
-        groupId,
-        ws,
-        id);
-  }
-
   public void setNormalised(UUID ws, UUID id, Normalised b) {
     db.update(
         "UPDATE transactions SET base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
@@ -417,7 +372,7 @@ public class TransactionRepository {
     return db.update(
         "UPDATE transactions t SET category_id = c.id, version = t.version + 1, updated_at = NOW() FROM categories c "
             + "WHERE c.id = ? AND c.workspace_id = ? AND t.workspace_id = ? AND t.id = ANY(?) AND t.type = c.kind "
-            + "AND t.deleted_at IS NULL AND t.shared_copy = FALSE",
+            + "AND t.deleted_at IS NULL",
         categoryId,
         ws,
         ws,

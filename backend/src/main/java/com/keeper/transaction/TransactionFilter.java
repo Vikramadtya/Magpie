@@ -13,7 +13,8 @@ public record TransactionFilter(
     UUID payeeId,
     UUID tagId,
     String type,
-    String q) {
+    String q,
+    UUID tripId) {
 
   SqlWhere toWhere(UUID workspaceId) {
     SqlWhere where =
@@ -24,7 +25,8 @@ public record TransactionFilter(
         .andIf(accountId, "t.account_id = ?")
         .andIf(categoryId, "t.category_id = ?")
         .andIf(payeeId, "t.payee_id = ?")
-        .andIf(type, "t.type = ?");
+        .andIf(type, "t.type = ?")
+        .andIf(tripId, "t.trip_id = ?");
     if (tagId != null) {
       where.and(
           "EXISTS (SELECT 1 FROM transaction_tags x WHERE x.transaction_id = t.id AND x.tag_id = ?)",

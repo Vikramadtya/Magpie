@@ -117,10 +117,11 @@ public class TransactionController {
       @Nullable @QueryValue UUID payeeId,
       @Nullable @QueryValue UUID tagId,
       @Nullable @QueryValue @Pattern(regexp = "^(INCOME|EXPENSE|TRANSFER)$") String type,
-      @Nullable @QueryValue @Size(max = 100) String q) {
+      @Nullable @QueryValue @Size(max = 100) String q,
+      @Nullable @QueryValue UUID tripId) {
     return service.list(
         workspaceId,
-        new TransactionFilter(from, to, accountId, categoryId, payeeId, tagId, type, q),
+        new TransactionFilter(from, to, accountId, categoryId, payeeId, tagId, type, q, tripId),
         cursor,
         limit);
   }

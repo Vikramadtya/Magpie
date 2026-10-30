@@ -194,7 +194,7 @@ public class LoanService {
     db.tx(
         () -> {
           for (TransactionView t : transactionRepo.findByLoan(ws, loanId)) {
-            transactions.deleteOne(ws, actor, t.id(), false);
+            transactions.deleteOne(ws, actor, t.id());
           }
           loans.markDeleted(ws, loanId);
         });

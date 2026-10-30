@@ -1,36 +1,27 @@
 package com.keeper.workspace;
 
-import com.keeper.auth.TokenService;
 import com.keeper.category.DefaultCategories;
 import com.keeper.common.db.Db;
-import com.keeper.common.exception.BadRequestException;
-import com.keeper.common.exception.BusinessRuleException;
-import com.keeper.common.exception.ForbiddenException;
-import com.keeper.common.exception.ResourceNotFoundException;
 import com.keeper.security.MembershipCache;
-import com.keeper.security.Role;
+import com.keeper.transaction.NormalisationService;
 import jakarta.inject.Singleton;
-import java.security.SecureRandom;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
+/** Each user has one personal ledger, created at sign-up. It is only theirs. */
 @Singleton
 public class WorkspaceService {
   private final WorkspaceRepository workspaces;
   private final DefaultCategories defaults;
   private final MembershipCache cache;
-  private final com.keeper.transaction.NormalisationService normalisation;
+  private final NormalisationService normalisation;
   private final Db db;
-  private final SecureRandom random = new SecureRandom();
 
   public WorkspaceService(
       WorkspaceRepository workspaces,
       DefaultCategories defaults,
       MembershipCache cache,
-      com.keeper.transaction.NormalisationService normalisation,
+      NormalisationService normalisation,
       Db db) {
     this.workspaces = workspaces;
     this.defaults = defaults;
@@ -44,23 +35,10 @@ public class WorkspaceService {
   }
 
   public Workspace create(UUID userId, String name, String currency) {
-    return create(userId, name, currency, "PERSONAL");
-  }
-
-  public Workspace create(UUID userId, String name, String currency, String kind) {
-    // Everyone has exactly one editable personal ledger; extra ledgers are shared (view-only) ones.
-    if ("PERSONAL".equals(kind)
-        && db.count(
-                "SELECT count(*) FROM workspaces WHERE created_by = ? AND kind = 'PERSONAL'",
-                userId)
-            > 0) {
-      throw new com.keeper.common.exception.ConflictException(
-          "You already have a personal ledger. Create a shared ledger to track spending with a group.");
-    }
     UUID id =
         db.tx(
             () -> {
-              UUID created = workspaces.insert(name, currency.toUpperCase(), userId, kind);
+              UUID created = workspaces.insert(name, currency.toUpperCase(), userId);
               defaults.seed(created);
               return created;
             });
@@ -79,77 +57,5 @@ public class WorkspaceService {
   public void delete(UUID ws) {
     workspaces.delete(ws);
     cache.evictWorkspace(ws);
-  }
-
-  // ---- members ----
-
-  public List<WorkspaceRepository.Member> members(UUID ws) {
-    return workspaces.members(ws);
-  }
-
-  public void changeRole(UUID ws, UUID target, Role role) {
-    guardLastOwner(ws, target, role);
-    if (workspaces.setRole(ws, target, role) == 0) {
-      throw new ResourceNotFoundException("Member", target.toString());
-    }
-    cache.evict(target, ws);
-  }
-
-  /** Owners can remove anyone; any member may remove themselves (leave). */
-  public void removeMember(UUID ws, UUID target) {
-    guardLastOwner(ws, target, null);
-    if (workspaces.removeMember(ws, target) == 0) {
-      throw new ResourceNotFoundException("Member", target.toString());
-    }
-    cache.evict(target, ws);
-  }
-
-  public void leave(UUID ws, UUID userId) {
-    if (workspaces.roleOf(ws, userId).isEmpty()) {
-      throw new ResourceNotFoundException("Workspace", ws.toString());
-    }
-    removeMember(ws, userId);
-  }
-
-  private void guardLastOwner(UUID ws, UUID target, Role newRole) {
-    boolean demoting = newRole != Role.OWNER;
-    boolean isOwner = workspaces.roleOf(ws, target).filter(r -> r == Role.OWNER).isPresent();
-    if (isOwner && demoting && workspaces.ownerCount(ws) <= 1) {
-      throw new BusinessRuleException("A workspace needs at least one owner");
-    }
-  }
-
-  // ---- invites ----
-
-  /** Returns the raw invite token; only its hash is stored. */
-  public String invite(UUID ws, UUID by, Role requested) {
-    if (requested == Role.OWNER) {
-      throw new BadRequestException("Invite as EDITOR or VIEWER");
-    }
-    String kind =
-        db.one("SELECT kind FROM workspaces WHERE id = ?", rs -> rs.getString(1), ws)
-            .orElse("PERSONAL");
-    if (!"SHARED".equals(kind)) {
-      throw new BadRequestException(
-          "Your personal ledger is just yours. Create a shared ledger to track spending with others.");
-    }
-    // A shared ledger is view-only for everyone, so there is no meaningful editor role there.
-    Role role = Role.VIEWER;
-    byte[] raw = new byte[24];
-    random.nextBytes(raw);
-    String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-    workspaces.insertInvite(
-        ws, role, TokenService.hash(token), Instant.now().plus(Duration.ofDays(7)), by);
-    return token;
-  }
-
-  public Workspace accept(String token, UUID userId) {
-    var invite =
-        workspaces
-            .claimInvite(TokenService.hash(token))
-            .orElseThrow(() -> new ForbiddenException("Invite is invalid or expired"));
-    workspaces.addMember(invite.workspaceId(), userId, invite.role());
-    cache.evict(userId, invite.workspaceId());
-    return workspaces.find(invite.workspaceId(), userId).orElseThrow();
   }
 }

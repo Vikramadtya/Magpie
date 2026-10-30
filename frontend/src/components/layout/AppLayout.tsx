@@ -9,7 +9,7 @@ import { cn } from '../../lib/cn';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { Skeleton } from '../ui/StateView';
 import { CommandPalette } from './CommandPalette';
-import { visibleNav } from './nav';
+import { NAV_ITEMS } from './nav';
 
 export default function AppLayout() {
   return (
@@ -20,7 +20,6 @@ export default function AppLayout() {
 }
 
 function Shell() {
-  const { workspace } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const online = useOnline();
@@ -53,11 +52,6 @@ function Shell() {
         {!online && (
           <div role="status" className="flex items-center justify-center gap-2 py-1.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300">
             <WifiOff className="w-3.5 h-3.5" /> You're offline. Showing saved data; changes need a connection.
-          </div>
-        )}
-        {workspace?.kind === 'SHARED' && (
-          <div role="status" className="px-4 py-1.5 text-xs text-center bg-accent/10 text-accent">
-            Shared ledger · view-only. Everyone adds spending by sharing expenses from their own personal ledger.
           </div>
         )}
         <main id="main" className="flex-1 overflow-y-auto">
@@ -94,6 +88,8 @@ function SidebarContent() {
         </button>
       </div>
 
+      {/* Everyone has one personal ledger; the switcher only appears for older accounts with more. */}
+      {workspaces.length > 1 && (
       <div className="px-4 mb-3">
         <label className="sr-only" htmlFor="ws-switch">Workspace</label>
         <select
@@ -103,15 +99,16 @@ function SidebarContent() {
           className="w-full h-9 rounded-lg border border-border bg-background px-2 text-sm"
         >
           {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>{w.name}{w.kind === 'SHARED' ? ' · shared' : ''}</option>
+            <option key={w.id} value={w.id}>{w.name}</option>
           ))}
         </select>
       </div>
+      )}
 
       <div className="px-4 mb-3 hidden md:block"><AddButton /></div>
 
       <nav className="flex-1 px-4 flex flex-col gap-0.5 overflow-y-auto" aria-label="Main">
-        {visibleNav(workspace?.kind).map((item) => (
+        {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -144,8 +141,6 @@ function SidebarContent() {
 
 function AddButton({ compact }: { compact?: boolean }) {
   const dialog = useTransactionDialog();
-  const { workspace } = useAuth();
-  if (workspace?.kind === 'SHARED') return null; // shared ledgers are view-only
   return (
     <button
       onClick={() => dialog.open()}

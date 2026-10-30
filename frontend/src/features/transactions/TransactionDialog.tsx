@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { payeesApi } from '../../api/endpoints';
 import type { Category, Transaction, TxType } from '../../api/types';
-import { useAuth, useWorkspace } from '../../auth/AuthProvider';
+import { useWorkspace } from '../../auth/AuthProvider';
+import { useAssignToTrip, useTrips } from '../../hooks/useTrips';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
@@ -16,7 +17,7 @@ import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../../lib/mon
 import { cn } from '../../lib/cn';
 import { qk } from '../../hooks/keys';
 import { useAccounts, useCategories, usePayees, useTags } from '../../hooks/useReference';
-import { useCreateTransaction, useSetNormalised, useShareTransaction, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
+import { useCreateTransaction, useSetNormalised, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
 import { useFxQuote } from '../../hooks/useInsights';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -32,17 +33,11 @@ export function useTransactionDialog() {
 }
 
 export function TransactionDialogProvider({ children }: { children: ReactNode }) {
-  const { canEdit, kind } = useWorkspace();
+  const { canEdit } = useWorkspace();
   const [state, setState] = useState<{ tx: Transaction | null; preset?: { type?: TxType; accountId?: string } } | null>(null);
   const open = useCallback<DialogApi['open']>(
     (tx, preset) => {
-      if (!canEdit) {
-        return toast.info(
-          kind === 'SHARED'
-            ? 'A shared ledger is view-only. Record the expense in your own ledger and share it there.'
-            : 'You have view-only access to this workspace',
-        );
-      }
+      if (!canEdit) return toast.info('You have view-only access to this workspace');
       setState({ tx: tx ?? null, preset });
     },
     [canEdit],
@@ -81,11 +76,9 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
   const transfer = useTransfer();
-  const share = useShareTransaction();
-  const { workspaces, workspace } = useAuth();
-  // a personal ledger can share an expense to any shared ledger it belongs to
-  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'SHARED' && w.role !== 'VIEWER') : [];
-  const [householdId, setHouseholdId] = useState('');
+  const trips = useTrips().data ?? [];
+  const assign = useAssignToTrip();
+  const [tripId, setTripId] = useState(tx?.tripId ?? '');
 
   const editing = tx !== null;
   const isTransferLeg = tx?.type === 'TRANSFER';
@@ -119,6 +112,14 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const quote = useFxQuote(foreign ? typedMinor : null, currency, accountCurrency);
   const transferQuote = useFxQuote(crossCurrency ? typedMinor : null, accountCurrency, toAccount?.currency ?? accountCurrency);
   const currencyOptions = [...new Set([accountCurrency, ...CURRENCIES, currency])];
+
+  // Recording while travelling: preselect the trip that is on today.
+  useEffect(() => {
+    if (editing || tripId || trips.length === 0) return;
+    const now = today();
+    const current = trips.find((t) => t.startDate <= now && now <= t.endDate);
+    if (current) setTripId(current.id);
+  }, [trips, editing, tripId]);
 
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
@@ -200,10 +201,12 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           occurredOn: date, categoryId: categoryId || null, payeeId, note: note || null, tagIds,
           currency: foreign ? currency : undefined, accountAmountMinor: foreign ? accountMinor : null,
         };
-        if (editing) await update.mutateAsync({ tx: tx!, input });
-        else if (householdId && type === 'EXPENSE') {
+        if (editing) {
+          await update.mutateAsync({ tx: tx!, input });
+          if (type !== 'TRANSFER' && (tx!.tripId ?? '') !== tripId) await assign.mutateAsync({ ids: [tx!.id], tripId: tripId || null });
+        } else if (tripId && type === 'EXPENSE') {
           const created = await create.mutateAsync({ input, key: idempotencyKey });
-          await share.mutateAsync({ id: created.id, householdId });
+          await assign.mutateAsync({ ids: [created.id], tripId });
         } else create.mutate({ input, key: idempotencyKey }); // optimistic: don't wait for the server
       }
       if (addAnother && !editing) {
@@ -346,11 +349,11 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
 
         {editing && tx && <NormalisedBox tx={tx} />}
 
-        {!editing && type === 'EXPENSE' && households.length > 0 && (
-          <Field label="Also share to" hint="Records a linked copy in that shared ledger (a trip, a flat…), credited to you.">
-            <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)}>
-              <option value="">Just me</option>
-              {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+        {type === 'EXPENSE' && trips.length > 0 && !isTransferLeg && (
+          <Field label="Trip" hint="Counts this towards a trip's total.">
+            <Select value={tripId} onChange={(e) => setTripId(e.target.value)}>
+              <option value="">Not part of a trip</option>
+              {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </Select>
           </Field>
         )}

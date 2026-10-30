@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 /**
  * Single choke point for tenant isolation: every /api/v1/workspaces/{id}/... request must come from
- * a member whose role covers the HTTP method. Non-members get 404 so ids cannot be probed.
+ * the ledger's member. Anyone else gets 404 so ids cannot be probed.
  */
 @ServerFilter("/api/v1/workspaces/**")
 public class WorkspaceAccessFilter implements Ordered {
@@ -38,7 +38,7 @@ public class WorkspaceAccessFilter implements Ordered {
   public HttpResponse<?> check(HttpRequest<?> request) {
     Matcher m = PATH.matcher(request.getPath());
     if (!m.matches()) {
-      return null; // collection routes (list/create workspaces) handled by the controller
+      return null; // the workspace list is handled by the controller
     }
     Authentication auth = request.getUserPrincipal(Authentication.class).orElse(null);
     if (auth == null) {
@@ -50,53 +50,21 @@ public class WorkspaceAccessFilter implements Ordered {
     } catch (IllegalArgumentException e) {
       return problem(HttpStatus.NOT_FOUND, "Workspace not found");
     }
-    Optional<MembershipCache.Membership> membership =
-        memberships.membership(Actor.id(auth), workspaceId);
-    if (membership.isEmpty()) {
+    Optional<Role> role = memberships.roleOf(Actor.id(auth), workspaceId);
+    if (role.isEmpty()) {
       return problem(HttpStatus.NOT_FOUND, "Workspace not found");
     }
-    Role role = membership.get().role();
-    boolean household = "SHARED".equals(membership.get().kind());
     String rest = m.group(2) == null ? "" : m.group(2);
-    boolean read = request.getMethod() == HttpMethod.GET || request.getMethod() == HttpMethod.HEAD;
-    if (household && !read && !householdWritable(rest)) {
-      return problem(
-          HttpStatus.FORBIDDEN,
-          "A shared ledger is view-only. Record the expense in your own ledger and share it there.");
-    }
-    if (!role.atLeast(required(request.getMethod(), rest, household))) {
+    if (!role.get().atLeast(required(request.getMethod(), rest))) {
       return problem(HttpStatus.FORBIDDEN, "Your role does not allow this action");
     }
-    request.setAttribute(ROLE_ATTRIBUTE, role);
+    request.setAttribute(ROLE_ATTRIBUTE, role.get());
     return null;
   }
 
-  /**
-   * What a household still accepts: membership management, settling up and comments on shared
-   * expenses.
-   */
-  static boolean householdWritable(String rest) {
-    return rest.isEmpty()
-        || rest.equals("/leave")
-        || rest.startsWith("/members")
-        || rest.startsWith("/invites")
-        || rest.startsWith("/household/settlements")
-        || rest.matches("^/transactions/[0-9a-fA-F-]{36}/comments$");
-  }
-
-  static Role required(HttpMethod method, String rest, boolean household) {
+  static Role required(HttpMethod method, String rest) {
     boolean read = method == HttpMethod.GET || method == HttpMethod.HEAD;
-    if (rest.equals("/leave")) return Role.VIEWER;
-    // every household member can settle up and comment, whatever their invite role
-    if (household
-        && !read
-        && (rest.startsWith("/household/settlements") || rest.contains("/comments"))) {
-      return Role.VIEWER;
-    }
-    boolean ownerOnly =
-        rest.isEmpty() && !read // rename / delete workspace
-            || (rest.startsWith("/members") || rest.startsWith("/invites")) && !read;
-    if (ownerOnly) return Role.OWNER;
+    if (rest.isEmpty() && !read) return Role.OWNER; // rename / delete the ledger
     return read ? Role.VIEWER : Role.EDITOR;
   }
 

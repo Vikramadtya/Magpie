@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CheckSquare, Banknote, Home, MessageSquare, Pencil, RotateCcw, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSearchParams } from 'react-router-dom';
@@ -16,17 +16,15 @@ import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { useAccounts, useCategories } from '../hooks/useReference';
-import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useShareTransaction, useTransactionList } from '../hooks/useTransactions';
-import { useMembers } from '../hooks/useInsights';
+import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList } from '../hooks/useTransactions';
+import { useAssignToTrip, useTrips } from '../hooks/useTrips';
 import { prettyDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { cn } from '../lib/cn';
 
 export default function TransactionsPage() {
-  const { canEdit, kind } = useWorkspace();
-  const { workspaces, workspace } = useAuth();
-  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'SHARED' && w.role !== 'VIEWER') : [];
-  const memberNames = new Map((useMembers().data ?? []).map((m) => [m.userId, m.name]));
+  const { canEdit } = useWorkspace();
+  const trips = useTrips().data ?? [];
   const dialog = useTransactionDialog();
   const [params, setParams] = useSearchParams();
   const accounts = useAccounts().data ?? [];
@@ -43,6 +41,7 @@ export default function TransactionsPage() {
       type: (params.get('type') as TxType) || undefined,
       from: params.get('from') || undefined,
       to: params.get('to') || undefined,
+      tripId: params.get('trip') || undefined,
     }),
     [debounced, params],
   );
@@ -62,25 +61,15 @@ export default function TransactionsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toDelete, setToDelete] = useState<Transaction | null>(null);
   const [commentsFor, setCommentsFor] = useState<Transaction | null>(null);
-  const [shareFor, setShareFor] = useState<Transaction | null>(null);
+  const [tripFor, setTripFor] = useState<Transaction | null>(null);
   const [deletedOpen, setDeletedOpen] = useState(false);
   const del = useDeleteTransaction();
   const bulk = useBulkTransactions();
-  const shareMut = useShareTransaction();
-  const shareSelected = async (householdId: string) => {
-    const eligible = rows.filter((t) => selected.has(t.id) && t.type === 'EXPENSE' && !t.loanId && !t.sharedCopy && !t.sharedGroupId);
-    if (eligible.length === 0) return toast.info('Pick expenses that are not already shared');
-    let ok = 0;
-    for (const t of eligible) {
-      try {
-        await shareMut.mutateAsync({ id: t.id, householdId });
-        ok++;
-      } catch {
-        /* the failure toast comes from the mutation; keep going with the rest */
-      }
-    }
-    toast.success(`Shared ${ok} of ${eligible.length} expense${eligible.length === 1 ? '' : 's'}`);
-    setSelecting(false);
+  const assign = useAssignToTrip();
+  const addSelectedToTrip = (tripId: string | null) => {
+    const ids = rows.filter((t) => selected.has(t.id) && t.type === 'EXPENSE' && !t.loanId).map((t) => t.id);
+    if (ids.length === 0) return toast.info('Select some expenses first');
+    assign.mutate({ ids, tripId }, { onSuccess: () => setSelecting(false) });
   };
 
   useEffect(() => {
@@ -133,6 +122,12 @@ export default function TransactionsPage() {
             </optgroup>
           ))}
         </Select>
+        {trips.length > 0 && (
+          <Select value={filters.tripId ?? ''} onChange={(e) => setParam('trip', e.target.value)} aria-label="Trip">
+            <option value="">All trips</option>
+            {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </Select>
+        )}
         <Select value={filters.type ?? ''} onChange={(e) => setParam('type', e.target.value)} aria-label="Type">
           <option value="">All types</option>
           <option value="EXPENSE">Expenses</option>
@@ -154,10 +149,11 @@ export default function TransactionsPage() {
         <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-2 shadow">
           <span className="text-sm">{selected.size} selected</span>
           <div className="flex gap-2">
-            {households.length > 0 && (
-              <Select className="h-9 w-44" value="" onChange={(e) => e.target.value && void shareSelected(e.target.value)} aria-label="Share selected to a shared ledger">
-                <option value="">Share to…</option>
-                {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            {trips.length > 0 && (
+              <Select className="h-9 w-44" value="" onChange={(e) => { const v = e.target.value; if (v) addSelectedToTrip(v === '__none' ? null : v); }} aria-label="Add selected to a trip">
+                <option value="">Add to trip…</option>
+                {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="__none">Remove from trip</option>
               </Select>
             )}
             <Select className="h-9 w-48" defaultValue="" onChange={(e) => { if (e.target.value) { bulk.mutate({ action: 'RECATEGORIZE', ids: [...selected], categoryId: e.target.value }); setSelecting(false); } }} aria-label="Recategorize selected">
@@ -193,9 +189,8 @@ export default function TransactionsPage() {
                 selecting={selecting}
                 selected={selected.has(t.id)}
                 canEdit={canEdit}
-                canShare={households.length > 0 && t.type === 'EXPENSE' && !t.loanId && !t.sharedCopy}
-                by={kind === 'SHARED' ? memberNames.get(t.createdBy) : undefined}
-                onShare={() => setShareFor(t)}
+                canTrip={trips.length > 0 && t.type === 'EXPENSE' && !t.loanId}
+                onTrip={() => setTripFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
                 onDelete={() => setToDelete(t)}
@@ -216,18 +211,18 @@ export default function TransactionsPage() {
         onConfirm={() => { if (toDelete) del.mutate(toDelete); setToDelete(null); }}
       />
       <CommentsModal tx={commentsFor} onClose={() => setCommentsFor(null)} />
-      {shareFor && <ShareModal tx={shareFor} households={households} onClose={() => setShareFor(null)} />}
+      {tripFor && <TripModal tx={tripFor} onClose={() => setTripFor(null)} />}
       <DeletedModal open={deletedOpen} onClose={() => setDeletedOpen(false)} />
     </>
   );
 }
 
 interface RowProps {
-  tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canShare: boolean; by?: string;
-  onShare: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
+  tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canTrip: boolean;
+  onTrip: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare, onToggle, onEdit, onDelete, onComments }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
@@ -240,11 +235,11 @@ function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
-          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}{by ? ` · ${by}` : ''}</p>
-          {(tx.loanId || tx.sharedGroupId) && (
-            <p className="text-[11px] text-accent flex items-center gap-1 mt-0.5">
-              {tx.loanId && <><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</>}
-              {tx.sharedGroupId && <><Home className="w-3 h-3" />{tx.sharedCopy ? 'From a personal ledger' : 'Shared to a ledger'}</>}
+          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
+          {(tx.loanId || tx.tripId) && (
+            <p className="text-[11px] text-accent flex items-center gap-2 mt-0.5">
+              {tx.loanId && <span className="inline-flex items-center gap-1"><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</span>}
+              {tx.tripId && <span className="inline-flex items-center gap-1"><Plane className="w-3 h-3" />{tx.tripName}</span>}
             </p>
           )}
         </div>
@@ -252,9 +247,9 @@ function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare
         {!pending && !selecting && (
           <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
-            {canEdit && canShare && <IconButton label={tx.sharedGroupId ? 'Shared ledger' : 'Share to a shared ledger'} onClick={onShare}><Users className="w-4 h-4" /></IconButton>}
-            {canEdit && !tx.sharedCopy && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
-            {canEdit && !tx.sharedCopy && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
+            {canEdit && canTrip && <IconButton label={tx.tripId ? 'Change trip' : 'Add to a trip'} onClick={onTrip}><Plane className="w-4 h-4" /></IconButton>}
+            {canEdit && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
+            {canEdit && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
           </div>
         )}
       </div>
@@ -301,32 +296,23 @@ function CommentsModal({ tx, onClose }: { tx: Transaction | null; onClose: () =>
   );
 }
 
-function ShareModal({ tx, households, onClose }: { tx: Transaction; households: { id: string; name: string }[]; onClose: () => void }) {
-  const share = useShareTransaction();
-  const [householdId, setHouseholdId] = useState(households[0]?.id ?? '');
-  const shared = !!tx.sharedGroupId;
+function TripModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
+  const trips = useTrips().data ?? [];
+  const assign = useAssignToTrip();
+  const [tripId, setTripId] = useState(tx.tripId ?? trips[0]?.id ?? '');
   return (
-    <Modal isOpen onClose={onClose} title={shared ? 'Shared to a ledger' : 'Share to a shared ledger'}>
-      {shared ? (
-        <>
-          <p className="text-sm text-secondary mb-4">A linked copy of this expense is in a shared ledger, credited to you. It follows any edits you make here.</p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Close</Button>
-            <Button variant="destructive" disabled={share.isPending} onClick={() => share.mutate({ id: tx.id, householdId: null }, { onSuccess: onClose })}>Stop sharing</Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-secondary mb-3">Records a linked copy in the shared ledger (a trip, a flat…), credited to you. Later edits or deletes here update it.</p>
-          <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} aria-label="Shared ledger">
-            {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </Select>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button disabled={!householdId || share.isPending} onClick={() => share.mutate({ id: tx.id, householdId }, { onSuccess: onClose })}>Share</Button>
-          </div>
-        </>
-      )}
+    <Modal isOpen onClose={onClose} title="Trip">
+      <p className="text-sm text-secondary mb-3">Counts this expense towards a trip's total, in your main currency.</p>
+      <Select value={tripId} onChange={(e) => setTripId(e.target.value)} aria-label="Trip">
+        {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+      </Select>
+      <div className="flex justify-between gap-2 mt-4">
+        {tx.tripId ? <Button variant="outline" disabled={assign.isPending} onClick={() => assign.mutate({ ids: [tx.id], tripId: null }, { onSuccess: onClose })}>Remove from trip</Button> : <span />}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={!tripId || assign.isPending} onClick={() => assign.mutate({ ids: [tx.id], tripId }, { onSuccess: onClose })}>Save</Button>
+        </div>
+      </div>
     </Modal>
   );
 }

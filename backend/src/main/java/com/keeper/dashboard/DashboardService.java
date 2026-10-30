@@ -91,7 +91,10 @@ public class DashboardService {
 
     CursorPage<TransactionView> recent =
         transactions.list(
-            ws, new TransactionFilter(null, null, null, null, null, null, null, null), null, 8);
+            ws,
+            new TransactionFilter(null, null, null, null, null, null, null, null, null),
+            null,
+            8);
     int savings =
         income.get() > 0 ? (int) ((income.get() - expense.get()) * 100 / income.get()) : 0;
 

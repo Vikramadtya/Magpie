@@ -33,7 +33,6 @@ public class TransactionService {
   private final FxConverter fx;
   private final Normaliser normaliser;
   private final RevisionService revisions;
-  private final io.micronaut.context.event.ApplicationEventPublisher<TransactionChanged> changes;
   private final RefChecks refs;
   private final Audit audit;
   private final Db db;
@@ -47,7 +46,6 @@ public class TransactionService {
       FxConverter fx,
       Normaliser normaliser,
       RevisionService revisions,
-      io.micronaut.context.event.ApplicationEventPublisher<TransactionChanged> changes,
       RefChecks refs,
       Audit audit,
       Db db) {
@@ -59,7 +57,6 @@ public class TransactionService {
     this.fx = fx;
     this.normaliser = normaliser;
     this.revisions = revisions;
-    this.changes = changes;
     this.refs = refs;
     this.audit = audit;
     this.db = db;
@@ -114,7 +111,7 @@ public class TransactionService {
     return get(ws, id);
   }
 
-  /** Shared by manual entry, recurring postings, CSV import, loans and household copies. */
+  /** Shared by manual entry, recurring postings, CSV import, and loans. */
   public UUID insertEntry(
       UUID ws,
       UUID actor,
@@ -205,7 +202,6 @@ public class TransactionService {
     db.tx(
         () -> {
           Raw cur = lockOrFail(ws, id);
-          guardNotSharedCopy(cur);
           if (r.expectedVersion() != null && r.expectedVersion() != cur.version()) {
             throw new ConflictException("This transaction was changed by someone else");
           }
@@ -260,19 +256,16 @@ public class TransactionService {
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
-    changes.publishEvent(new TransactionChanged(ws, id));
     return get(ws, id);
   }
 
   public void delete(UUID ws, UUID actor, UUID id) {
-    db.tx(() -> deleteOne(ws, actor, id, false));
+    db.tx(() -> deleteOne(ws, actor, id));
     audit.record(ws, actor, "transaction", id, "DELETE", "");
-    changes.publishEvent(new TransactionChanged(ws, id));
   }
 
   public int bulkDelete(UUID ws, UUID actor, List<UUID> ids) {
-    db.tx(() -> ids.forEach(id -> deleteOne(ws, actor, id, false)));
-    ids.forEach(id -> changes.publishEvent(new TransactionChanged(ws, id)));
+    db.tx(() -> ids.forEach(id -> deleteOne(ws, actor, id)));
     audit.record(ws, actor, "transaction", null, "BULK_DELETE", ids.size() + " transactions");
     return ids.size();
   }
@@ -312,7 +305,6 @@ public class TransactionService {
               return new UndoResult("REVERTED", get(ws, id));
             });
     audit.record(ws, actor, "transaction", id, "UNDO", result.action());
-    changes.publishEvent(new TransactionChanged(ws, id));
     return result;
   }
 
@@ -320,7 +312,6 @@ public class TransactionService {
   public TransactionView restore(UUID ws, UUID actor, UUID id) {
     db.tx(() -> restoreRows(ws, id));
     audit.record(ws, actor, "transaction", id, "RESTORE", "");
-    changes.publishEvent(new TransactionChanged(ws, id));
     return get(ws, id);
   }
 
@@ -347,7 +338,6 @@ public class TransactionService {
 
   private void revertUpdate(UUID ws, UUID actor, UUID id, TransactionView old) {
     Raw cur = lockOrFail(ws, id);
-    guardNotSharedCopy(cur);
     if ("TRANSFER".equals(cur.type())) {
       transactions.updateTransferMeta(ws, cur.transferId(), old.occurredOn(), old.note(), actor);
       return;
@@ -435,19 +425,9 @@ public class TransactionService {
         .orElseThrow(() -> new ResourceNotFoundException("Transaction", id.toString()));
   }
 
-  /** Household copies are managed from the personal ledger they came from. */
-  private static void guardNotSharedCopy(Raw row) {
-    if (row.sharedCopy()) {
-      throw new ConflictException(
-          "This entry is synced from a personal ledger. Change it there, or remove it from the household.");
-    }
-  }
-
-  /** {@code internal} lets the household sync remove its own copies. */
-  public void deleteOne(UUID ws, UUID actor, UUID id, boolean internal) {
+  public void deleteOne(UUID ws, UUID actor, UUID id) {
     Raw cur = transactions.lock(ws, id).orElse(null);
     if (cur == null) return; // already gone: deletes are idempotent
-    if (!internal) guardNotSharedCopy(cur);
     List<Raw> legs =
         cur.transferId() == null
             ? List.of(cur)

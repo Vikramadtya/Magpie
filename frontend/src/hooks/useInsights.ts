@@ -81,10 +81,6 @@ export function useUndoImport() {
   return useMutation({ mutationFn: (batchId: string) => importApi.undo(id, batchId), onSuccess: () => void invalidateMoney(qc, id) });
 }
 
-export function useMembers() {
-  const { id } = useWorkspace();
-  return useQuery({ queryKey: qk.members(id), queryFn: () => workspaceApi.members(id) });
-}
 export function useActivity() {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.activity(id), queryFn: () => workspaceApi.activity(id) });

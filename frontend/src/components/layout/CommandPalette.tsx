@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTransactionDialog } from '../../features/transactions/TransactionDialog';
-import { visibleNav } from './nav';
+import { NAV_ITEMS } from './nav';
 
 /** ⌘K / Ctrl+K: jump anywhere or start an entry without touching the mouse. */
 export function CommandPalette() {
@@ -46,7 +46,7 @@ export function CommandPalette() {
             <Item onSelect={run(() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'))}>Toggle dark mode</Item>
           </Command.Group>
           <Command.Group heading="Go to" className="text-xs text-secondary [&_[cmdk-item]]:text-primary">
-            {visibleNav(workspace?.kind).map((n) => (
+            {NAV_ITEMS.map((n) => (
               <Item key={n.path} onSelect={run(() => navigate(n.path))}>{n.label}</Item>
             ))}
           </Command.Group>

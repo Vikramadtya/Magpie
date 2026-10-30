@@ -38,5 +38,5 @@ public record TransactionView(
     String baseCurrency,
     BigDecimal baseFxRate,
     boolean baseOverridden,
-    UUID sharedGroupId,
-    boolean sharedCopy) {}
+    UUID tripId,
+    String tripName) {}

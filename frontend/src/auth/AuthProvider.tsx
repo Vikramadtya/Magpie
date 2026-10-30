@@ -79,8 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: me?.user ?? null,
       workspaces,
       workspace,
-      // a household is a view-only ledger: spending enters it only by sharing from a personal one
-      canEdit: role ? rank[role] >= rank.EDITOR && workspace?.kind !== 'SHARED' : false,
+      canEdit: role ? rank[role] >= rank.EDITOR : false,
       isOwner: role === 'OWNER',
       selectWorkspace: (id) => {
         setWorkspaceId(id);

@@ -9,7 +9,6 @@ const lazyPage = <T extends { default: React.ComponentType }>(load: () => Promis
 const LandingPage = lazyPage(() => import('./pages/LandingPage'));
 const LoginPage = lazyPage(() => import('./auth/LoginPage'));
 const AuthCallback = lazyPage(() => import('./auth/AuthCallback'));
-const InvitePage = lazyPage(() => import('./auth/InvitePage'));
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazyPage(() => import('./pages/TransactionsPage'));
 const AccountsPage = lazyPage(() => import('./pages/AccountsPage'));
@@ -19,7 +18,8 @@ const RecurringPage = lazyPage(() => import('./pages/RecurringPage'));
 const InvestmentsPage = lazyPage(() => import('./pages/InvestmentsPage'));
 const AnalyticsPage = lazyPage(() => import('./pages/AnalyticsPage'));
 const LoansPage = lazyPage(() => import('./pages/LoansPage'));
-const HouseholdPage = lazyPage(() => import('./pages/HouseholdPage'));
+const TripsPage = lazyPage(() => import('./pages/TripsPage'));
+const TripDetailPage = lazyPage(() => import('./pages/TripDetailPage'));
 const CategoriesPage = lazyPage(() => import('./pages/CategoriesPage'));
 const PayeesPage = lazyPage(() => import('./pages/PayeesPage'));
 const ImportPage = lazyPage(() => import('./pages/ImportPage'));
@@ -54,7 +54,6 @@ export const router = createBrowserRouter([
   { path: '/', element: <Landing /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/auth/callback', element: <AuthCallback /> },
-  { path: '/invite/:token', element: <InvitePage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -65,7 +64,8 @@ export const router = createBrowserRouter([
       { path: '/goals', element: <GoalsPage /> },
       { path: '/recurring', element: <RecurringPage /> },
       { path: '/loans', element: <LoansPage /> },
-      { path: '/shared', element: <HouseholdPage /> },
+      { path: '/trips', element: <TripsPage /> },
+      { path: '/trips/:id', element: <TripDetailPage /> },
       { path: '/investments', element: <InvestmentsPage /> },
       { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/categories', element: <CategoriesPage /> },

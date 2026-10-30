@@ -7,7 +7,6 @@ import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Patch;
 import io.micronaut.http.annotation.PathVariable;
-import io.micronaut.http.annotation.Post;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.Valid;
@@ -23,10 +22,7 @@ public class WorkspaceController {
 
   @Serdeable
   public record WorkspaceRequest(
-      @NotBlank @Size(max = 120) String name,
-      @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
-      /** PERSONAL (default) or SHARED (a read-only group ledger: a trip, a flat, a couple). */
-      @Pattern(regexp = "^(PERSONAL|SHARED)$") String kind) {}
+      @NotBlank @Size(max = 120) String name, @Pattern(regexp = "^[A-Za-z]{3}$") String currency) {}
 
   private final WorkspaceService service;
 
@@ -37,15 +33,6 @@ public class WorkspaceController {
   @Get
   public List<Workspace> list(Authentication auth) {
     return service.list(Actor.id(auth));
-  }
-
-  @Post
-  public Workspace create(Authentication auth, @Valid @Body WorkspaceRequest body) {
-    return service.create(
-        Actor.id(auth),
-        body.name(),
-        body.currency() == null ? "USD" : body.currency(),
-        body.kind() == null ? "PERSONAL" : body.kind());
   }
 
   @Patch("/{workspaceId}")

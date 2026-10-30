@@ -12,16 +12,7 @@ export const authApi = {
 };
 
 export const workspaceApi = {
-  create: (name: string, currency: string, kind: 'PERSONAL' | 'SHARED' = 'PERSONAL') =>
-    http.post<T.Workspace>('/api/v1/workspaces', { name, currency, kind }).then((r) => r.data),
   rename: (ws: string, name: string, currency: string) => api.patch<T.Workspace>(ws, '', { name, currency }),
-  remove: (ws: string) => api.del(ws, ''),
-  members: (ws: string) => api.get<T.Member[]>(ws, '/members'),
-  setRole: (ws: string, userId: string, role: T.Role) => api.patch<void>(ws, `/members/${userId}`, { role }),
-  removeMember: (ws: string, userId: string) => api.del(ws, `/members/${userId}`),
-  leave: (ws: string) => api.post<void>(ws, '/leave'),
-  invite: (ws: string, role: 'EDITOR' | 'VIEWER') => api.post<{ token: string; path: string }>(ws, '/invites', { role }),
-  accept: (token: string) => http.post<T.Workspace>(`/api/v1/invites/${encodeURIComponent(token)}/accept`, {}).then((r) => r.data),
   activity: (ws: string) => api.get<T.Activity[]>(ws, '/activity', { limit: 50 }),
 };
 
@@ -78,8 +69,6 @@ export const transactionsApi = {
   setNormalised: (ws: string, id: string, baseAmountMinor: number) =>
     api.put<T.Transaction>(ws, `/transactions/${id}/normalized`, { baseAmountMinor }),
   resetNormalised: (ws: string, id: string) => api.delJson<T.Transaction>(ws, `/transactions/${id}/normalized`),
-  share: (ws: string, id: string, householdId: string) => api.post<T.Transaction>(ws, `/transactions/${id}/share`, { householdId }),
-  unshare: (ws: string, id: string) => api.delJson<T.Transaction>(ws, `/transactions/${id}/share`),
   comments: (ws: string, id: string) => api.get<T.Comment[]>(ws, `/transactions/${id}/comments`),
   addComment: (ws: string, id: string, body: string) => api.post<T.Comment>(ws, `/transactions/${id}/comments`, { body }),
 };
@@ -167,9 +156,14 @@ export const marketApi = {
   quote: (symbol: string) => http.get<T.PricedQuote>('/api/v1/market/quote', { params: { symbol } }).then((r) => r.data),
 };
 
-export const householdApi = {
-  summary: (ws: string, month: string) => api.get<T.HouseholdSummary>(ws, '/household/summary', { month }),
-  settle: (ws: string, b: { toUserId: string; amountMinor: number; occurredOn: string; note?: string | null }) =>
-    api.post<unknown>(ws, '/household/settlements', b),
-  removeSettlement: (ws: string, id: string) => api.del(ws, `/household/settlements/${id}`),
+export const tripsApi = {
+  list: (ws: string) => api.get<T.Trip[]>(ws, '/trips'),
+  detail: (ws: string, id: string) => api.get<T.TripDetail>(ws, `/trips/${id}`),
+  create: (ws: string, b: T.TripInput) => api.post<T.Trip>(ws, '/trips', b),
+  update: (ws: string, id: string, b: T.TripInput) => api.put<T.Trip>(ws, `/trips/${id}`, b),
+  remove: (ws: string, id: string) => api.del(ws, `/trips/${id}`),
+  assign: (ws: string, id: string, ids: string[]) => api.post<{ affected: number }>(ws, `/trips/${id}/assign`, { ids }),
+  assignRange: (ws: string, id: string) => api.post<{ affected: number }>(ws, `/trips/${id}/assign-range`),
+  unassign: (ws: string, ids: string[]) => api.post<{ affected: number }>(ws, '/trips/unassign', { ids }),
+  clear: (ws: string, id: string) => api.post<{ affected: number }>(ws, `/trips/${id}/clear`),
 };
