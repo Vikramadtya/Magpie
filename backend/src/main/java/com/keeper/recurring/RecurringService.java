@@ -163,6 +163,7 @@ public class RecurringService {
                 rule.name(),
                 List.of(),
                 null,
+                null,
                 null);
         transactions.insertEntry(
             ws, actor, "rule:" + rule.id() + ":" + date, request, EntryOrigin.recurring(rule.id()));

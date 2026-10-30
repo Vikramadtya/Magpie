@@ -238,7 +238,7 @@ public class LoanService {
       UUID ws) {
     UUID payeeId = payees.upsert(ws, person, null).id();
     return new TransactionController.Request(
-        account.id(), type, amount, date, null, payeeId, note, List.of(), null, null);
+        account.id(), type, amount, date, null, payeeId, note, List.of(), null, null, null);
   }
 
   private static Loan toLoan(LoanRepository.Row r) {

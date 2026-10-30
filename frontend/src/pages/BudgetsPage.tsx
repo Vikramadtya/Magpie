@@ -12,7 +12,7 @@ import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { groupCategories } from '../features/transactions/TransactionDialog';
 import { useCopyBudgets, useBudgets, useRemoveBudget, useSetBudget } from '../hooks/usePlanning';
-import { useCategories } from '../hooks/useReference';
+import { useCategories, usePeople } from '../hooks/useReference';
 import { monthKey } from '../lib/dates';
 import { formatMoney, parseMoney, toInputValue } from '../lib/money';
 import type { BudgetLine } from '../api/types';
@@ -100,6 +100,8 @@ function BudgetModal({ line, month, existing, currency, onClose }: { line: Budge
   const [categoryId, setCategoryId] = useState(line?.categoryId ?? '');
   const [amount, setAmount] = useState(line ? toInputValue(line.amountMinor, currency) : '');
   const [rollover, setRollover] = useState(line?.rollover ?? false);
+  const [includeOthers, setIncludeOthers] = useState(line?.includeOthers ?? false);
+  const hasPeople = (usePeople().data ?? []).length > 0;
   const [error, setError] = useState('');
 
   const submit = (e: FormEvent) => {
@@ -107,7 +109,7 @@ function BudgetModal({ line, month, existing, currency, onClose }: { line: Budge
     const minor = parseMoney(amount, currency);
     if (!categoryId) return setError('Choose a category');
     if (minor === null) return setError('Enter a valid amount');
-    set.mutate({ categoryId, month, amountMinor: minor, rollover }, { onSuccess: onClose });
+    set.mutate({ categoryId, month, amountMinor: minor, rollover, includeOthers }, { onSuccess: onClose });
   };
 
   return (
@@ -127,6 +129,9 @@ function BudgetModal({ line, month, existing, currency, onClose }: { line: Budge
         )}
         <Field label={`Monthly limit (${currency})`} error={error}><MoneyInput value={amount} currency={currency} onChange={setAmount} autoFocus /></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={rollover} onChange={(e) => setRollover(e.target.checked)} /> Carry unspent amount into next month</label>
+        {(hasPeople || includeOthers) && (
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={includeOthers} onChange={(e) => setIncludeOthers(e.target.checked)} /> Include spending by others on your accounts</label>
+        )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={set.isPending}>Save</Button>

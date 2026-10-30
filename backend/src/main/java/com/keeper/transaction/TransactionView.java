@@ -39,4 +39,6 @@ public record TransactionView(
     BigDecimal baseFxRate,
     boolean baseOverridden,
     UUID tripId,
-    String tripName) {}
+    String tripName,
+    UUID spentById,
+    String spentByName) {}

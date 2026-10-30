@@ -285,6 +285,7 @@ public class SplitAcceptService {
                 note,
                 List.of(),
                 null,
+                null,
                 null),
             EntryOrigin.NONE);
     if (tripId != null) trips.assign(ws, tripId, List.of(id));

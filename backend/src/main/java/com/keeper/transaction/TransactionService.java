@@ -146,7 +146,8 @@ public class TransactionService {
                 actor,
                 amounts.origMinor(),
                 amounts.origCurrency(),
-                base));
+                base,
+                spentBy(ws, r.spentById())));
     transactions.replaceTags(id, validTags(ws, r.tagIds()));
     accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
     return id;
@@ -252,7 +253,8 @@ public class TransactionService {
               actor,
               amounts.origMinor(),
               amounts.origCurrency(),
-              base);
+              base,
+              spentBy(ws, req.spentById()));
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
         });
     audit.record(ws, actor, "transaction", id, "UPDATE", r.type() == null ? "" : r.type());
@@ -268,6 +270,19 @@ public class TransactionService {
     db.tx(() -> ids.forEach(id -> deleteOne(ws, actor, id)));
     audit.record(ws, actor, "transaction", null, "BULK_DELETE", ids.size() + " transactions");
     return ids.size();
+  }
+
+  public int bulkSpentBy(UUID ws, UUID actor, List<UUID> ids, UUID personId) {
+    refs.person(ws, personId);
+    int n = transactions.setSpentBy(ws, ids, personId);
+    audit.record(ws, actor, "transaction", null, "BULK_SPENT_BY", n + " transactions");
+    return n;
+  }
+
+  /** Validates the person belongs to this ledger; null means the ledger owner. */
+  private UUID spentBy(UUID ws, UUID personId) {
+    refs.person(ws, personId);
+    return personId;
   }
 
   public int bulkRecategorize(UUID ws, UUID actor, List<UUID> ids, UUID categoryId) {

@@ -87,7 +87,7 @@ public class ImportController {
       CursorPage<TransactionView> page =
           transactions.list(
               workspaceId,
-              new TransactionFilter(from, to, null, null, null, null, null, null, null),
+              new TransactionFilter(from, to, null, null, null, null, null, null, null, null),
               cursor,
               200);
       for (TransactionView t : page.items()) {

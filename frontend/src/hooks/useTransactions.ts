@@ -100,7 +100,7 @@ export function useCreateTransaction() {
         id: `pending-${key}`, accountId: input.accountId, accountName: account?.name ?? '', type: input.type, direction,
         amountMinor: input.amountMinor, currency: account?.currency ?? 'USD', occurredOn: input.occurredOn,
         categoryId: input.categoryId ?? null, categoryName: null, payeeId: input.payeeId ?? null, payeeName: null,
-        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null, loanId: null, loanPerson: null, baseAmountMinor: null, baseCurrency: null, baseFxRate: null, baseOverridden: false, tripId: null, tripName: null,
+        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null, loanId: null, loanPerson: null, baseAmountMinor: null, baseCurrency: null, baseFxRate: null, baseOverridden: false, tripId: null, tripName: null, spentById: input.spentById ?? null, spentByName: null,
       };
       prev.lists.forEach(([queryKey, data]) => {
         const filters = (queryKey[3] ?? {}) as TransactionFilters;
@@ -171,7 +171,7 @@ export function useBulkTransactions() {
   const { id: ws } = useWorkspace();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (b: { action: 'DELETE' | 'RECATEGORIZE'; ids: string[]; categoryId?: string }) => transactionsApi.bulk(ws, b),
+    mutationFn: (b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; ids: string[]; categoryId?: string; personId?: string | null }) => transactionsApi.bulk(ws, b),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }

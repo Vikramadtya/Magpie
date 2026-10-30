@@ -49,7 +49,7 @@ public class AnalyticsService {
     db.list(
         "SELECT g.id, g.name, g.color, SUM(t.base_amount_minor) FROM transactions t "
             + "JOIN categories c ON c.id = t.category_id JOIN categories g ON g.id = COALESCE(c.parent_id, c.id) "
-            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL "
+            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL AND t.spent_by IS NULL "
             + "AND t.base_amount_minor IS NOT NULL AND t.occurred_on BETWEEN ? AND ? GROUP BY g.id, g.name, g.color",
         rs -> {
           UUID id = rs.getObject(1, UUID.class);
@@ -75,7 +75,7 @@ public class AnalyticsService {
     Map<String, long[]> months = new TreeMap<>();
     db.list(
         "SELECT to_char(date_trunc('month', occurred_on), 'YYYY-MM'), type, SUM(base_amount_minor) FROM transactions "
-            + "WHERE workspace_id = ? AND type IN ('INCOME','EXPENSE') AND deleted_at IS NULL AND loan_id IS NULL "
+            + "WHERE workspace_id = ? AND type IN ('INCOME','EXPENSE') AND deleted_at IS NULL AND loan_id IS NULL AND spent_by IS NULL "
             + "AND base_amount_minor IS NOT NULL AND occurred_on BETWEEN ? AND ? GROUP BY 1, 2",
         rs -> {
           long[] slot = months.computeIfAbsent(rs.getString(1), k -> new long[2]);
@@ -148,7 +148,7 @@ public class AnalyticsService {
     Map<UUID, PayeeSpend> byPayee = new LinkedHashMap<>();
     db.list(
         "SELECT p.id, p.name, SUM(t.base_amount_minor), COUNT(*) FROM transactions t JOIN payees p ON p.id = t.payee_id "
-            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL "
+            + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL AND t.spent_by IS NULL "
             + "AND t.base_amount_minor IS NOT NULL AND t.occurred_on BETWEEN ? AND ? GROUP BY p.id, p.name",
         rs -> {
           UUID id = rs.getObject(1, UUID.class);

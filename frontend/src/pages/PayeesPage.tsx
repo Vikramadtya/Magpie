@@ -11,7 +11,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { groupCategories } from '../features/transactions/TransactionDialog';
-import { useCategories, useCreatePayee, useCreateTag, useDeletePayee, useDeleteTag, usePayees, useTags, useUpdatePayee } from '../hooks/useReference';
+import { useCategories, useCreatePayee, useCreatePerson, useCreateTag, useDeletePayee, useDeletePerson, useDeleteTag, usePayees, usePeople, useTags, useUpdatePayee } from '../hooks/useReference';
 
 export default function PayeesPage() {
   const { canEdit } = useWorkspace();
@@ -22,6 +22,10 @@ export default function PayeesPage() {
   const [deleting, setDeleting] = useState<Payee | null>(null);
   const [tagName, setTagName] = useState('');
   const del = useDeletePayee();
+  const people = usePeople();
+  const [personName, setPersonName] = useState('');
+  const createPerson = useCreatePerson();
+  const deletePerson = useDeletePerson();
   const createTag = useCreateTag();
   const deleteTag = useDeleteTag();
   const nameOf = (id: string | null) => categories.find((c) => c.id === id)?.name;
@@ -30,6 +34,12 @@ export default function PayeesPage() {
     e.preventDefault();
     if (!tagName.trim()) return;
     createTag.mutate({ name: tagName.trim() }, { onSuccess: () => setTagName('') });
+  };
+
+  const addPerson = (e: FormEvent) => {
+    e.preventDefault();
+    if (!personName.trim()) return;
+    createPerson.mutate(personName.trim(), { onSuccess: () => setPersonName('') });
   };
 
   return (
@@ -68,6 +78,27 @@ export default function PayeesPage() {
               <form onSubmit={addTag} className="flex gap-2">
                 <Input value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="New tag" maxLength={60} aria-label="New tag" />
                 <Button type="submit" disabled={createTag.isPending}>Add</Button>
+              </form>
+            )}
+          </div>
+        </section>
+        <section className="lg:col-span-3">
+          <h2 className="font-semibold mb-1">People</h2>
+          <p className="text-xs text-secondary mb-3">Others who spend from your accounts. Mark a transaction as theirs and it stays out of your own spending, analytics and budgets (unless a budget opts in).</p>
+          <div className="glass-panel p-4">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {(people.data ?? []).map((p) => (
+                <span key={p.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-border">
+                  {p.name}
+                  {canEdit && <button aria-label={`Remove ${p.name}`} onClick={() => deletePerson.mutate(p.id)}><X className="w-3 h-3" /></button>}
+                </span>
+              ))}
+              {people.data?.length === 0 && <p className="text-sm text-secondary">No one yet.</p>}
+            </div>
+            {canEdit && (
+              <form onSubmit={addPerson} className="flex gap-2 max-w-sm">
+                <Input value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="Add a person" maxLength={120} aria-label="New person" />
+                <Button type="submit" disabled={createPerson.isPending}>Add</Button>
               </form>
             )}
           </div>

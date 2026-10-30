@@ -52,6 +52,18 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {d.spentByOthers.length > 0 && (
+              <div className="glass-panel p-4">
+                <p className="text-xs text-secondary">Spent by others on your accounts this month</p>
+                <p className="mt-1 text-sm">
+                  {d.spentByOthers.map((o, i) => (
+                    <span key={o.personId}>{i > 0 && ' · '}{o.name} <strong className="text-red-500">{formatMoney(o.expenseMinor, d.currency)}</strong></span>
+                  ))}
+                </p>
+                <p className="text-[11px] text-secondary mt-1">Not included in your spending above.</p>
+              </div>
+            )}
+
             {(forecast && (forecast.monthsOfHistory > 0 || forecast.fixedExpenses.length > 0 || forecast.fixedIncome.length > 0)) || (loans && loans.loans.length > 0) ? (
               <div className="grid md:grid-cols-2 gap-4">
                 {forecast && (forecast.monthsOfHistory > 0 || forecast.fixedExpenses.length > 0 || forecast.fixedIncome.length > 0) && (

@@ -29,6 +29,10 @@ public class RefChecks {
     require("payees", ws, id);
   }
 
+  public void person(UUID ws, UUID id) {
+    require("people", ws, id);
+  }
+
   public void tag(UUID ws, UUID id) {
     require("tags", ws, id);
   }

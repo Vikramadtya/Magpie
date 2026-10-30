@@ -20,7 +20,8 @@ import java.util.UUID;
 public class BudgetController {
 
   @Serdeable
-  public record Request(@Min(0) @Max(1_000_000_000_000L) long amountMinor, boolean rollover) {}
+  public record Request(
+      @Min(0) @Max(1_000_000_000_000L) long amountMinor, boolean rollover, boolean includeOthers) {}
 
   @Serdeable
   public record Copied(int copied) {}
@@ -43,7 +44,13 @@ public class BudgetController {
       @PathVariable UUID categoryId,
       @PathVariable String month,
       @Valid @Body Request body) {
-    service.set(workspaceId, categoryId, parse(month), body.amountMinor(), body.rollover());
+    service.set(
+        workspaceId,
+        categoryId,
+        parse(month),
+        body.amountMinor(),
+        body.rollover(),
+        body.includeOthers());
   }
 
   @Delete("/{categoryId}/{month}")

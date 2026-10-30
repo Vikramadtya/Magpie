@@ -217,7 +217,7 @@ public class ForecastService {
     long spent =
         db.one(
                 "SELECT COALESCE(SUM(base_amount_minor), 0) FROM transactions WHERE workspace_id = ? AND type = 'EXPENSE' "
-                    + "AND deleted_at IS NULL AND loan_id IS NULL AND base_amount_minor IS NOT NULL AND occurred_on BETWEEN ? AND ?",
+                    + "AND deleted_at IS NULL AND loan_id IS NULL AND spent_by IS NULL AND base_amount_minor IS NOT NULL AND occurred_on BETWEEN ? AND ?",
                 rs -> rs.getLong(1),
                 ws,
                 now.atDay(1),
@@ -226,7 +226,7 @@ public class ForecastService {
     long variableSoFar =
         db.one(
                 "SELECT COALESCE(SUM(base_amount_minor), 0) FROM transactions WHERE workspace_id = ? AND type = 'EXPENSE' "
-                    + "AND deleted_at IS NULL AND loan_id IS NULL AND recurring_rule_id IS NULL AND base_amount_minor IS NOT NULL "
+                    + "AND deleted_at IS NULL AND loan_id IS NULL AND spent_by IS NULL AND recurring_rule_id IS NULL AND base_amount_minor IS NOT NULL "
                     + "AND occurred_on BETWEEN ? AND ?",
                 rs -> rs.getLong(1),
                 ws,

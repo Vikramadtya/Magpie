@@ -46,6 +46,13 @@ export const payeesApi = {
   remove: (ws: string, id: string) => api.del(ws, `/payees/${id}`),
 };
 
+export const peopleApi = {
+  list: (ws: string) => api.get<T.Person[]>(ws, '/people'),
+  create: (ws: string, name: string) => api.post<T.Person>(ws, '/people', { name }),
+  rename: (ws: string, id: string, name: string) => api.patch<T.Person>(ws, `/people/${id}`, { name }),
+  remove: (ws: string, id: string) => api.del(ws, `/people/${id}`),
+};
+
 export const tagsApi = {
   list: (ws: string) => api.get<T.Tag[]>(ws, '/tags'),
   create: (ws: string, name: string, color?: string) => api.post<T.Tag>(ws, '/tags', { name, color }),
@@ -60,7 +67,7 @@ export const transactionsApi = {
     api.put<T.Transaction>(ws, `/transactions/${id}`, b),
   remove: (ws: string, id: string) => api.del(ws, `/transactions/${id}`),
   transfer: (ws: string, b: T.TransferInput, key: string) => api.post<T.Transaction[]>(ws, '/transfers', b, { 'Idempotency-Key': key }),
-  bulk: (ws: string, b: { action: 'DELETE' | 'RECATEGORIZE'; ids: string[]; categoryId?: string }) =>
+  bulk: (ws: string, b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; ids: string[]; categoryId?: string; personId?: string | null }) =>
     api.post<{ affected: number }>(ws, '/transactions/bulk', b),
   undo: (ws: string, id: string) =>
     api.post<{ action: 'RESTORED' | 'REVERTED'; transaction: T.Transaction }>(ws, `/transactions/${id}/undo`),
@@ -75,8 +82,8 @@ export const transactionsApi = {
 
 export const budgetsApi = {
   summary: (ws: string, month: string) => api.get<T.BudgetSummary>(ws, '/budgets', { month }),
-  set: (ws: string, categoryId: string, month: string, amountMinor: number, rollover: boolean) =>
-    api.put<void>(ws, `/budgets/${categoryId}/${month}`, { amountMinor, rollover }),
+  set: (ws: string, categoryId: string, month: string, amountMinor: number, rollover: boolean, includeOthers: boolean) =>
+    api.put<void>(ws, `/budgets/${categoryId}/${month}`, { amountMinor, rollover, includeOthers }),
   remove: (ws: string, categoryId: string, month: string) => api.del(ws, `/budgets/${categoryId}/${month}`),
   copyPrevious: (ws: string, month: string) => api.post<{ copied: number }>(ws, `/budgets/copy-previous?month=${month}`),
 };

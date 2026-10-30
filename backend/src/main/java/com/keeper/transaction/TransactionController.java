@@ -46,7 +46,9 @@ public class TransactionController {
        * Exact amount in the account's currency when the entered currency differs (overrides the
        * rate).
        */
-      @Positive @Max(MAX_MINOR) Long accountAmountMinor) {}
+      @Positive @Max(MAX_MINOR) Long accountAmountMinor,
+      /** Who spent it when it is not the ledger owner; null means the owner. */
+      UUID spentById) {}
 
   /** Same fields as Request plus the version the client last saw (optimistic locking). */
   @Serdeable
@@ -61,7 +63,8 @@ public class TransactionController {
       @Size(max = 1000) String note,
       @Size(max = 20) List<UUID> tagIds,
       @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
-      @Positive @Max(MAX_MINOR) Long accountAmountMinor) {
+      @Positive @Max(MAX_MINOR) Long accountAmountMinor,
+      UUID spentById) {
 
     Request toRequest() {
       return new Request(
@@ -74,7 +77,8 @@ public class TransactionController {
           note,
           tagIds,
           currency,
-          accountAmountMinor);
+          accountAmountMinor,
+          spentById);
     }
   }
 
@@ -89,9 +93,10 @@ public class TransactionController {
 
   @Serdeable
   public record BulkRequest(
-      @NotNull @Pattern(regexp = "^(DELETE|RECATEGORIZE)$") String action,
+      @NotNull @Pattern(regexp = "^(DELETE|RECATEGORIZE|SPENT_BY)$") String action,
       @NotNull @Size(min = 1, max = 500) List<UUID> ids,
-      UUID categoryId) {}
+      UUID categoryId,
+      UUID personId) {}
 
   @Serdeable
   public record BulkResult(int affected) {}
@@ -118,10 +123,12 @@ public class TransactionController {
       @Nullable @QueryValue UUID tagId,
       @Nullable @QueryValue @Pattern(regexp = "^(INCOME|EXPENSE|TRANSFER)$") String type,
       @Nullable @QueryValue @Size(max = 100) String q,
-      @Nullable @QueryValue UUID tripId) {
+      @Nullable @QueryValue UUID tripId,
+      @Nullable @QueryValue @Pattern(regexp = "^(me|[0-9a-fA-F-]{36})$") String spentBy) {
     return service.list(
         workspaceId,
-        new TransactionFilter(from, to, accountId, categoryId, payeeId, tagId, type, q, tripId),
+        new TransactionFilter(
+            from, to, accountId, categoryId, payeeId, tagId, type, q, tripId, spentBy),
         cursor,
         limit);
   }
@@ -202,9 +209,11 @@ public class TransactionController {
       Authentication auth, @PathVariable UUID workspaceId, @Valid @Body BulkRequest body) {
     UUID actor = Actor.id(auth);
     int n =
-        "DELETE".equals(body.action())
-            ? service.bulkDelete(workspaceId, actor, body.ids())
-            : service.bulkRecategorize(workspaceId, actor, body.ids(), body.categoryId());
+        switch (body.action()) {
+          case "DELETE" -> service.bulkDelete(workspaceId, actor, body.ids());
+          case "SPENT_BY" -> service.bulkSpentBy(workspaceId, actor, body.ids(), body.personId());
+          default -> service.bulkRecategorize(workspaceId, actor, body.ids(), body.categoryId());
+        };
     return new BulkResult(n);
   }
 }

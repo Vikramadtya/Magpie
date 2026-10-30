@@ -19,8 +19,8 @@ function useMoneyMutation<TArgs, TOut>(fn: (ws: string, args: TArgs) => Promise<
 }
 
 export const useSetBudget = () =>
-  useMoneyMutation((ws, a: { categoryId: string; month: string; amountMinor: number; rollover: boolean }) =>
-    budgetsApi.set(ws, a.categoryId, a.month, a.amountMinor, a.rollover));
+  useMoneyMutation((ws, a: { categoryId: string; month: string; amountMinor: number; rollover: boolean; includeOthers: boolean }) =>
+    budgetsApi.set(ws, a.categoryId, a.month, a.amountMinor, a.rollover, a.includeOthers));
 export const useRemoveBudget = () =>
   useMoneyMutation((ws, a: { categoryId: string; month: string }) => budgetsApi.remove(ws, a.categoryId, a.month));
 export const useCopyBudgets = () => useMoneyMutation((ws, month: string) => budgetsApi.copyPrevious(ws, month));

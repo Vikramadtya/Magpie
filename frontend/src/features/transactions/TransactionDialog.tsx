@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { payeesApi } from '../../api/endpoints';
+import { payeesApi, peopleApi } from '../../api/endpoints';
 import type { Category, Transaction, TxType } from '../../api/types';
 import { useWorkspace } from '../../auth/AuthProvider';
 import { useAssignToTrip, useTrips } from '../../hooks/useTrips';
@@ -16,7 +16,7 @@ import { errorMessage } from '../../lib/http';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../../lib/money';
 import { cn } from '../../lib/cn';
 import { qk } from '../../hooks/keys';
-import { useAccounts, useCategories, usePayees, useTags } from '../../hooks/useReference';
+import { useAccounts, useCategories, usePayees, usePeople, useTags } from '../../hooks/useReference';
 import { useCreateTransaction, useSetNormalised, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
 import { useFxQuote } from '../../hooks/useInsights';
 import { useQueryClient } from '@tanstack/react-query';
@@ -72,6 +72,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const accounts = (useAccounts().data ?? []).filter((a) => !a.archived);
   const categories = useCategories().data ?? [];
   const payees = usePayees().data ?? [];
+  const people = usePeople().data ?? [];
   const tags = useTags().data ?? [];
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
@@ -95,6 +96,9 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const [date, setDate] = useState(tx?.occurredOn ?? today());
   const [categoryId, setCategoryId] = useState(tx?.categoryId ?? '');
   const [payeeName, setPayeeName] = useState(tx?.payeeName ?? '');
+  // '' = you, a person's id, or NEW_PERSON with a typed name.
+  const [spentBy, setSpentBy] = useState(tx?.spentById ?? '');
+  const [newPerson, setNewPerson] = useState('');
   const [note, setNote] = useState(tx?.note ?? '');
   const [tagIds, setTagIds] = useState<string[]>(tx?.tagIds ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -196,9 +200,14 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           payeeId = known?.id ?? (await payeesApi.create(ws, payeeName.trim())).id;
           if (!known) void qc.invalidateQueries({ queryKey: qk.payees(ws) });
         }
+        let spentById: string | null = null;
+        if (type === 'EXPENSE' && spentBy === NEW_PERSON && newPerson.trim()) {
+          spentById = (await peopleApi.create(ws, newPerson.trim())).id;
+          void qc.invalidateQueries({ queryKey: qk.people(ws) });
+        } else if (type === 'EXPENSE' && spentBy && spentBy !== NEW_PERSON) spentById = spentBy;
         const input = {
           accountId, type: (type === 'INCOME' ? 'INCOME' : 'EXPENSE') as 'INCOME' | 'EXPENSE', amountMinor: amountMinor!,
-          occurredOn: date, categoryId: categoryId || null, payeeId, note: note || null, tagIds,
+          occurredOn: date, categoryId: categoryId || null, payeeId, note: note || null, tagIds, spentById,
           currency: foreign ? currency : undefined, accountAmountMinor: foreign ? accountMinor : null,
         };
         if (editing) {
@@ -358,6 +367,17 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           </Field>
         )}
 
+        {type === 'EXPENSE' && !isTransferLeg && (people.length > 0 || spentBy) && (
+          <Field label="Spent by" hint="Someone else using your account. Their spending stays out of your totals.">
+            <Select value={spentBy} onChange={(e) => setSpentBy(e.target.value)}>
+              <option value="">Me</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value={NEW_PERSON}>Someone new…</option>
+            </Select>
+            {spentBy === NEW_PERSON && <Input className="mt-2" value={newPerson} onChange={(e) => setNewPerson(e.target.value)} placeholder="Name" maxLength={120} />}
+          </Field>
+        )}
+
         <Field label="Note">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" maxLength={1000} />
         </Field>
@@ -371,6 +391,8 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
     </Modal>
   );
 }
+
+const NEW_PERSON = '__new__';
 
 /** Parents with their children, for one kind (income/expense). */
 export function groupCategories(all: Category[], kind: 'INCOME' | 'EXPENSE') {

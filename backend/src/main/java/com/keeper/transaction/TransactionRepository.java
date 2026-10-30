@@ -43,19 +43,20 @@ public class TransactionRepository {
       UUID actor,
       Long origAmountMinor,
       String origCurrency,
-      Normalised base) {}
+      Normalised base,
+      UUID spentById) {}
 
   private static final String COLUMNS =
       "t.id, t.account_id, a.name AS account_name, t.type, t.direction, t.amount_minor, t.currency, "
           + "t.occurred_on, t.category_id, c.name AS category_name, t.payee_id, p.name AS payee_name, t.note, "
           + "t.transfer_id, t.version, t.created_by, t.created_at, t.orig_amount_minor, t.orig_currency, "
           + "t.loan_id, l.person AS loan_person, t.base_amount_minor, t.base_currency, t.base_fx_rate, "
-          + "t.base_overridden, t.trip_id, tr.name AS trip_name, "
+          + "t.base_overridden, t.trip_id, tr.name AS trip_name, t.spent_by, pe.name AS spent_by_name, "
           + "COALESCE((SELECT array_agg(tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}') AS tag_ids";
   private static final String FROM =
       " FROM transactions t JOIN accounts a ON a.id = t.account_id "
           + "LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN payees p ON p.id = t.payee_id "
-          + "LEFT JOIN loans l ON l.id = t.loan_id LEFT JOIN trips tr ON tr.id = t.trip_id ";
+          + "LEFT JOIN loans l ON l.id = t.loan_id LEFT JOIN trips tr ON tr.id = t.trip_id LEFT JOIN people pe ON pe.id = t.spent_by ";
   private static final String SELECT = "SELECT " + COLUMNS + FROM;
 
   static final RowMapper<TransactionView> VIEW =
@@ -88,7 +89,9 @@ public class TransactionRepository {
               rs.getBigDecimal("base_fx_rate"),
               rs.getBoolean("base_overridden"),
               rs.getObject("trip_id", UUID.class),
-              rs.getString("trip_name"));
+              rs.getString("trip_name"),
+              rs.getObject("spent_by", UUID.class),
+              rs.getString("spent_by_name"));
 
   private static List<UUID> uuids(java.sql.ResultSet rs, String col) throws SQLException {
     Object[] arr = (Object[]) rs.getArray(col).getArray();
@@ -221,8 +224,8 @@ public class TransactionRepository {
         "INSERT INTO transactions(id, workspace_id, account_id, type, direction, amount_minor, currency, occurred_on, "
             + "category_id, payee_id, note, transfer_id, recurring_rule_id, import_hash, import_batch_id, "
             + "idempotency_key, created_by, updated_by, orig_amount_minor, orig_currency, loan_id, "
-            + "base_amount_minor, base_currency, base_fx_rate, base_overridden) "
-            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            + "base_amount_minor, base_currency, base_fx_rate, base_overridden, spent_by) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         i.workspaceId(),
         i.accountId(),
@@ -247,7 +250,8 @@ public class TransactionRepository {
         b.amountMinor(),
         b.currency(),
         b.rate(),
-        b.overridden());
+        b.overridden(),
+        i.spentById());
     return id;
   }
 
@@ -266,11 +270,12 @@ public class TransactionRepository {
       UUID actor,
       Long origAmountMinor,
       String origCurrency,
-      Normalised base) {
+      Normalised base,
+      UUID spentById) {
     db.update(
         "UPDATE transactions SET account_id = ?, type = ?, direction = ?, amount_minor = ?, currency = ?, occurred_on = ?, "
             + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, orig_amount_minor = ?, orig_currency = ?, "
-            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
+            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, spent_by = ?, "
             + "updated_at = NOW(), version = version + 1 WHERE workspace_id = ? AND id = ?",
         accountId,
         type,
@@ -288,6 +293,7 @@ public class TransactionRepository {
         base.currency(),
         base.rate(),
         base.overridden(),
+        spentById,
         ws,
         id);
   }
@@ -297,7 +303,7 @@ public class TransactionRepository {
     db.update(
         "UPDATE transactions SET account_id = ?, type = ?, direction = ?, amount_minor = ?, currency = ?, occurred_on = ?, "
             + "category_id = ?, payee_id = ?, note = ?, updated_by = ?, orig_amount_minor = ?, orig_currency = ?, "
-            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, "
+            + "base_amount_minor = ?, base_currency = ?, base_fx_rate = ?, base_overridden = ?, spent_by = ?, "
             + "updated_at = NOW(), version = version + 1 WHERE workspace_id = ? AND id = ?",
         v.accountId(),
         v.type(),
@@ -315,6 +321,7 @@ public class TransactionRepository {
         v.baseCurrency(),
         v.baseFxRate(),
         v.baseOverridden(),
+        v.spentById(),
         ws,
         v.id());
   }
@@ -375,6 +382,15 @@ public class TransactionRepository {
             + "AND t.deleted_at IS NULL",
         categoryId,
         ws,
+        ws,
+        ids);
+  }
+
+  public int setSpentBy(UUID ws, List<UUID> ids, UUID personId) {
+    return db.update(
+        "UPDATE transactions SET spent_by = ?, version = version + 1, updated_at = NOW() "
+            + "WHERE workspace_id = ? AND id = ANY(?) AND type <> 'TRANSFER' AND deleted_at IS NULL",
+        personId,
         ws,
         ids);
   }

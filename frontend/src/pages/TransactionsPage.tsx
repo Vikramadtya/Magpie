@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, User, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSearchParams } from 'react-router-dom';
@@ -15,7 +15,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
-import { useAccounts, useCategories } from '../hooks/useReference';
+import { useAccounts, useCategories, usePeople } from '../hooks/useReference';
 import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList } from '../hooks/useTransactions';
 import { useAssignToTrip, useTrips } from '../hooks/useTrips';
 import { prettyDate } from '../lib/dates';
@@ -25,6 +25,7 @@ import { cn } from '../lib/cn';
 export default function TransactionsPage() {
   const { canEdit } = useWorkspace();
   const trips = useTrips().data ?? [];
+  const people = usePeople().data ?? [];
   const dialog = useTransactionDialog();
   const [params, setParams] = useSearchParams();
   const accounts = useAccounts().data ?? [];
@@ -42,6 +43,7 @@ export default function TransactionsPage() {
       from: params.get('from') || undefined,
       to: params.get('to') || undefined,
       tripId: params.get('trip') || undefined,
+      spentBy: params.get('by') || undefined,
     }),
     [debounced, params],
   );
@@ -122,6 +124,13 @@ export default function TransactionsPage() {
             </optgroup>
           ))}
         </Select>
+        {people.length > 0 && (
+          <Select value={filters.spentBy ?? ''} onChange={(e) => setParam('by', e.target.value)} aria-label="Spent by">
+            <option value="">Everyone</option>
+            <option value="me">Me</option>
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+        )}
         {trips.length > 0 && (
           <Select value={filters.tripId ?? ''} onChange={(e) => setParam('trip', e.target.value)} aria-label="Trip">
             <option value="">All trips</option>
@@ -149,6 +158,13 @@ export default function TransactionsPage() {
         <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-2 shadow">
           <span className="text-sm">{selected.size} selected</span>
           <div className="flex gap-2">
+            {people.length > 0 && (
+              <Select className="h-9 w-40" value="" onChange={(e) => { const v = e.target.value; if (v) { bulk.mutate({ action: 'SPENT_BY', ids: [...selected], personId: v === '__me' ? null : v }); setSelecting(false); } }} aria-label="Set spent by">
+                <option value="">Spent by…</option>
+                <option value="__me">Me</option>
+                {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+            )}
             {trips.length > 0 && (
               <Select className="h-9 w-44" value="" onChange={(e) => { const v = e.target.value; if (v) addSelectedToTrip(v === '__none' ? null : v); }} aria-label="Add selected to a trip">
                 <option value="">Add to trip…</option>
@@ -236,9 +252,10 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
           <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
-          {(tx.loanId || tx.tripId) && (
+          {(tx.loanId || tx.tripId || tx.spentById) && (
             <p className="text-[11px] text-accent flex items-center gap-2 mt-0.5">
               {tx.loanId && <span className="inline-flex items-center gap-1"><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</span>}
+              {tx.spentById && <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{tx.spentByName}</span>}
               {tx.tripId && <span className="inline-flex items-center gap-1"><Plane className="w-3 h-3" />{tx.tripName}</span>}
             </p>
           )}

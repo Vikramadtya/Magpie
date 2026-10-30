@@ -136,6 +136,7 @@ public class ImportService {
                     row.description().isBlank() ? null : row.description(),
                     List.of(),
                     null,
+                    null,
                     null);
             transactions.insertEntry(ws, actor, null, request, EntryOrigin.imported(hash, batchId));
             counts[0]++;

@@ -35,7 +35,12 @@ public class DashboardService {
       List<TransactionView> recent,
       BudgetService.Summary budgets,
       List<RecurringService.Upcoming> upcoming,
-      List<String> missingCurrencies) {}
+      List<String> missingCurrencies,
+      List<PersonSpend> spentByOthers) {}
+
+  /** What someone else spent from the owner's accounts this month. */
+  @Serdeable
+  public record PersonSpend(UUID personId, String name, long expenseMinor) {}
 
   private final AccountRepository accounts;
   private final TransactionService transactions;
@@ -78,7 +83,7 @@ public class DashboardService {
     AtomicLong expense = new AtomicLong();
     db.list(
         "SELECT type, SUM(base_amount_minor) FROM transactions WHERE workspace_id = ? AND deleted_at IS NULL "
-            + "AND loan_id IS NULL AND base_amount_minor IS NOT NULL "
+            + "AND loan_id IS NULL AND spent_by IS NULL AND base_amount_minor IS NOT NULL "
             + "AND type IN ('INCOME','EXPENSE') AND occurred_on BETWEEN ? AND ? GROUP BY type",
         rs -> {
           long v = rs.getLong(2);
@@ -89,10 +94,21 @@ public class DashboardService {
         month.atDay(1),
         month.atEndOfMonth());
 
+    List<PersonSpend> others =
+        db.list(
+            "SELECT p.id, p.name, SUM(t.base_amount_minor) FROM transactions t JOIN people p ON p.id = t.spent_by "
+                + "WHERE t.workspace_id = ? AND t.type = 'EXPENSE' AND t.deleted_at IS NULL AND t.loan_id IS NULL "
+                + "AND t.base_amount_minor IS NOT NULL AND t.occurred_on BETWEEN ? AND ? "
+                + "GROUP BY p.id, p.name ORDER BY 3 DESC",
+            rs -> new PersonSpend(rs.getObject(1, UUID.class), rs.getString(2), rs.getLong(3)),
+            ws,
+            month.atDay(1),
+            month.atEndOfMonth());
+
     CursorPage<TransactionView> recent =
         transactions.list(
             ws,
-            new TransactionFilter(null, null, null, null, null, null, null, null, null),
+            new TransactionFilter(null, null, null, null, null, null, null, null, null, null),
             null,
             8);
     int savings =
@@ -112,8 +128,8 @@ public class DashboardService {
         budgets.summary(ws, month),
         recurring.upcoming(ws, 14),
         mergeMissing(
-            converter.missing(),
-            missingRates.currencies(ws, month.atDay(1), month.atEndOfMonth())));
+            converter.missing(), missingRates.currencies(ws, month.atDay(1), month.atEndOfMonth())),
+        others);
   }
 
   private static List<String> mergeMissing(java.util.Set<String> a, List<String> b) {

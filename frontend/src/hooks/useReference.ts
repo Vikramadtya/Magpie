@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { accountsApi, categoriesApi, payeesApi, tagsApi } from '../api/endpoints';
+import { accountsApi, categoriesApi, payeesApi, peopleApi, tagsApi } from '../api/endpoints';
 import type { AccountType } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
@@ -19,6 +19,11 @@ export function useCategories() {
 export function usePayees() {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.payees(id), queryFn: () => payeesApi.list(id), staleTime: REFERENCE_STALE });
+}
+
+export function usePeople() {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: qk.people(id), queryFn: () => peopleApi.list(id), staleTime: REFERENCE_STALE });
 }
 
 export function useTags() {
@@ -56,6 +61,11 @@ export const useCreatePayee = () =>
 export const useUpdatePayee = () =>
   useRefreshing((ws, b: { id: string; name: string; defaultCategoryId?: string | null }) => payeesApi.update(ws, b.id, b.name, b.defaultCategoryId), (ws) => [qk.payees(ws)], true);
 export const useDeletePayee = () => useRefreshing((ws, id: string) => payeesApi.remove(ws, id), (ws) => [qk.payees(ws)], true);
+
+export const useCreatePerson = () => useRefreshing((ws, name: string) => peopleApi.create(ws, name), (ws) => [qk.people(ws)]);
+export const useRenamePerson = () =>
+  useRefreshing((ws, b: { id: string; name: string }) => peopleApi.rename(ws, b.id, b.name), (ws) => [qk.people(ws)], true);
+export const useDeletePerson = () => useRefreshing((ws, id: string) => peopleApi.remove(ws, id), (ws) => [qk.people(ws)], true);
 
 export const useCreateTag = () =>
   useRefreshing((ws, b: { name: string; color?: string }) => tagsApi.create(ws, b.name, b.color), (ws) => [qk.tags(ws)]);

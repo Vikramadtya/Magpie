@@ -20,6 +20,7 @@ export interface CategoryNode {
   id: string; name: string; kind: 'INCOME' | 'EXPENSE'; icon: string | null; color: string | null; children: CategoryNode[];
 }
 export interface Payee { id: string; name: string; defaultCategoryId: string | null }
+export interface Person { id: string; name: string }
 export interface Tag { id: string; name: string; color: string | null }
 
 export interface Transaction {
@@ -33,11 +34,15 @@ export interface Transaction {
   /** Amount in the workspace base currency at that day's rate (editable); null when no rate was available. */
   baseAmountMinor: number | null; baseCurrency: string | null; baseFxRate: number | null; baseOverridden: boolean;
   tripId: string | null; tripName: string | null;
+  /** Set when someone other than the ledger owner spent it. */
+  spentById: string | null; spentByName: string | null;
 }
 export interface CursorPage<T> { items: T[]; nextCursor: string | null }
 export interface TransactionFilters {
   from?: string; to?: string; accountId?: string; categoryId?: string; payeeId?: string; tagId?: string;
   type?: TxType; q?: string; tripId?: string;
+  /** 'me' for your own spending, or a person's id. */
+  spentBy?: string;
 }
 export interface TransactionInput {
   accountId: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; occurredOn: string;
@@ -46,6 +51,8 @@ export interface TransactionInput {
   currency?: string;
   /** Exact amount in the account's currency when `currency` differs (overrides the rate). */
   accountAmountMinor?: number | null;
+  /** Who spent it, when not you. */
+  spentById?: string | null;
 }
 export interface TransferInput {
   fromAccountId: string; toAccountId: string; amountMinor: number; destAmountMinor?: number | null;
@@ -56,6 +63,8 @@ export interface Comment { id: string; userId: string; userName: string; body: s
 export interface BudgetLine {
   categoryId: string; categoryName: string; color: string | null; amountMinor: number; rollover: boolean;
   rolloverMinor: number; spentMinor: number; remainingMinor: number;
+  /** Whether spending by other people on your accounts counts against this budget. */
+  includeOthers: boolean;
 }
 export interface BudgetSummary { month: string; currency: string; budgetedMinor: number; spentMinor: number; lines: BudgetLine[] }
 
@@ -82,6 +91,8 @@ export interface Dashboard {
   accounts: Account[]; recent: Transaction[]; budgets: BudgetSummary; upcoming: Upcoming[];
   /** Currencies with no exchange rate yet; their amounts were not converted. */
   missingCurrencies: string[];
+  /** What other people spent from your accounts this month. */
+  spentByOthers: { personId: string; name: string; expenseMinor: number }[];
 }
 export interface Report<T> { currency: string; items: T[]; missingCurrencies: string[] }
 export interface FxQuote { available: boolean; rate: number | null; convertedMinor: number | null }

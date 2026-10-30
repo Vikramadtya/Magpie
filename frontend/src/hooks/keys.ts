@@ -6,6 +6,7 @@ export const qk = {
   accounts: (ws: string) => ['ws', ws, 'accounts'] as const,
   categories: (ws: string) => ['ws', ws, 'categories'] as const,
   payees: (ws: string) => ['ws', ws, 'payees'] as const,
+  people: (ws: string) => ['ws', ws, 'people'] as const,
   tags: (ws: string) => ['ws', ws, 'tags'] as const,
   transactions: (ws: string) => ['ws', ws, 'transactions'] as const,
   transactionList: (ws: string, f: TransactionFilters) => ['ws', ws, 'transactions', f] as const,
