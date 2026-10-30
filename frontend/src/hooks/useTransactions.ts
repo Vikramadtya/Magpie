@@ -1,10 +1,37 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { transactionsApi } from '../api/endpoints';
+import { errorMessage } from '../lib/http';
 import type { Account, CursorPage, Transaction, TransactionFilters, TransactionInput, TransferInput } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
 
 type TxCache = InfiniteData<CursorPage<Transaction>, string | undefined>;
+
+/** Reverts the latest change to a transaction and refreshes everything derived from it. */
+async function runUndo(qc: QueryClient, ws: string, id: string) {
+  try {
+    await transactionsApi.undo(ws, id);
+    toast.success('Undone');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    void invalidateMoney(qc, ws);
+  }
+}
+
+async function runRemove(qc: QueryClient, ws: string, id: string) {
+  try {
+    await transactionsApi.remove(ws, id);
+    toast.success('Removed. You can restore it from Recently deleted.');
+  } catch (e) {
+    toast.error(errorMessage(e));
+  } finally {
+    void invalidateMoney(qc, ws);
+  }
+}
+
+const withUndo = (message: string, undo: () => void) => toast(message, { action: { label: 'Undo', onClick: undo }, duration: 8000 });
 
 export function useTransactionList(filters: TransactionFilters) {
   const { id } = useWorkspace();
@@ -73,7 +100,7 @@ export function useCreateTransaction() {
         id: `pending-${key}`, accountId: input.accountId, accountName: account?.name ?? '', type: input.type, direction,
         amountMinor: input.amountMinor, currency: account?.currency ?? 'USD', occurredOn: input.occurredOn,
         categoryId: input.categoryId ?? null, categoryName: null, payeeId: input.payeeId ?? null, payeeName: null,
-        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null,
+        note: input.note ?? null, tagIds: input.tagIds ?? [], transferId: null, version: 0, createdBy: user?.id ?? '', createdAt: new Date().toISOString(), origAmountMinor: null, origCurrency: null, loanId: null, loanPerson: null, baseAmountMinor: null, baseCurrency: null, baseFxRate: null, baseOverridden: false, sharedGroupId: null, sharedCopy: false,
       };
       prev.lists.forEach(([queryKey, data]) => {
         const filters = (queryKey[3] ?? {}) as TransactionFilters;
@@ -87,6 +114,7 @@ export function useCreateTransaction() {
       return prev;
     },
     onError: (_e, _v, prev) => restore(qc, ws, prev),
+    onSuccess: (tx) => withUndo('Transaction added', () => void runRemove(qc, ws, tx.id)),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }
@@ -114,6 +142,7 @@ export function useDeleteTransaction() {
       return prev;
     },
     onError: (_e, _v, prev) => restore(qc, ws, prev),
+    onSuccess: (_d, tx) => withUndo('Transaction deleted', () => void runUndo(qc, ws, tx.id)),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }
@@ -124,6 +153,7 @@ export function useUpdateTransaction() {
   return useMutation({
     mutationFn: ({ tx, input }: { tx: Transaction; input: TransactionInput }) =>
       transactionsApi.update(ws, tx.id, { ...input, type: tx.type === 'TRANSFER' ? 'TRANSFER' : input.type, expectedVersion: tx.version }),
+    onSuccess: (_d, { tx }) => withUndo('Changes saved', () => void runUndo(qc, ws, tx.id)),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }
@@ -161,5 +191,42 @@ export function useAddComment(transactionId: string) {
   return useMutation({
     mutationFn: (body: string) => transactionsApi.addComment(ws, transactionId, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.comments(ws, transactionId) }),
+  });
+}
+
+export function useDeletedTransactions(enabled: boolean) {
+  const { id: ws } = useWorkspace();
+  return useQuery({ queryKey: qk.deleted(ws), queryFn: () => transactionsApi.deleted(ws), enabled });
+}
+
+export function useRestoreTransaction() {
+  const { id: ws } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => transactionsApi.restore(ws, id),
+    onSuccess: () => toast.success('Restored'),
+    onSettled: () => void invalidateMoney(qc, ws),
+  });
+}
+
+/** Sets or resets the base-currency value reports use for one transaction. */
+export function useSetNormalised() {
+  const { id: ws } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, baseAmountMinor }: { id: string; baseAmountMinor: number | null }) =>
+      baseAmountMinor === null ? transactionsApi.resetNormalised(ws, id) : transactionsApi.setNormalised(ws, id, baseAmountMinor),
+    onSettled: () => void invalidateMoney(qc, ws),
+  });
+}
+
+export function useShareTransaction() {
+  const { id: ws } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, householdId }: { id: string; householdId: string | null }) =>
+      householdId ? transactionsApi.share(ws, id, householdId) : transactionsApi.unshare(ws, id),
+    onSuccess: (_d, { householdId }) => toast.success(householdId ? 'Shared with your household' : 'No longer shared'),
+    onSettled: () => void invalidateMoney(qc, ws),
   });
 }

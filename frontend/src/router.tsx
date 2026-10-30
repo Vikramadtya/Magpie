@@ -18,6 +18,8 @@ const GoalsPage = lazyPage(() => import('./pages/GoalsPage'));
 const RecurringPage = lazyPage(() => import('./pages/RecurringPage'));
 const InvestmentsPage = lazyPage(() => import('./pages/InvestmentsPage'));
 const AnalyticsPage = lazyPage(() => import('./pages/AnalyticsPage'));
+const LoansPage = lazyPage(() => import('./pages/LoansPage'));
+const HouseholdPage = lazyPage(() => import('./pages/HouseholdPage'));
 const CategoriesPage = lazyPage(() => import('./pages/CategoriesPage'));
 const PayeesPage = lazyPage(() => import('./pages/PayeesPage'));
 const ImportPage = lazyPage(() => import('./pages/ImportPage'));
@@ -62,6 +64,8 @@ export const router = createBrowserRouter([
       { path: '/budgets', element: <BudgetsPage /> },
       { path: '/goals', element: <GoalsPage /> },
       { path: '/recurring', element: <RecurringPage /> },
+      { path: '/loans', element: <LoansPage /> },
+      { path: '/household', element: <HouseholdPage /> },
       { path: '/investments', element: <InvestmentsPage /> },
       { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/categories', element: <CategoriesPage /> },

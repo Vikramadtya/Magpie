@@ -9,7 +9,7 @@ import { cn } from '../../lib/cn';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { Skeleton } from '../ui/StateView';
 import { CommandPalette } from './CommandPalette';
-import { NAV_ITEMS } from './nav';
+import { visibleNav } from './nav';
 
 export default function AppLayout() {
   return (
@@ -105,7 +105,7 @@ function SidebarContent() {
       <div className="px-4 mb-3 hidden md:block"><AddButton /></div>
 
       <nav className="flex-1 px-4 flex flex-col gap-0.5 overflow-y-auto" aria-label="Main">
-        {NAV_ITEMS.map((item) => (
+        {visibleNav(workspace?.kind).map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

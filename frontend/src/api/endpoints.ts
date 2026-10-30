@@ -12,7 +12,8 @@ export const authApi = {
 };
 
 export const workspaceApi = {
-  create: (name: string, currency: string) => http.post<T.Workspace>('/api/v1/workspaces', { name, currency }).then((r) => r.data),
+  create: (name: string, currency: string, kind: 'PERSONAL' | 'HOUSEHOLD' = 'PERSONAL') =>
+    http.post<T.Workspace>('/api/v1/workspaces', { name, currency, kind }).then((r) => r.data),
   rename: (ws: string, name: string, currency: string) => api.patch<T.Workspace>(ws, '', { name, currency }),
   remove: (ws: string) => api.del(ws, ''),
   members: (ws: string) => api.get<T.Member[]>(ws, '/members'),
@@ -70,6 +71,15 @@ export const transactionsApi = {
   transfer: (ws: string, b: T.TransferInput, key: string) => api.post<T.Transaction[]>(ws, '/transfers', b, { 'Idempotency-Key': key }),
   bulk: (ws: string, b: { action: 'DELETE' | 'RECATEGORIZE'; ids: string[]; categoryId?: string }) =>
     api.post<{ affected: number }>(ws, '/transactions/bulk', b),
+  undo: (ws: string, id: string) =>
+    api.post<{ action: 'RESTORED' | 'REVERTED'; transaction: T.Transaction }>(ws, `/transactions/${id}/undo`),
+  restore: (ws: string, id: string) => api.post<T.Transaction>(ws, `/transactions/${id}/restore`),
+  deleted: (ws: string) => api.get<T.Transaction[]>(ws, '/transactions/deleted'),
+  setNormalised: (ws: string, id: string, baseAmountMinor: number) =>
+    api.put<T.Transaction>(ws, `/transactions/${id}/normalized`, { baseAmountMinor }),
+  resetNormalised: (ws: string, id: string) => api.delJson<T.Transaction>(ws, `/transactions/${id}/normalized`),
+  share: (ws: string, id: string, householdId: string) => api.post<T.Transaction>(ws, `/transactions/${id}/share`, { householdId }),
+  unshare: (ws: string, id: string) => api.delJson<T.Transaction>(ws, `/transactions/${id}/share`),
   comments: (ws: string, id: string) => api.get<T.Comment[]>(ws, `/transactions/${id}/comments`),
   addComment: (ws: string, id: string, body: string) => api.post<T.Comment>(ws, `/transactions/${id}/comments`, { body }),
 };
@@ -132,6 +142,34 @@ export const holdingsApi = {
   summary: (ws: string) => api.get<T.InvestmentSummary>(ws, '/investments/summary'),
   create: (ws: string, b: T.HoldingInput) => api.post<T.Holding>(ws, '/holdings', b),
   update: (ws: string, id: string, b: T.HoldingInput) => api.put<T.Holding>(ws, `/holdings/${id}`, b),
+  refresh: (ws: string) => api.post<T.Holding[]>(ws, '/holdings/refresh'),
   setPrice: (ws: string, id: string, priceMinor: number) => api.put<T.Holding>(ws, `/holdings/${id}/price`, { priceMinor }),
   remove: (ws: string, id: string) => api.del(ws, `/holdings/${id}`),
+};
+
+export const loansApi = {
+  overview: (ws: string) => api.get<T.LoanOverview>(ws, '/loans'),
+  detail: (ws: string, id: string) => api.get<T.LoanDetail>(ws, `/loans/${id}`),
+  create: (ws: string, b: { person: string; direction: 'BORROWED' | 'LENT'; accountId: string; amountMinor: number; occurredOn: string; dueOn?: string | null; note?: string | null }) =>
+    api.post<T.Loan>(ws, '/loans', b),
+  repay: (ws: string, id: string, b: { accountId: string; amountMinor: number; occurredOn: string; note?: string | null }) =>
+    api.post<T.Loan>(ws, `/loans/${id}/payments`, b),
+  remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
+};
+
+export const forecastApi = {
+  forecast: (ws: string) => api.get<T.Forecast>(ws, '/forecast'),
+  insights: (ws: string) => api.get<T.Insights>(ws, '/insights'),
+};
+
+export const marketApi = {
+  search: (q: string) => http.get<T.SecurityHit[]>('/api/v1/market/search', { params: { q } }).then((r) => r.data),
+  quote: (symbol: string) => http.get<T.PricedQuote>('/api/v1/market/quote', { params: { symbol } }).then((r) => r.data),
+};
+
+export const householdApi = {
+  summary: (ws: string, month: string) => api.get<T.HouseholdSummary>(ws, '/household/summary', { month }),
+  settle: (ws: string, b: { toUserId: string; amountMinor: number; occurredOn: string; note?: string | null }) =>
+    api.post<unknown>(ws, '/household/settlements', b),
+  removeSettlement: (ws: string, id: string) => api.del(ws, `/household/settlements/${id}`),
 };

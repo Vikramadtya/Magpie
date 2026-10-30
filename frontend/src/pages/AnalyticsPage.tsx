@@ -1,5 +1,6 @@
 import { endOfMonth, format, startOfMonth, startOfYear, subMonths } from 'date-fns';
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { cn } from '../lib/cn';
 import { Link } from 'react-router-dom';
 import { FxWarning } from '../components/FxWarning';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -9,6 +10,8 @@ import { useCashFlow, useNetWorth, useSpending, useTopPayees } from '../hooks/us
 import { isoDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 
+const ForecastTab = lazy(() => import('../features/analytics/ForecastTab'));
+const PatternsTab = lazy(() => import('../features/analytics/PatternsTab'));
 const NetWorthChart = lazy(() => import('../components/charts/NetWorthChart'));
 const CashFlowChart = lazy(() => import('../components/charts/CashFlowChart'));
 const SpendingDonut = lazy(() => import('../components/charts/SpendingDonut'));
@@ -20,6 +23,7 @@ const RANGES = {
 } as const;
 
 export default function AnalyticsPage() {
+  const [tab, setTab] = useState<'overview' | 'forecast' | 'patterns'>('overview');
   const [range, setRange] = useState<keyof typeof RANGES>('month');
   const { from, to } = useMemo(() => ({ from: isoDate(RANGES[range].from()), to: isoDate(RANGES[range].to()) }), [range]);
   const cashFrom = isoDate(startOfMonth(subMonths(new Date(), 11)));
@@ -36,6 +40,15 @@ export default function AnalyticsPage() {
           {Object.entries(RANGES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </Select>
       } />
+      <div className="inline-flex p-1 rounded-lg bg-black/5 dark:bg-white/10 mb-6" role="tablist">
+        {([['overview', 'Overview'], ['forecast', 'Forecast'], ['patterns', 'Patterns']] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn('px-4 py-1.5 text-sm font-medium rounded-md', tab === k ? 'bg-surface shadow-sm' : 'text-secondary')}>{label}</button>
+        ))}
+      </div>
+      {tab === 'forecast' && <Suspense fallback={<Skeleton className="h-64" />}><ForecastTab /></Suspense>}
+      {tab === 'patterns' && <Suspense fallback={<Skeleton className="h-64" />}><PatternsTab /></Suspense>}
+      {tab === 'overview' && (
+        <>
       <FxWarning currencies={[...new Set([...(spending.data?.missingCurrencies ?? []), ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={spending.data?.currency ?? ''} />
       <div className="grid lg:grid-cols-2 gap-6">
         <section className="glass-panel p-5">
@@ -83,6 +96,8 @@ export default function AnalyticsPage() {
           <Suspense fallback={<Skeleton className="h-64" />}>{worth.data ? <NetWorthChart points={worth.data.items} currency={worth.data.currency} /> : <Skeleton className="h-64" />}</Suspense>
         </section>
       </div>
+        </>
+      )}
     </>
   );
 }

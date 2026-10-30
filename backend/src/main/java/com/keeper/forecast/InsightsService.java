@@ -396,7 +396,8 @@ public class InsightsService {
     var flow = analytics.cashFlow(ws, now.minusMonths(11).atDay(1), now.atEndOfMonth());
     List<SavingsMonth> out = new ArrayList<>();
     for (var m : flow.items()) {
-      if (m.incomeMinor() == 0 && m.expenseMinor() == 0) continue;
+      // a savings rate only means something in months that had income
+      if (m.incomeMinor() <= 0) continue;
       int rate =
           m.incomeMinor() > 0
               ? (int) Math.round((m.incomeMinor() - m.expenseMinor()) * 100.0 / m.incomeMinor())

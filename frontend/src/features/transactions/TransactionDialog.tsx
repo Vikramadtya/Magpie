@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { payeesApi } from '../../api/endpoints';
 import type { Category, Transaction, TxType } from '../../api/types';
-import { useWorkspace } from '../../auth/AuthProvider';
+import { useAuth, useWorkspace } from '../../auth/AuthProvider';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
@@ -12,11 +12,11 @@ import { MoneyInput } from '../../components/ui/MoneyInput';
 import { Select } from '../../components/ui/Select';
 import { today } from '../../lib/dates';
 import { errorMessage } from '../../lib/http';
-import { CURRENCIES, parseMoney, toInputValue } from '../../lib/money';
+import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../../lib/money';
 import { cn } from '../../lib/cn';
 import { qk } from '../../hooks/keys';
 import { useAccounts, useCategories, usePayees, useTags } from '../../hooks/useReference';
-import { useCreateTransaction, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
+import { useCreateTransaction, useSetNormalised, useShareTransaction, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
 import { useFxQuote } from '../../hooks/useInsights';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -75,6 +75,11 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
   const transfer = useTransfer();
+  const share = useShareTransaction();
+  const { workspaces, workspace } = useAuth();
+  // personal ledgers can share an expense into a household they can edit
+  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'HOUSEHOLD' && w.role !== 'VIEWER') : [];
+  const [householdId, setHouseholdId] = useState('');
 
   const editing = tx !== null;
   const isTransferLeg = tx?.type === 'TRANSFER';
@@ -190,7 +195,10 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           currency: foreign ? currency : undefined, accountAmountMinor: foreign ? accountMinor : null,
         };
         if (editing) await update.mutateAsync({ tx: tx!, input });
-        else create.mutate({ input, key: idempotencyKey }); // optimistic: don't wait for the server
+        else if (householdId && type === 'EXPENSE') {
+          const created = await create.mutateAsync({ input, key: idempotencyKey });
+          await share.mutateAsync({ id: created.id, householdId });
+        } else create.mutate({ input, key: idempotencyKey }); // optimistic: don't wait for the server
       }
       if (addAnother && !editing) {
         setAmount('');
@@ -330,6 +338,17 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
           </>
         )}
 
+        {editing && tx && <NormalisedBox tx={tx} />}
+
+        {!editing && type === 'EXPENSE' && households.length > 0 && (
+          <Field label="Household" hint="Also records this in the shared ledger, credited to you.">
+            <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)}>
+              <option value="">Just me</option>
+              {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </Select>
+          </Field>
+        )}
+
         <Field label="Note">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" maxLength={1000} />
         </Field>
@@ -350,4 +369,47 @@ export function groupCategories(all: Category[], kind: 'INCOME' | 'EXPENSE') {
   return ofKind
     .filter((c) => !c.parentId)
     .map((parent) => ({ parent, children: ofKind.filter((c) => c.parentId === parent.id) }));
+}
+
+/**
+ * Reports count each transaction in the workspace's base currency at the rate of the day it
+ * happened. This shows that value and lets the user set their own (or go back to the day's rate).
+ */
+function NormalisedBox({ tx }: { tx: Transaction }) {
+  const { baseCurrency } = useWorkspace();
+  const setNormalised = useSetNormalised();
+  const [value, setValue] = useState(tx.baseAmountMinor != null ? toInputValue(tx.baseAmountMinor, baseCurrency) : '');
+  const [overridden, setOverridden] = useState(tx.baseOverridden);
+  const [rate, setRate] = useState(tx.baseFxRate);
+  if (tx.type === 'TRANSFER' || tx.loanId || tx.currency === baseCurrency) return null;
+
+  const apply = (minor: number | null) =>
+    setNormalised.mutate(
+      { id: tx.id, baseAmountMinor: minor },
+      {
+        onSuccess: (updated) => {
+          setValue(updated.baseAmountMinor != null ? toInputValue(updated.baseAmountMinor, baseCurrency) : '');
+          setOverridden(updated.baseOverridden);
+          setRate(updated.baseFxRate);
+          toast.success(minor === null ? "Back to that day's rate" : 'Value updated');
+        },
+      },
+    );
+
+  const parsed = parseMoney(value, baseCurrency);
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-2">
+      <p className="text-sm font-medium">Counted in reports as ({baseCurrency})</p>
+      <p className="text-xs text-secondary">
+        {tx.baseAmountMinor == null
+          ? `No exchange rate was available for ${tx.occurredOn}. Enter a value to include it.`
+          : `${formatMoney(tx.baseAmountMinor, baseCurrency)} at ${rate?.toFixed(4)} on ${tx.occurredOn}${overridden ? ' (set by you)' : ''}`}
+      </p>
+      <div className="flex gap-2">
+        <MoneyInput value={value} currency={baseCurrency} onChange={setValue} aria-label={`Value in ${baseCurrency}`} />
+        <Button type="button" variant="secondary" disabled={!parsed || setNormalised.isPending} onClick={() => parsed && apply(parsed)}>Set</Button>
+        {overridden && <Button type="button" variant="outline" disabled={setNormalised.isPending} onClick={() => apply(null)}>Reset</Button>}
+      </div>
+    </div>
+  );
 }

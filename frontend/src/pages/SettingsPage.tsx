@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(ws.name);
   const [currency, setCurrency] = useState(ws.baseCurrency);
   const [newName, setNewName] = useState('');
+  const [newKind, setNewKind] = useState<'PERSONAL' | 'HOUSEHOLD'>('PERSONAL');
   const [inviteRole, setInviteRole] = useState<'EDITOR' | 'VIEWER'>('EDITOR');
   const [inviteLink, setInviteLink] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -49,7 +50,7 @@ export default function SettingsPage() {
   const createWorkspace = (e: FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    void run(async () => { const created = await workspaceApi.create(newName.trim(), currency); await reload(); selectWorkspace(created.id); setNewName(''); }, 'Workspace created');
+    void run(async () => { const created = await workspaceApi.create(newName.trim(), currency, newKind); await reload(); selectWorkspace(created.id); setNewName(''); }, 'Workspace created');
   };
   const invite = () =>
     run(async () => {
@@ -137,7 +138,8 @@ export default function SettingsPage() {
         <section className="glass-panel p-5">
           <h2 className="font-semibold mb-3">New workspace</h2>
           <form onSubmit={createWorkspace} className="flex gap-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Household" maxLength={120} aria-label="Workspace name" />
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Our home" maxLength={120} aria-label="Workspace name" />
+            <Select className="w-44" value={newKind} onChange={(e) => setNewKind(e.target.value as 'PERSONAL' | 'HOUSEHOLD')} aria-label="Workspace type"><option value="PERSONAL">Personal</option><option value="HOUSEHOLD">Household (shared)</option></Select>
             <Button type="submit">Create</Button>
           </form>
         </section>

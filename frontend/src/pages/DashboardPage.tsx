@@ -10,6 +10,7 @@ import { FxWarning } from '../components/FxWarning';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { useDashboard, useNetWorth } from '../hooks/useInsights';
+import { useForecast, useLoans } from '../hooks/useExtras';
 import { monthKey, shortDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 
@@ -21,6 +22,8 @@ export default function DashboardPage() {
   const dash = useDashboard(month);
   const worth = useNetWorth(6);
   const dialog = useTransactionDialog();
+  const forecast = useForecast().data;
+  const loans = useLoans().data;
   const d = dash.data;
 
   return (
@@ -48,6 +51,24 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold mt-1 tabular-nums">{d.savingsRatePercent}%</p>
               </div>
             </div>
+
+            {(forecast && (forecast.monthsOfHistory > 0 || forecast.fixedExpenses.length > 0 || forecast.fixedIncome.length > 0)) || (loans && loans.loans.length > 0) ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {forecast && (forecast.monthsOfHistory > 0 || forecast.fixedExpenses.length > 0 || forecast.fixedIncome.length > 0) && (
+                  <Link to="/analytics" className="glass-panel p-4 block hover:border-accent transition-colors">
+                    <p className="text-xs text-secondary">Next month forecast</p>
+                    <p className="mt-1 text-sm">Income <strong className="text-green-600 dark:text-green-400">{formatMoney(forecast.income.totalMinor, forecast.currency)}</strong> · Spending <strong className="text-red-500">{formatMoney(forecast.expense.totalMinor, forecast.currency)}</strong></p>
+                    <p className="text-xs text-secondary mt-1">{formatMoney(forecast.expense.fixedMinor, forecast.currency)} of spending is already fixed by recurring bills</p>
+                  </Link>
+                )}
+                {loans && loans.loans.length > 0 && (
+                  <Link to="/loans" className="glass-panel p-4 block hover:border-accent transition-colors">
+                    <p className="text-xs text-secondary">Loans</p>
+                    <p className="mt-1 text-sm">Owed to you <strong className="text-green-600 dark:text-green-400">{formatMoney(loans.owedToMeMinor, loans.currency)}</strong> · You owe <strong className="text-red-500">{formatMoney(loans.iOweMinor, loans.currency)}</strong></p>
+                  </Link>
+                )}
+              </div>
+            ) : null}
 
             <section className="glass-panel p-5">
               <h2 className="font-semibold mb-2">Net worth</h2>

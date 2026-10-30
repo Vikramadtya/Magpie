@@ -11,4 +11,6 @@ export const api = {
   put: <T>(ws: string, path: string, body?: unknown) => http.put<T>(base(ws) + path, body).then((r) => r.data),
   patch: <T>(ws: string, path: string, body?: unknown) => http.patch<T>(base(ws) + path, body).then((r) => r.data),
   del: (ws: string, path: string) => http.delete(base(ws) + path).then(() => undefined),
+  /** DELETE that returns a body. */
+  delJson: <T>(ws: string, path: string) => http.delete<T>(base(ws) + path).then((r) => r.data),
 };

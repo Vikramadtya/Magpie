@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CheckSquare, MessageSquare, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeftRight, CheckSquare, Banknote, Home, MessageSquare, Pencil, RotateCcw, Trash2, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSearchParams } from 'react-router-dom';
@@ -15,13 +15,17 @@ import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { useAccounts, useCategories } from '../hooks/useReference';
-import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useTransactionList } from '../hooks/useTransactions';
+import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useShareTransaction, useTransactionList } from '../hooks/useTransactions';
+import { useMembers } from '../hooks/useInsights';
 import { prettyDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { cn } from '../lib/cn';
 
 export default function TransactionsPage() {
-  const { canEdit } = useWorkspace();
+  const { canEdit, kind } = useWorkspace();
+  const { workspaces, workspace } = useAuth();
+  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'HOUSEHOLD' && w.role !== 'VIEWER') : [];
+  const memberNames = new Map((useMembers().data ?? []).map((m) => [m.userId, m.name]));
   const dialog = useTransactionDialog();
   const [params, setParams] = useSearchParams();
   const accounts = useAccounts().data ?? [];
@@ -57,6 +61,8 @@ export default function TransactionsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toDelete, setToDelete] = useState<Transaction | null>(null);
   const [commentsFor, setCommentsFor] = useState<Transaction | null>(null);
+  const [shareFor, setShareFor] = useState<Transaction | null>(null);
+  const [deletedOpen, setDeletedOpen] = useState(false);
   const del = useDeleteTransaction();
   const bulk = useBulkTransactions();
 
@@ -83,6 +89,9 @@ export default function TransactionsPage() {
         actions={
           canEdit && (
             <>
+              <Button variant="outline" size="sm" onClick={() => setDeletedOpen(true)}>
+                <RotateCcw className="w-4 h-4 mr-2" />Recently deleted
+              </Button>
               <Button variant={selecting ? 'secondary' : 'outline'} size="sm" onClick={() => setSelecting(!selecting)}>
                 <CheckSquare className="w-4 h-4 mr-2" />{selecting ? 'Done' : 'Select'}
               </Button>
@@ -161,6 +170,9 @@ export default function TransactionsPage() {
                 selecting={selecting}
                 selected={selected.has(t.id)}
                 canEdit={canEdit}
+                canShare={households.length > 0 && t.type === 'EXPENSE' && !t.loanId && !t.sharedCopy}
+                by={kind === 'HOUSEHOLD' ? memberNames.get(t.createdBy) : undefined}
+                onShare={() => setShareFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
                 onDelete={() => setToDelete(t)}
@@ -181,16 +193,18 @@ export default function TransactionsPage() {
         onConfirm={() => { if (toDelete) del.mutate(toDelete); setToDelete(null); }}
       />
       <CommentsModal tx={commentsFor} onClose={() => setCommentsFor(null)} />
+      {shareFor && <ShareModal tx={shareFor} households={households} onClose={() => setShareFor(null)} />}
+      <DeletedModal open={deletedOpen} onClose={() => setDeletedOpen(false)} />
     </>
   );
 }
 
 interface RowProps {
-  tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean;
-  onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
+  tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canShare: boolean; by?: string;
+  onShare: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, onToggle, onEdit, onDelete, onComments }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare, onToggle, onEdit, onDelete, onComments }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
@@ -203,14 +217,21 @@ function Row({ tx, showDate, selecting, selected, canEdit, onToggle, onEdit, onD
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
-          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
+          <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}{by ? ` · ${by}` : ''}</p>
+          {(tx.loanId || tx.sharedGroupId) && (
+            <p className="text-[11px] text-accent flex items-center gap-1 mt-0.5">
+              {tx.loanId && <><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</>}
+              {tx.sharedGroupId && <><Home className="w-3 h-3" />{tx.sharedCopy ? 'From a personal ledger' : 'Shared with household'}</>}
+            </p>
+          )}
         </div>
         <Amount minor={tx.direction * tx.amountMinor} currency={tx.currency} signed={tx.type !== 'TRANSFER'} className="text-sm font-semibold" />
         {!pending && !selecting && (
           <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
-            {canEdit && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
-            {canEdit && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
+            {canEdit && canShare && <IconButton label={tx.sharedGroupId ? 'Household sharing' : 'Share with household'} onClick={onShare}><Users className="w-4 h-4" /></IconButton>}
+            {canEdit && !tx.sharedCopy && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
+            {canEdit && !tx.sharedCopy && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
           </div>
         )}
       </div>
@@ -252,6 +273,64 @@ function CommentsModal({ tx, onClose }: { tx: Transaction | null; onClose: () =>
           <Input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a comment…" maxLength={2000} aria-label="Comment" />
           <Button type="submit" disabled={add.isPending}>Post</Button>
         </form>
+      )}
+    </Modal>
+  );
+}
+
+function ShareModal({ tx, households, onClose }: { tx: Transaction; households: { id: string; name: string }[]; onClose: () => void }) {
+  const share = useShareTransaction();
+  const [householdId, setHouseholdId] = useState(households[0]?.id ?? '');
+  const shared = !!tx.sharedGroupId;
+  return (
+    <Modal isOpen onClose={onClose} title={shared ? 'Shared with your household' : 'Share with household'}>
+      {shared ? (
+        <>
+          <p className="text-sm text-secondary mb-4">A linked copy of this expense is in your household ledger, credited to you. It follows any edits you make here.</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button variant="destructive" disabled={share.isPending} onClick={() => share.mutate({ id: tx.id, householdId: null }, { onSuccess: onClose })}>Stop sharing</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-secondary mb-3">Records a linked copy in the household ledger, credited to you. Later edits or deletes here update it.</p>
+          <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} aria-label="Household">
+            {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+          </Select>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button disabled={!householdId || share.isPending} onClick={() => share.mutate({ id: tx.id, householdId }, { onSuccess: onClose })}>Share</Button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function DeletedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const deleted = useDeletedTransactions(open);
+  const restore = useRestoreTransaction();
+  const rows = deleted.data ?? [];
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Recently deleted">
+      {deleted.isLoading ? (
+        <Skeleton className="h-16" />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-secondary">Nothing deleted in the last 30 days.</p>
+      ) : (
+        <ul className="divide-y divide-border max-h-96 overflow-y-auto">
+          {rows.map((t) => (
+            <li key={t.id} className="py-2.5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{t.payeeName ?? t.note ?? t.categoryName ?? t.type}</p>
+                <p className="text-xs text-secondary">{prettyDate(t.occurredOn)} · {t.accountName}</p>
+              </div>
+              <Amount minor={t.direction * t.amountMinor} currency={t.currency} signed={t.type !== 'TRANSFER'} className="text-sm" />
+              <Button size="sm" variant="outline" disabled={restore.isPending} onClick={() => restore.mutate(t.id)}>Restore</Button>
+            </li>
+          ))}
+        </ul>
       )}
     </Modal>
   );

@@ -4,7 +4,7 @@ export type AccountType = 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'CASH' | 'LOA
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
 export interface User { id: string; email: string; name: string }
-export interface Workspace { id: string; name: string; baseCurrency: string; role: Role }
+export interface Workspace { id: string; name: string; baseCurrency: string; role: Role; kind: 'PERSONAL' | 'HOUSEHOLD' }
 export interface Session { accessToken: string; expiresIn: number; user: User }
 export interface Me { user: User; workspaces: Workspace[] }
 
@@ -29,6 +29,10 @@ export interface Transaction {
   note: string | null; tagIds: string[]; transferId: string | null; version: number; createdBy: string; createdAt: string;
   /** The amount as entered, when it was in a currency other than the account's. */
   origAmountMinor: number | null; origCurrency: string | null;
+  loanId: string | null; loanPerson: string | null;
+  /** Amount in the workspace base currency at that day's rate (editable); null when no rate was available. */
+  baseAmountMinor: number | null; baseCurrency: string | null; baseFxRate: number | null; baseOverridden: boolean;
+  sharedGroupId: string | null; sharedCopy: boolean;
 }
 export interface CursorPage<T> { items: T[]; nextCursor: string | null }
 export interface TransactionFilters {
@@ -96,11 +100,64 @@ export interface ImportResult { batchId: string; imported: number; duplicates: n
 export interface Holding {
   id: string; accountId: string | null; symbol: string; name: string; quantity: number; costBasisMinor: number;
   priceMinor: number; currency: string; priceAsOf: string | null; marketValueMinor: number; gainMinor: number;
+  providerSymbol: string | null; exchange: string | null; assetType: string | null;
+  priceSource: 'MANUAL' | 'LIVE'; priceUpdatedAt: string | null;
 }
 export interface HoldingInput {
   accountId?: string | null; symbol: string; name: string; quantity: number; costBasisMinor: number; priceMinor: number; currency: string;
+  providerSymbol?: string | null; exchange?: string | null; assetType?: string | null;
 }
 export interface InvestmentSummary {
   currency: string; valueMinor: number; costMinor: number; gainMinor: number; gainPercent: number;
   allocation: { symbol: string; valueMinor: number; percent: number }[];
+}
+
+// ---------- loans ----------
+export interface Loan {
+  id: string; person: string; direction: 'BORROWED' | 'LENT'; principalMinor: number; currency: string;
+  occurredOn: string; dueOn: string | null; note: string | null; repaidMinor: number; outstandingMinor: number; status: 'OPEN' | 'SETTLED';
+}
+export interface LoanPerson { person: string; netMinor: number; openLoans: number }
+export interface LoanOverview { currency: string; owedToMeMinor: number; iOweMinor: number; people: LoanPerson[]; loans: Loan[] }
+export interface LoanDetail { loan: Loan; transactions: Transaction[] }
+
+// ---------- forecast and insights ----------
+export interface ForecastLine { fixedMinor: number; variableMinor: number; totalMinor: number; lowMinor: number; highMinor: number }
+export interface CategoryForecast {
+  categoryId: string | null; name: string; color: string | null; forecastMinor: number; lowMinor: number; highMinor: number;
+  method: string; confidence: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'; months: number; lastMonthMinor: number; averageMinor: number;
+}
+export interface FixedItem { ruleId: string; name: string; amountMinor: number; date: string }
+export interface Forecast {
+  month: string; currency: string; expense: ForecastLine; income: ForecastLine; netMinor: number;
+  categories: CategoryForecast[]; fixedExpenses: FixedItem[]; fixedIncome: FixedItem[]; monthsOfHistory: number;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  thisMonth: { spentMinor: number; projectedMinor: number; expectedMinor: number; daysElapsed: number; daysInMonth: number };
+  missingCurrencies: string[];
+}
+export interface Insights {
+  currency: string; highlights: string[];
+  movers: { categoryId: string | null; name: string; thisMonthMinor: number; usualMinor: number; deltaMinor: number; percent: number }[];
+  weekdays: { day: string; averageMinor: number; sharePercent: number }[];
+  weeksOfMonth: { label: string; averageMinor: number }[];
+  anomalies: { id: string; date: string; name: string; category: string; amountMinor: number; typicalMinor: number; timesTypical: number }[];
+  subscriptions: { payee: string; amountMinor: number; frequency: string; lastDate: string; nextExpected: string; perYearMinor: number; charges: number }[];
+  savings: { month: string; ratePercent: number; incomeMinor: number; expenseMinor: number }[];
+  growth: { categoryId: string | null; name: string; percentPerMonth: number; latestMinor: number }[];
+  largest: { id: string; date: string; name: string; category: string; amountMinor: number }[];
+}
+
+// ---------- market data ----------
+export interface SecurityHit { symbol: string; name: string; exchange: string | null; type: string | null; currency: string | null }
+export interface PricedQuote { available: boolean; symbol: string; name: string | null; currency: string | null; exchange: string | null; priceMinor: number | null; source: string | null }
+
+// ---------- household ----------
+export interface MemberStat { userId: string; name: string; paidMinor: number; sharePercent: number; fairShareMinor: number; balanceMinor: number }
+export interface MemberAmount { userId: string; name: string; amountMinor: number }
+export interface HouseholdSummary {
+  month: string; currency: string; totalMinor: number; members: MemberStat[]; balances: MemberStat[];
+  categories: { categoryId: string | null; name: string; color: string | null; totalMinor: number; byMember: MemberAmount[] }[];
+  trend: { month: string; byMember: MemberAmount[] }[];
+  suggested: { fromUserId: string; fromName: string; toUserId: string; toName: string; amountMinor: number }[];
+  settlements: { id: string; fromUserId: string; fromName: string; toUserId: string; toName: string; amountMinor: number; occurredOn: string; note: string | null }[];
 }
