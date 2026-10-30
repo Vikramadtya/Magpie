@@ -28,9 +28,8 @@ export default function SettingsPage() {
   const [name, setName] = useState(ws.name);
   const [currency, setCurrency] = useState(ws.baseCurrency);
   const [newName, setNewName] = useState('');
-  const [newKind, setNewKind] = useState<'PERSONAL' | 'HOUSEHOLD'>('PERSONAL');
-  // household members only need to share and settle up, so viewer is the sensible default there
-  const [inviteRole, setInviteRole] = useState<'EDITOR' | 'VIEWER'>(ws.kind === 'HOUSEHOLD' ? 'VIEWER' : 'EDITOR');
+  // a shared ledger is view-only for everyone, so invitees are always viewers
+  const inviteRole = 'VIEWER' as const;
   const [inviteLink, setInviteLink] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -51,7 +50,7 @@ export default function SettingsPage() {
   const createWorkspace = (e: FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    void run(async () => { const created = await workspaceApi.create(newName.trim(), currency, newKind); await reload(); selectWorkspace(created.id); setNewName(''); }, 'Workspace created');
+    void run(async () => { const created = await workspaceApi.create(newName.trim(), currency, 'SHARED'); await reload(); selectWorkspace(created.id); setNewName(''); }, 'Shared ledger created');
   };
   const invite = () =>
     run(async () => {
@@ -84,6 +83,7 @@ export default function SettingsPage() {
           </section>
         )}
 
+        {ws.kind === 'SHARED' ? (
         <section className="glass-panel p-5">
           <h2 className="font-semibold mb-3">People</h2>
           <StateView isLoading={members.isLoading} error={members.error}>
@@ -108,7 +108,6 @@ export default function SettingsPage() {
             <div className="mt-4 pt-4 border-t border-border">
               <p className="text-sm font-medium mb-2">Invite someone</p>
               <div className="flex gap-2">
-                <Select className="w-32" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'EDITOR' | 'VIEWER')} aria-label="Invite role"><option value="EDITOR">Editor</option><option value="VIEWER">Viewer</option></Select>
                 <Button onClick={() => void invite()}>Create link</Button>
               </div>
               {inviteLink && (
@@ -121,6 +120,9 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+        ) : (
+          <p className="text-sm text-secondary">This is your personal ledger. It is only yours: to track spending with others, create a shared ledger below and share expenses to it.</p>
+        )}
 
         <section className="glass-panel p-5">
           <h2 className="font-semibold mb-3">Recent activity</h2>
@@ -137,22 +139,22 @@ export default function SettingsPage() {
         </section>
 
         <section className="glass-panel p-5">
-          <h2 className="font-semibold mb-3">New workspace</h2>
+          <h2 className="font-semibold mb-3">New shared ledger</h2>
           <form onSubmit={createWorkspace} className="flex gap-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Our home" maxLength={120} aria-label="Workspace name" />
-            <Select className="w-44" value={newKind} onChange={(e) => setNewKind(e.target.value as 'PERSONAL' | 'HOUSEHOLD')} aria-label="Workspace type"><option value="PERSONAL">Personal</option><option value="HOUSEHOLD">Household (shared)</option></Select>
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Lisbon trip" maxLength={120} aria-label="Shared ledger name" />
             <Button type="submit">Create</Button>
           </form>
         </section>
 
+        {ws.kind === 'SHARED' && (
         <section className="glass-panel p-5 border-red-500/30">
           <h2 className="font-semibold mb-3 text-red-500">Danger zone</h2>
           <div className="flex flex-wrap gap-2">
-            {workspaces.length > 1 || !ws.isOwner ? <Button variant="outline" onClick={() => setConfirmLeave(true)}>Leave workspace</Button> : null}
-            {ws.isOwner && workspaces.length > 1 && <Button variant="destructive" onClick={() => setConfirmDelete(true)}>Delete workspace</Button>}
+            <Button variant="outline" onClick={() => setConfirmLeave(true)}>Leave shared ledger</Button>
+            {ws.isOwner && <Button variant="destructive" onClick={() => setConfirmDelete(true)}>Delete shared ledger</Button>}
           </div>
-          {workspaces.length === 1 && <p className="text-xs text-secondary mt-2">Create another workspace before leaving or deleting your only one.</p>}
         </section>
+        )}
       </div>
 
       <ConfirmDialog open={confirmLeave} title="Leave workspace?" message={`You will lose access to "${ws.name}". An owner can invite you again.`} confirmLabel="Leave" onCancel={() => setConfirmLeave(false)} onConfirm={() => { setConfirmLeave(false); void leaveOrDelete(() => workspaceApi.leave(ws.id)); }} />

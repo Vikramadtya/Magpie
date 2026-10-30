@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSearchParams } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
+import { toast } from 'sonner';
 import type { Transaction, TransactionFilters, TxType } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
@@ -24,7 +25,7 @@ import { cn } from '../lib/cn';
 export default function TransactionsPage() {
   const { canEdit, kind } = useWorkspace();
   const { workspaces, workspace } = useAuth();
-  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'HOUSEHOLD' && w.role !== 'VIEWER') : [];
+  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'SHARED' && w.role !== 'VIEWER') : [];
   const memberNames = new Map((useMembers().data ?? []).map((m) => [m.userId, m.name]));
   const dialog = useTransactionDialog();
   const [params, setParams] = useSearchParams();
@@ -65,6 +66,22 @@ export default function TransactionsPage() {
   const [deletedOpen, setDeletedOpen] = useState(false);
   const del = useDeleteTransaction();
   const bulk = useBulkTransactions();
+  const shareMut = useShareTransaction();
+  const shareSelected = async (householdId: string) => {
+    const eligible = rows.filter((t) => selected.has(t.id) && t.type === 'EXPENSE' && !t.loanId && !t.sharedCopy && !t.sharedGroupId);
+    if (eligible.length === 0) return toast.info('Pick expenses that are not already shared');
+    let ok = 0;
+    for (const t of eligible) {
+      try {
+        await shareMut.mutateAsync({ id: t.id, householdId });
+        ok++;
+      } catch {
+        /* the failure toast comes from the mutation; keep going with the rest */
+      }
+    }
+    toast.success(`Shared ${ok} of ${eligible.length} expense${eligible.length === 1 ? '' : 's'}`);
+    setSelecting(false);
+  };
 
   useEffect(() => {
     if (!selecting) setSelected(new Set());
@@ -137,6 +154,12 @@ export default function TransactionsPage() {
         <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-2 shadow">
           <span className="text-sm">{selected.size} selected</span>
           <div className="flex gap-2">
+            {households.length > 0 && (
+              <Select className="h-9 w-44" value="" onChange={(e) => e.target.value && void shareSelected(e.target.value)} aria-label="Share selected to a shared ledger">
+                <option value="">Share to…</option>
+                {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+              </Select>
+            )}
             <Select className="h-9 w-48" defaultValue="" onChange={(e) => { if (e.target.value) { bulk.mutate({ action: 'RECATEGORIZE', ids: [...selected], categoryId: e.target.value }); setSelecting(false); } }} aria-label="Recategorize selected">
               <option value="">Set category…</option>
               {[...expenseGroups, ...incomeGroups].flatMap((g) => [g.parent, ...g.children]).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -171,7 +194,7 @@ export default function TransactionsPage() {
                 selected={selected.has(t.id)}
                 canEdit={canEdit}
                 canShare={households.length > 0 && t.type === 'EXPENSE' && !t.loanId && !t.sharedCopy}
-                by={kind === 'HOUSEHOLD' ? memberNames.get(t.createdBy) : undefined}
+                by={kind === 'SHARED' ? memberNames.get(t.createdBy) : undefined}
                 onShare={() => setShareFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
@@ -221,7 +244,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare
           {(tx.loanId || tx.sharedGroupId) && (
             <p className="text-[11px] text-accent flex items-center gap-1 mt-0.5">
               {tx.loanId && <><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</>}
-              {tx.sharedGroupId && <><Home className="w-3 h-3" />{tx.sharedCopy ? 'From a personal ledger' : 'Shared with household'}</>}
+              {tx.sharedGroupId && <><Home className="w-3 h-3" />{tx.sharedCopy ? 'From a personal ledger' : 'Shared to a ledger'}</>}
             </p>
           )}
         </div>
@@ -229,7 +252,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canShare, by, onShare
         {!pending && !selecting && (
           <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
-            {canEdit && canShare && <IconButton label={tx.sharedGroupId ? 'Household sharing' : 'Share with household'} onClick={onShare}><Users className="w-4 h-4" /></IconButton>}
+            {canEdit && canShare && <IconButton label={tx.sharedGroupId ? 'Shared ledger' : 'Share to a shared ledger'} onClick={onShare}><Users className="w-4 h-4" /></IconButton>}
             {canEdit && !tx.sharedCopy && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
             {canEdit && !tx.sharedCopy && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
           </div>
@@ -283,10 +306,10 @@ function ShareModal({ tx, households, onClose }: { tx: Transaction; households: 
   const [householdId, setHouseholdId] = useState(households[0]?.id ?? '');
   const shared = !!tx.sharedGroupId;
   return (
-    <Modal isOpen onClose={onClose} title={shared ? 'Shared with your household' : 'Share with household'}>
+    <Modal isOpen onClose={onClose} title={shared ? 'Shared to a ledger' : 'Share to a shared ledger'}>
       {shared ? (
         <>
-          <p className="text-sm text-secondary mb-4">A linked copy of this expense is in your household ledger, credited to you. It follows any edits you make here.</p>
+          <p className="text-sm text-secondary mb-4">A linked copy of this expense is in a shared ledger, credited to you. It follows any edits you make here.</p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Close</Button>
             <Button variant="destructive" disabled={share.isPending} onClick={() => share.mutate({ id: tx.id, householdId: null }, { onSuccess: onClose })}>Stop sharing</Button>
@@ -294,8 +317,8 @@ function ShareModal({ tx, households, onClose }: { tx: Transaction; households: 
         </>
       ) : (
         <>
-          <p className="text-sm text-secondary mb-3">Records a linked copy in the household ledger, credited to you. Later edits or deletes here update it.</p>
-          <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} aria-label="Household">
+          <p className="text-sm text-secondary mb-3">Records a linked copy in the shared ledger (a trip, a flat…), credited to you. Later edits or deletes here update it.</p>
+          <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)} aria-label="Shared ledger">
             {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </Select>
           <div className="flex justify-end gap-2 mt-4">

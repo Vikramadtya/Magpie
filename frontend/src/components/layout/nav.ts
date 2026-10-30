@@ -10,7 +10,7 @@ export const NAV_ITEMS = [
   { path: '/goals', label: 'Goals', icon: Target },
   { path: '/recurring', label: 'Recurring', icon: Repeat },
   { path: '/loans', label: 'Loans', icon: Banknote },
-  { path: '/household', label: 'Household', icon: Home, householdOnly: true },
+  { path: '/shared', label: 'Shared ledger', icon: Home, sharedOnly: true },
   { path: '/investments', label: 'Investments', icon: TrendingUp },
   { path: '/analytics', label: 'Analytics', icon: PieChart },
   { path: '/categories', label: 'Categories', icon: ListTree },
@@ -21,6 +21,6 @@ export const NAV_ITEMS = [
 
 type NavItem = (typeof NAV_ITEMS)[number];
 
-/** The household page only makes sense inside a household workspace. */
+/** The shared-ledger page only makes sense inside a shared ledger. */
 export const visibleNav = (kind?: string): NavItem[] =>
-  NAV_ITEMS.filter((n) => !('householdOnly' in n && n.householdOnly) || kind === 'HOUSEHOLD');
+  NAV_ITEMS.filter((n) => !('sharedOnly' in n && n.sharedOnly) || kind === 'SHARED');

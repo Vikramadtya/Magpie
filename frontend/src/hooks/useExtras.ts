@@ -59,7 +59,7 @@ export function useRefreshHoldings() {
   });
 }
 
-// ---------- household ----------
+// ---------- shared ledger ----------
 export function useHouseholdSummary(month: string, enabled: boolean) {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.household(id, month), queryFn: () => householdApi.summary(id, month), enabled });

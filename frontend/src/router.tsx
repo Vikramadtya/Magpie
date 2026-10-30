@@ -65,7 +65,7 @@ export const router = createBrowserRouter([
       { path: '/goals', element: <GoalsPage /> },
       { path: '/recurring', element: <RecurringPage /> },
       { path: '/loans', element: <LoansPage /> },
-      { path: '/household', element: <HouseholdPage /> },
+      { path: '/shared', element: <HouseholdPage /> },
       { path: '/investments', element: <InvestmentsPage /> },
       { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/categories', element: <CategoriesPage /> },

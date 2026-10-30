@@ -38,8 +38,8 @@ export function TransactionDialogProvider({ children }: { children: ReactNode })
     (tx, preset) => {
       if (!canEdit) {
         return toast.info(
-          kind === 'HOUSEHOLD'
-            ? 'A household is view-only. Record the expense in your own ledger and share it here.'
+          kind === 'SHARED'
+            ? 'A shared ledger is view-only. Record the expense in your own ledger and share it there.'
             : 'You have view-only access to this workspace',
         );
       }
@@ -83,8 +83,8 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const transfer = useTransfer();
   const share = useShareTransaction();
   const { workspaces, workspace } = useAuth();
-  // personal ledgers can share an expense into a household they can edit
-  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'HOUSEHOLD' && w.role !== 'VIEWER') : [];
+  // a personal ledger can share an expense to any shared ledger it belongs to
+  const households = workspace?.kind === 'PERSONAL' ? workspaces.filter((w) => w.kind === 'SHARED' && w.role !== 'VIEWER') : [];
   const [householdId, setHouseholdId] = useState('');
 
   const editing = tx !== null;
@@ -347,7 +347,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
         {editing && tx && <NormalisedBox tx={tx} />}
 
         {!editing && type === 'EXPENSE' && households.length > 0 && (
-          <Field label="Household" hint="Also records this in the shared ledger, credited to you.">
+          <Field label="Also share to" hint="Records a linked copy in that shared ledger (a trip, a flat…), credited to you.">
             <Select value={householdId} onChange={(e) => setHouseholdId(e.target.value)}>
               <option value="">Just me</option>
               {households.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}

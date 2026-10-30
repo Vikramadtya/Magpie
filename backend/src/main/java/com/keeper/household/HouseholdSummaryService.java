@@ -306,7 +306,7 @@ public class HouseholdSummaryService {
     String kind =
         db.one("SELECT kind FROM workspaces WHERE id = ?", rs -> rs.getString(1), ws)
             .orElse("PERSONAL");
-    if (!"HOUSEHOLD".equals(kind))
-      throw new BadRequestException("This workspace is not a household");
+    if (!"SHARED".equals(kind))
+      throw new BadRequestException("This workspace is not a shared ledger");
   }
 }

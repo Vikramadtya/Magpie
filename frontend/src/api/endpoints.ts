@@ -12,7 +12,7 @@ export const authApi = {
 };
 
 export const workspaceApi = {
-  create: (name: string, currency: string, kind: 'PERSONAL' | 'HOUSEHOLD' = 'PERSONAL') =>
+  create: (name: string, currency: string, kind: 'PERSONAL' | 'SHARED' = 'PERSONAL') =>
     http.post<T.Workspace>('/api/v1/workspaces', { name, currency, kind }).then((r) => r.data),
   rename: (ws: string, name: string, currency: string) => api.patch<T.Workspace>(ws, '', { name, currency }),
   remove: (ws: string) => api.del(ws, ''),

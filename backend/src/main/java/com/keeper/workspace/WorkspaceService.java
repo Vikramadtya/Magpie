@@ -48,6 +48,15 @@ public class WorkspaceService {
   }
 
   public Workspace create(UUID userId, String name, String currency, String kind) {
+    // Everyone has exactly one editable personal ledger; extra ledgers are shared (view-only) ones.
+    if ("PERSONAL".equals(kind)
+        && db.count(
+                "SELECT count(*) FROM workspaces WHERE created_by = ? AND kind = 'PERSONAL'",
+                userId)
+            > 0) {
+      throw new com.keeper.common.exception.ConflictException(
+          "You already have a personal ledger. Create a shared ledger to track spending with a group.");
+    }
     UUID id =
         db.tx(
             () -> {
@@ -113,10 +122,19 @@ public class WorkspaceService {
   // ---- invites ----
 
   /** Returns the raw invite token; only its hash is stored. */
-  public String invite(UUID ws, UUID by, Role role) {
-    if (role == Role.OWNER) {
+  public String invite(UUID ws, UUID by, Role requested) {
+    if (requested == Role.OWNER) {
       throw new BadRequestException("Invite as EDITOR or VIEWER");
     }
+    String kind =
+        db.one("SELECT kind FROM workspaces WHERE id = ?", rs -> rs.getString(1), ws)
+            .orElse("PERSONAL");
+    if (!"SHARED".equals(kind)) {
+      throw new BadRequestException(
+          "Your personal ledger is just yours. Create a shared ledger to track spending with others.");
+    }
+    // A shared ledger is view-only for everyone, so there is no meaningful editor role there.
+    Role role = Role.VIEWER;
     byte[] raw = new byte[24];
     random.nextBytes(raw);
     String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);

@@ -55,9 +55,9 @@ function Shell() {
             <WifiOff className="w-3.5 h-3.5" /> You're offline. Showing saved data; changes need a connection.
           </div>
         )}
-        {workspace?.kind === 'HOUSEHOLD' && (
+        {workspace?.kind === 'SHARED' && (
           <div role="status" className="px-4 py-1.5 text-xs text-center bg-accent/10 text-accent">
-            Household ledger · view-only. Members add spending by sharing expenses from their own ledgers.
+            Shared ledger · view-only. Everyone adds spending by sharing expenses from their own personal ledger.
           </div>
         )}
         <main id="main" className="flex-1 overflow-y-auto">
@@ -103,7 +103,7 @@ function SidebarContent() {
           className="w-full h-9 rounded-lg border border-border bg-background px-2 text-sm"
         >
           {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>{w.name}{w.role !== 'OWNER' ? ` (${w.role.toLowerCase()})` : ''}</option>
+            <option key={w.id} value={w.id}>{w.name}{w.kind === 'SHARED' ? ' · shared' : ''}</option>
           ))}
         </select>
       </div>
@@ -145,7 +145,7 @@ function SidebarContent() {
 function AddButton({ compact }: { compact?: boolean }) {
   const dialog = useTransactionDialog();
   const { workspace } = useAuth();
-  if (workspace?.kind === 'HOUSEHOLD') return null; // households are view-only
+  if (workspace?.kind === 'SHARED') return null; // shared ledgers are view-only
   return (
     <button
       onClick={() => dialog.open()}

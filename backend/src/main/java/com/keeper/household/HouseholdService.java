@@ -74,7 +74,7 @@ public class HouseholdService {
             .find(personalWs, txId)
             .orElseThrow(() -> new ResourceNotFoundException("Transaction", txId.toString()));
     if (!"EXPENSE".equals(src.type()) || src.loanId() != null || src.sharedCopy()) {
-      throw new BusinessRuleException("Only your own expenses can be shared with a household");
+      throw new BusinessRuleException("Only your own expenses can be shared to a shared ledger");
     }
     if (src.sharedGroupId() != null) {
       throw new ConflictException("This expense is already shared");
@@ -219,11 +219,11 @@ public class HouseholdService {
   private void requireHouseholdMember(UUID householdWs, UUID actor) {
     workspaces
         .roleOf(householdWs, actor)
-        .orElseThrow(() -> new ForbiddenException("You are not a member of that household"));
+        .orElseThrow(() -> new ForbiddenException("You are not a member of that shared ledger"));
     String kind =
         db.one("SELECT kind FROM workspaces WHERE id = ?", rs -> rs.getString(1), householdWs)
             .orElse("PERSONAL");
-    if (!"HOUSEHOLD".equals(kind))
-      throw new BadRequestException("That workspace is not a household");
+    if (!"SHARED".equals(kind))
+      throw new BadRequestException("That workspace is not a shared ledger");
   }
 }

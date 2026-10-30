@@ -21,7 +21,7 @@ const StackedBars = lazy(() => import('../components/charts/StackedBars'));
 export default function HouseholdPage() {
   const { kind, baseCurrency } = useWorkspace();
   const { user } = useAuth();
-  const isHousehold = kind === 'HOUSEHOLD';
+  const isHousehold = kind === 'SHARED';
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const summary = useHouseholdSummary(month, isHousehold);
   const remove = useRemoveSettlement();
@@ -41,11 +41,11 @@ export default function HouseholdPage() {
   if (!isHousehold) {
     return (
       <>
-        <PageHeader title="Household" />
+        <PageHeader title="Shared ledger" />
         <div className="glass-panel p-8 text-center max-w-xl">
-          <p className="font-medium mb-2">This is a personal ledger</p>
+          <p className="font-medium mb-2">This is your personal ledger</p>
           <p className="text-sm text-secondary mb-4">
-            A household is a view-only workspace for analytics on shared spending. Create one in Settings, invite your partner or family, then tick “Household” when you record an expense in your own ledger (or use the share icon on an existing one). It appears in the household and shows who spent what.
+            A shared ledger is a view-only view of what a group spent together, like a trip, a flat or a couple. Create one in Settings, invite the others, then share expenses to it from your own ledger (tick “Also share to” when you add one, or select expenses and share them in bulk). It shows who spent what and who owes whom.
           </p>
           <Link to="/settings"><Button>Go to Settings</Button></Link>
         </div>
@@ -56,8 +56,8 @@ export default function HouseholdPage() {
   return (
     <>
       <PageHeader
-        title="Household"
-        subtitle="Shared spending from everyone's own ledgers: who paid what and who owes whom"
+        title="Shared ledger"
+        subtitle="What the group spent, from everyone's own ledgers: who paid what and who owes whom"
         actions={<><MonthPicker month={month} onChange={setMonth} /><Button size="sm" onClick={() => setSettling({})}>Settle up</Button></>}
       />
       <StateView isLoading={summary.isLoading} error={summary.error} onRetry={() => void summary.refetch()} skeleton={<Skeleton className="h-40" />}>

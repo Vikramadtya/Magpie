@@ -47,56 +47,93 @@ class TenantIsolationTest extends ApiTestBase {
   }
 
   @Test
-  void invitedViewerCanReadButNotWrite_editorCanWriteButNotManage() {
+  void sharedLedgerMembersAreViewOnlyAndOnlyOwnersManageIt() {
     Session owner = register("o2");
-    Session viewer = register("v2");
-    Session editor = register("e2");
+    Session friend = register("v2");
 
-    String viewerToken =
-        (String)
-            post(owner.token(), ws(owner) + "/invites", Map.of("role", "VIEWER"), Map.class)
-                .get("token");
-    String editorToken =
-        (String)
-            post(owner.token(), ws(owner) + "/invites", Map.of("role", "EDITOR"), Map.class)
-                .get("token");
-    post(viewer.token(), "/api/v1/invites/" + viewerToken + "/accept", Map.of(), Map.class);
-    post(editor.token(), "/api/v1/invites/" + editorToken + "/accept", Map.of(), Map.class);
+    // extra ledgers are shared ones; the personal ledger can't have members
+    Map<?, ?> trip =
+        post(
+            owner.token(),
+            "/api/v1/workspaces",
+            Map.of("name", "Trip", "currency", "USD", "kind", "SHARED"),
+            Map.class);
+    String tripPath = "/api/v1/workspaces/" + trip.get("id");
+    assertEquals(
+        HttpStatus.BAD_REQUEST,
+        statusOf(
+            HttpRequest.POST(ws(owner) + "/invites", Map.of("role", "VIEWER"))
+                .bearerAuth(owner.token())));
 
+    String token =
+        (String)
+            post(owner.token(), tripPath + "/invites", Map.of("role", "EDITOR"), Map.class)
+                .get("token");
+    post(friend.token(), "/api/v1/invites/" + token + "/accept", Map.of(), Map.class);
     // invite links are single use
     assertEquals(
         HttpStatus.FORBIDDEN,
         statusOf(
-            HttpRequest.POST("/api/v1/invites/" + viewerToken + "/accept", Map.of())
-                .bearerAuth(editor.token())));
+            HttpRequest.POST("/api/v1/invites/" + token + "/accept", Map.of())
+                .bearerAuth(friend.token())));
 
-    assertEquals(
-        HttpStatus.OK,
-        statusOf(HttpRequest.GET(ws(owner) + "/accounts").bearerAuth(viewer.token())));
+    // everyone, including the owner, can read but not type entries in
     Map<String, Object> account =
         Map.of("name", "Joint", "type", "CHECKING", "currency", "USD", "openingBalanceMinor", 0);
     assertEquals(
-        HttpStatus.FORBIDDEN,
-        statusOf(HttpRequest.POST(ws(owner) + "/accounts", account).bearerAuth(viewer.token())));
-    assertEquals(
         HttpStatus.OK,
-        statusOf(HttpRequest.POST(ws(owner) + "/accounts", account).bearerAuth(editor.token())));
+        statusOf(HttpRequest.GET(tripPath + "/accounts").bearerAuth(friend.token())));
+    assertEquals(
+        HttpStatus.FORBIDDEN,
+        statusOf(HttpRequest.POST(tripPath + "/accounts", account).bearerAuth(friend.token())));
+    assertEquals(
+        HttpStatus.FORBIDDEN,
+        statusOf(HttpRequest.POST(tripPath + "/accounts", account).bearerAuth(owner.token())));
+    // only the owner manages members
     assertEquals(
         HttpStatus.FORBIDDEN,
         statusOf(
-            HttpRequest.POST(ws(owner) + "/invites", Map.of("role", "VIEWER"))
-                .bearerAuth(editor.token())));
+            HttpRequest.POST(tripPath + "/invites", Map.of("role", "VIEWER"))
+                .bearerAuth(friend.token())));
     assertEquals(
-        HttpStatus.FORBIDDEN, statusOf(HttpRequest.DELETE(ws(owner)).bearerAuth(editor.token())));
+        HttpStatus.FORBIDDEN, statusOf(HttpRequest.DELETE(tripPath).bearerAuth(friend.token())));
 
-    // the member list shows all three; a viewer can leave
-    assertEquals(3, getList(owner.token(), ws(owner) + "/members").size());
+    assertEquals(2, getList(owner.token(), tripPath + "/members").size());
     assertEquals(
         HttpStatus.OK,
-        statusOf(HttpRequest.POST(ws(owner) + "/leave", Map.of()).bearerAuth(viewer.token())));
+        statusOf(HttpRequest.POST(tripPath + "/leave", Map.of()).bearerAuth(friend.token())));
     assertEquals(
         HttpStatus.NOT_FOUND,
-        statusOf(HttpRequest.GET(ws(owner) + "/accounts").bearerAuth(viewer.token())));
+        statusOf(HttpRequest.GET(tripPath + "/accounts").bearerAuth(friend.token())));
+  }
+
+  @Test
+  void everyoneHasExactlyOnePersonalLedgerButManySharedOnes() {
+    Session s = register("one");
+    // registration already created the personal ledger
+    assertEquals(
+        HttpStatus.CONFLICT,
+        statusOf(
+            HttpRequest.POST(
+                    "/api/v1/workspaces",
+                    Map.of("name", "Second", "currency", "USD", "kind", "PERSONAL"))
+                .bearerAuth(s.token())));
+    assertEquals(
+        HttpStatus.CONFLICT,
+        statusOf(
+            HttpRequest.POST(
+                    "/api/v1/workspaces", Map.of("name", "Default kind", "currency", "USD"))
+                .bearerAuth(s.token())));
+    for (String name : List.of("Lisbon trip", "Flat", "Couple")) {
+      assertEquals(
+          HttpStatus.OK,
+          statusOf(
+              HttpRequest.POST(
+                      "/api/v1/workspaces",
+                      Map.of("name", name, "currency", "EUR", "kind", "SHARED"))
+                  .bearerAuth(s.token())));
+    }
+    assertEquals(4, getList(s.token(), "/api/v1/workspaces").size());
   }
 
   @Test

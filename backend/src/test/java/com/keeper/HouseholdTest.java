@@ -31,10 +31,10 @@ class HouseholdTest extends ApiTestBase {
         post(
             alice.token(),
             "/api/v1/workspaces",
-            Map.of("name", "Home", "currency", "USD", "kind", "HOUSEHOLD"),
+            Map.of("name", "Home", "currency", "USD", "kind", "SHARED"),
             Map.class);
     String hhId = (String) hh.get("id");
-    assertEquals("HOUSEHOLD", hh.get("kind"));
+    assertEquals("SHARED", hh.get("kind"));
     String invite =
         (String)
             post(alice.token(), ws(hhId) + "/invites", Map.of("role", "EDITOR"), Map.class)
@@ -269,7 +269,7 @@ class HouseholdTest extends ApiTestBase {
             post(
                     stranger.token(),
                     "/api/v1/workspaces",
-                    Map.of("name", "Theirs", "currency", "USD", "kind", "HOUSEHOLD"),
+                    Map.of("name", "Theirs", "currency", "USD", "kind", "SHARED"),
                     Map.class)
                 .get("id");
     String personal = ws(alice.workspaceId().toString());
@@ -310,5 +310,115 @@ class HouseholdTest extends ApiTestBase {
                     personal + "/transactions/" + tx.get("id") + "/share",
                     Map.of("householdId", hhId))
                 .bearerAuth(alice.token())));
+  }
+
+  private String spendAndShare(Session who, long amount, String sharedLedger) {
+    String personal = ws(who.workspaceId().toString());
+    String acc =
+        (String)
+            getList(who.token(), personal + "/accounts").stream()
+                .findFirst()
+                .map(a -> a.get("id"))
+                .orElseGet(
+                    () ->
+                        post(
+                                who.token(),
+                                personal + "/accounts",
+                                Map.of(
+                                    "name",
+                                    "Card",
+                                    "type",
+                                    "CHECKING",
+                                    "currency",
+                                    "USD",
+                                    "openingBalanceMinor",
+                                    1_000_000),
+                                Map.class)
+                            .get("id"))
+                .toString();
+    Map<?, ?> tx =
+        post(
+            who.token(),
+            personal + "/transactions",
+            Map.of(
+                "accountId",
+                acc,
+                "type",
+                "EXPENSE",
+                "amountMinor",
+                amount,
+                "occurredOn",
+                LocalDate.now().toString()),
+            Map.class);
+    post(
+        who.token(),
+        personal + "/transactions/" + tx.get("id") + "/share",
+        Map.of("householdId", sharedLedger),
+        Map.class);
+    return (String) tx.get("id");
+  }
+
+  @Test
+  void friendsOnATripEachShareAndSeeOneCombinedPicture() {
+    Session ann = register("ann");
+    Session ben = register("ben");
+    Session cat = register("cat");
+
+    // ann creates two shared ledgers; a person is in as many as they like, with their one personal
+    // ledger
+    String trip =
+        (String)
+            post(
+                    ann.token(),
+                    "/api/v1/workspaces",
+                    Map.of("name", "Lisbon", "currency", "USD", "kind", "SHARED"),
+                    Map.class)
+                .get("id");
+    String flat =
+        (String)
+            post(
+                    ann.token(),
+                    "/api/v1/workspaces",
+                    Map.of("name", "Flat", "currency", "USD", "kind", "SHARED"),
+                    Map.class)
+                .get("id");
+    for (Session friend : List.of(ben, cat)) {
+      String token =
+          (String)
+              post(ann.token(), ws(trip) + "/invites", Map.of("role", "VIEWER"), Map.class)
+                  .get("token");
+      post(friend.token(), "/api/v1/invites/" + token + "/accept", Map.of(), Map.class);
+    }
+    String flatToken =
+        (String)
+            post(ann.token(), ws(flat) + "/invites", Map.of("role", "VIEWER"), Map.class)
+                .get("token");
+    post(ben.token(), "/api/v1/invites/" + flatToken + "/accept", Map.of(), Map.class);
+
+    spendAndShare(ann, 9_000, trip); // ann paid for the hotel
+    spendAndShare(ben, 3_000, trip); // ben paid for dinner
+    spendAndShare(ben, 50_000, flat); // a different group entirely
+
+    Map<?, ?> tripSummary = get(cat.token(), ws(trip) + "/household/summary", Map.class);
+    assertEquals(12_000, num(tripSummary.get("totalMinor")));
+    Map<?, ?> catBalance =
+        ((List<?>) tripSummary.get("balances"))
+            .stream()
+                .map(b -> (Map<?, ?>) b)
+                .filter(b -> cat.userId().toString().equals(b.get("userId")))
+                .findFirst()
+                .orElseThrow();
+    assertEquals(
+        -4_000, num(catBalance.get("balanceMinor"))); // cat paid nothing, owes a third of 12,000
+    assertEquals(2, ((List<?>) tripSummary.get("suggested")).size()); // cat pays ann and ben
+
+    // the flat ledger only has what was shared to it
+    assertEquals(
+        50_000,
+        num(get(ben.token(), ws(flat) + "/household/summary", Map.class).get("totalMinor")));
+    // cat is not in the flat
+    assertEquals(
+        HttpStatus.NOT_FOUND,
+        statusOf(HttpRequest.GET(ws(flat) + "/household/summary").bearerAuth(cat.token())));
   }
 }

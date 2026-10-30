@@ -4,7 +4,7 @@ export type AccountType = 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'CASH' | 'LOA
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
 export interface User { id: string; email: string; name: string }
-export interface Workspace { id: string; name: string; baseCurrency: string; role: Role; kind: 'PERSONAL' | 'HOUSEHOLD' }
+export interface Workspace { id: string; name: string; baseCurrency: string; role: Role; kind: 'PERSONAL' | 'SHARED' }
 export interface Session { accessToken: string; expiresIn: number; user: User }
 export interface Me { user: User; workspaces: Workspace[] }
 

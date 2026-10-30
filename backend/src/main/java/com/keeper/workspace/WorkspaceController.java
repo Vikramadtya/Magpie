@@ -25,8 +25,8 @@ public class WorkspaceController {
   public record WorkspaceRequest(
       @NotBlank @Size(max = 120) String name,
       @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
-      /** PERSONAL (default) or HOUSEHOLD (a ledger shared by the people who live together). */
-      @Pattern(regexp = "^(PERSONAL|HOUSEHOLD)$") String kind) {}
+      /** PERSONAL (default) or SHARED (a read-only group ledger: a trip, a flat, a couple). */
+      @Pattern(regexp = "^(PERSONAL|SHARED)$") String kind) {}
 
   private final WorkspaceService service;
 

@@ -56,13 +56,13 @@ public class WorkspaceAccessFilter implements Ordered {
       return problem(HttpStatus.NOT_FOUND, "Workspace not found");
     }
     Role role = membership.get().role();
-    boolean household = "HOUSEHOLD".equals(membership.get().kind());
+    boolean household = "SHARED".equals(membership.get().kind());
     String rest = m.group(2) == null ? "" : m.group(2);
     boolean read = request.getMethod() == HttpMethod.GET || request.getMethod() == HttpMethod.HEAD;
     if (household && !read && !householdWritable(rest)) {
       return problem(
           HttpStatus.FORBIDDEN,
-          "A household is view-only. Record the expense in your own ledger and share it here.");
+          "A shared ledger is view-only. Record the expense in your own ledger and share it there.");
     }
     if (!role.atLeast(required(request.getMethod(), rest, household))) {
       return problem(HttpStatus.FORBIDDEN, "Your role does not allow this action");

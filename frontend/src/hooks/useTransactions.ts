@@ -226,7 +226,7 @@ export function useShareTransaction() {
   return useMutation({
     mutationFn: ({ id, householdId }: { id: string; householdId: string | null }) =>
       householdId ? transactionsApi.share(ws, id, householdId) : transactionsApi.unshare(ws, id),
-    onSuccess: (_d, { householdId }) => toast.success(householdId ? 'Shared with your household' : 'No longer shared'),
+    onSuccess: (_d, { householdId }) => toast.success(householdId ? 'Shared to the ledger' : 'No longer shared'),
     onSettled: () => void invalidateMoney(qc, ws),
   });
 }
