@@ -39,7 +39,8 @@ Render will host the Micronaut Java backend and execute Flyway schema migrations
 | `DB_URL` | The JDBC URL from Neon (e.g., `jdbc:postgresql://ep-...aws.neon.tech/keeper?sslmode=require`) |
 | `DB_USER` | Your Neon database username |
 | `DB_PASSWORD` | Your Neon database password |
-| `JWT_SECRET` | Generate a secure key (e.g., run `openssl rand -base64 32` in your terminal) |
+| `JWT_SECRET` | At least 32 random characters, e.g. `openssl rand -base64 48` |
+| `COOKIE_SECURE` | `true` (the default). Only set `false` for plain-http local setups |
 | `GOOGLE_CLIENT_ID` | Your Google OAuth2 Client ID |
 | `GOOGLE_CLIENT_SECRET` | Your Google OAuth2 Client Secret |
 | `FRONTEND_URL` | *Leave blank for now. We will fill this in Step 3.* |
@@ -59,10 +60,7 @@ Vercel will build and host the React/Vite frontend on their global CDN.
    - **Project Name:** `keeper-app`
    - **Framework Preset:** `Vite` (Vercel should auto-detect this).
    - **Root Directory:** Edit this and select `frontend`.
-4. **Environment Variables:**
-   - Expand the Environment Variables section and add:
-   - **Name:** `VITE_API_URL`
-   - **Value:** Your Render backend URL (e.g., `https://keeper-backend.onrender.com`)
+4. **Point the rewrites at your backend.** Edit `frontend/vercel.json` and replace `https://keeper-backend.onrender.com` with your Render URL. The browser only ever talks to your Vercel domain; Vercel forwards `/api`, `/oauth` and `/health` to Render. This keeps the HttpOnly refresh-token cookie first-party, so no cross-site cookies or wide-open CORS are needed. Leave `VITE_API_URL` unset.
 5. Click **Deploy**. Vercel will install dependencies, run type-checks, build the static assets, and deploy them.
 6. Once deployed, Vercel will provide you with a live domain (e.g., `https://keeper-app.vercel.app`).
 
@@ -76,6 +74,20 @@ Because your backend uses strict CORS and OAuth security, you must authorize you
 2. Go to the Environment section for your backend web service.
 3. Update the `FRONTEND_URL` variable to your new Vercel domain (e.g., `https://keeper-app.vercel.app`). Do not include a trailing slash.
 4. Render will automatically redeploy your backend with the new CORS and redirect rules.
-5. **Google Cloud Console:** Don't forget to go to your GCP OAuth dashboard and add your Vercel URL to the **Authorized JavaScript origins** and `https://keeper-app.vercel.app/auth/callback` to the **Authorized redirect URIs**.
+5. **Google Cloud Console:** add your Vercel URL to the **Authorized JavaScript origins** and `https://keeper-app.vercel.app/oauth/callback/google` to the **Authorized redirect URIs** (the callback goes through the Vercel rewrite, not directly to Render).
+
+---
+
+## 5. Upgrading from the previous schema
+
+Migration `V3__simple_ledger.sql` replaces the old ledger tables with the simple workspace/transaction model. It **keeps users and workspaces** (existing workspaces become OWNER memberships) but **drops all other old tables** (accounts, transactions, budgets and so on). Those were never written by the old stub services, but take a Neon backup/branch first if you are unsure.
+
+## 6. Local development
+
+```bash
+make up-db          # Postgres on :5432 (docker compose)
+make dev-be         # backend on :8080 (set JWT_SECRET, COOKIE_SECURE=false)
+make dev-fe         # Vite on :5173, proxies /api, /oauth and /health to :8080
+```
 
 **Done!** Your full-stack application is now live on the internet, secure, and auto-deploying whenever you push to `main`.
