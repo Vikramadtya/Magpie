@@ -1,3 +1,4 @@
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, PiggyBank } from 'lucide-react';
 import { endOfMonth, format, parseISO, startOfMonth, startOfYear, subMonths } from 'date-fns';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -75,10 +76,10 @@ function Overview({ from, to }: { from: string; to: string }) {
           <FxWarning currencies={[...new Set([...o.missingCurrencies, ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={o.currency} />
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Stat label="Income" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" footer={<><Delta current={o.current.incomeMinor} previous={o.previous.incomeMinor} /> vs previous period</>} />
-            <Stat label="Spending" value={formatMoney(o.current.expenseMinor, o.currency)} tone="expense" footer={<><Delta current={o.current.expenseMinor} previous={o.previous.expenseMinor} inverse /> vs previous period</>} />
-            <Stat label="Saved" value={formatMoney(o.current.savingsMinor, o.currency)} footer={<>{o.current.savingsRatePercent}% of income <Delta current={o.current.savingsMinor} previous={o.previous.savingsMinor} /></>} />
-            <Stat label="Average per day" value={formatMoney(o.current.avgPerDayMinor, o.currency)} footer={<>{o.current.expenseCount} {o.current.expenseCount === 1 ? 'purchase' : 'purchases'} <Delta current={o.current.avgPerDayMinor} previous={o.previous.avgPerDayMinor} inverse /></>} />
+            <Stat icon={<ArrowDownLeft className="w-4 h-4" />} label="Income" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" footer={<><Delta current={o.current.incomeMinor} previous={o.previous.incomeMinor} /> vs previous period</>} />
+            <Stat icon={<ArrowUpRight className="w-4 h-4" />} label="Spending" value={formatMoney(o.current.expenseMinor, o.currency)} tone="expense" footer={<><Delta current={o.current.expenseMinor} previous={o.previous.expenseMinor} inverse /> vs previous period</>} />
+            <Stat icon={<PiggyBank className="w-4 h-4" />} label="Saved" value={formatMoney(o.current.savingsMinor, o.currency)} footer={<>{o.current.savingsRatePercent}% of income <Delta current={o.current.savingsMinor} previous={o.previous.savingsMinor} /></>} />
+            <Stat icon={<CalendarDays className="w-4 h-4" />} label="Average per day" value={formatMoney(o.current.avgPerDayMinor, o.currency)} footer={<>{o.current.expenseCount} {o.current.expenseCount === 1 ? 'purchase' : 'purchases'} <Delta current={o.current.avgPerDayMinor} previous={o.previous.avgPerDayMinor} inverse /></>} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">

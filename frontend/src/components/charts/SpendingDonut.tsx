@@ -1,3 +1,4 @@
+import { TOOLTIP_STYLE } from '../../lib/chart';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { CategorySpend } from '../../api/types';
 import { formatMoney } from '../../lib/money';
@@ -14,7 +15,7 @@ export default function SpendingDonut({ items, currency }: { items: CategorySpen
           </Pie>
           <Tooltip
             formatter={(v, name) => [formatMoney(Number(v), currency), name]}
-            contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 8 }}
+            contentStyle={TOOLTIP_STYLE}
           />
         </PieChart>
       </ResponsiveContainer>

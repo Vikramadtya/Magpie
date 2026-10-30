@@ -1,4 +1,4 @@
-import { Banknote, CalendarClock, Inbox, Lightbulb, PiggyBank, TrendingUp } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, Inbox, Lightbulb, PiggyBank, TrendingUp } from 'lucide-react';
 import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Dashboard } from '../api/types';
@@ -52,8 +52,8 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <NetWorthHero d={d} points={worth.data?.items.map((p) => p.netWorthMinor) ?? []} />
-              <Stat label="Income" value={formatMoney(d.incomeMinor, d.currency)} tone="income" footer={<><Delta current={d.incomeMinor} previous={d.previousIncomeMinor} /> vs last month</>} />
-              <Stat label="Spending" value={formatMoney(d.expenseMinor, d.currency)} tone="expense" footer={<><Delta current={d.expenseMinor} previous={d.previousExpenseMinor} inverse /> vs last month</>} />
+              <Stat icon={<ArrowDownLeft className="w-4 h-4" />} label="Income" value={formatMoney(d.incomeMinor, d.currency)} tone="income" footer={<><Delta current={d.incomeMinor} previous={d.previousIncomeMinor} /> vs last month</>} />
+              <Stat icon={<ArrowUpRight className="w-4 h-4" />} label="Spending" value={formatMoney(d.expenseMinor, d.currency)} tone="expense" footer={<><Delta current={d.expenseMinor} previous={d.previousExpenseMinor} inverse /> vs last month</>} />
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
@@ -114,11 +114,11 @@ export default function DashboardPage() {
 
 function NetWorthHero({ d, points }: { d: Dashboard; points: number[] }) {
   return (
-    <div className="glass-panel p-5 col-span-2 flex flex-col">
-      <p className="text-xs font-medium text-secondary">Net worth</p>
-      <p className="text-3xl font-bold mt-1 tabular-nums tracking-tight">{formatMoney(d.netWorthMinor, d.currency)}</p>
-      <p className="text-xs text-secondary mt-1 flex items-center gap-1.5 flex-wrap">
-        {points.length > 1 && <><Delta current={points[points.length - 1]} previous={points[0]} /> over 6 months · </>}
+    <div className="hero-card p-6 col-span-2 flex flex-col">
+      <p className="text-[13px] font-medium text-white/60">Net worth</p>
+      <p className="text-4xl font-semibold mt-1.5 tabular-nums tracking-[-0.03em]">{formatMoney(d.netWorthMinor, d.currency)}</p>
+      <p className="text-xs text-white/60 mt-2 flex items-center gap-1.5 flex-wrap">
+        {points.length > 1 && <><Delta onDark current={points[points.length - 1]} previous={points[0]} /> over 6 months · </>}
         Assets {formatMoney(d.assetsMinor, d.currency)} · Debts {formatMoney(Math.abs(d.liabilitiesMinor), d.currency)}
       </p>
       <div className="mt-auto pt-3">
@@ -224,7 +224,7 @@ function TopCategories({ d }: { d: Dashboard }) {
                 <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: c.color ?? paletteColor(i) }} />{c.name}</span>
                 <span className="tabular-nums text-secondary">{formatMoney(c.totalMinor, d.currency)}</span>
               </div>
-              <ProgressBar tone="accent" value={(c.totalMinor / max) * 100} label={c.name} />
+              <ProgressBar tone="accent" color={c.color ?? paletteColor(i)} value={(c.totalMinor / max) * 100} label={c.name} />
             </li>
           ))}
         </ul>

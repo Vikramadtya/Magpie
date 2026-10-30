@@ -1,4 +1,4 @@
-import { Pencil, Plus, Share2, Trash2, X } from 'lucide-react';
+import { Banknote, CreditCard, Landmark, Pencil, PiggyBank, Plus, Share2, Trash2, TrendingUp, Wallet, X, type LucideIcon } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Account, AccountType } from '../api/types';
@@ -18,6 +18,10 @@ import { CURRENCIES, parseSignedMoney, toInputValue } from '../lib/money';
 
 const TYPE_LABELS: Record<AccountType, string> = {
   CHECKING: 'Checking', SAVINGS: 'Savings', CREDIT_CARD: 'Credit card', CASH: 'Cash', LOAN: 'Loan', INVESTMENT: 'Investment', OTHER: 'Other',
+};
+
+const TYPE_ICONS: Record<AccountType, LucideIcon> = {
+  CHECKING: Landmark, SAVINGS: PiggyBank, CREDIT_CARD: CreditCard, CASH: Wallet, LOAN: Banknote, INVESTMENT: TrendingUp, OTHER: Wallet,
 };
 
 export default function AccountsPage() {
@@ -53,15 +57,19 @@ export default function AccountsPage() {
         <div className="space-y-6">
           {groups.map((g) => (
             <section key={g.type}>
-              <h2 className="text-sm font-semibold text-secondary mb-2">{TYPE_LABELS[g.type]}</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-secondary mb-3">{TYPE_LABELS[g.type]}</h2>
               <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {g.items.map((a) => (
-                  <li key={a.id} className="glass-panel p-4 group">
+                  <li key={a.id} className="glass-panel p-5 group">
                     <button className="w-full text-left" onClick={() => navigate(`/transactions?account=${a.id}`)}>
-                      <p className="font-medium truncate">{a.name}</p>
-                      <p className="text-2xl font-bold mt-1 tabular-nums"><Amount minor={a.balanceMinor} currency={a.currency} /></p>
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">{(() => { const Icon = TYPE_ICONS[a.type]; return <Icon className="w-[18px] h-[18px]" />; })()}</span>
+                        <p className="font-medium truncate flex-1">{a.name}</p>
+                        <span className="text-[11px] font-medium text-secondary border border-border rounded-full px-2 py-0.5">{a.currency}</span>
+                      </div>
+                      <p className="text-[26px] leading-tight font-semibold mt-4 tabular-nums tracking-[-0.025em]"><Amount minor={a.balanceMinor} currency={a.currency} /></p>
                       {a.memo && <p className="text-[11px] text-accent mt-0.5">{a.shareStatus === 'ACTIVE' ? 'Lent to you · not in your net worth' : 'No longer shared with you'}</p>}
-                      <p className="text-xs text-secondary mt-0.5">{a.currency}{a.currency !== baseCurrency ? ` · converted to ${baseCurrency} in reports` : ''}</p>
+                      {a.currency !== baseCurrency && <p className="text-xs text-secondary mt-1">Converted to {baseCurrency} in reports</p>}
                     </button>
                     {canEdit && (
                       <div className="flex gap-1 mt-3 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">

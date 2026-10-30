@@ -35,7 +35,7 @@ function Shell() {
       {/* Desktop sidebar / mobile drawer */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-[260px] border-r border-border bg-sidebar flex flex-col pt-6 pb-4 transition-transform md:static md:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 w-[256px] border-r border-border bg-sidebar flex flex-col pt-6 pb-4 transition-transform md:static md:translate-x-0',
           menuOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -56,8 +56,8 @@ function Shell() {
             <WifiOff className="w-3.5 h-3.5" /> You're offline. Showing saved data; changes need a connection.
           </div>
         )}
-        <main id="main" className="flex-1 overflow-y-auto">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10">
+        <main id="main" className="flex-1 overflow-y-auto page-glow">
+          <div key={location.pathname} className="page-enter w-full max-w-[1180px] mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-12">
             <InvitationBanner />
             <ErrorBoundary>
               <Suspense fallback={<div className="space-y-3"><Skeleton className="h-10 w-48" /><Skeleton className="h-40" /></div>}>
@@ -121,7 +121,7 @@ function SidebarContent() {
                 to={item.path}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-3 px-3 py-1.5 text-[14px] font-medium rounded-lg transition-colors',
+                    'flex items-center gap-3 px-3 py-[7px] text-[14px] font-medium rounded-lg transition-colors',
                     isActive ? 'bg-accent/10 text-accent' : 'text-primary/80 hover:bg-black/5 dark:hover:bg-white/5',
                   )
                 }
@@ -138,10 +138,16 @@ function SidebarContent() {
       </nav>
 
       <div className="px-4 mt-3 pt-3 border-t border-border">
-        <p className="px-3 text-xs text-secondary truncate mb-1" title={user?.email}>{user?.email}</p>
-        <button onClick={() => void logout()} className="w-full flex items-center gap-3 px-3 py-1.5 text-[14px] font-medium rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
-          <LogOut className="w-[18px] h-[18px] text-secondary" /> Log out
-        </button>
+        <div className="flex items-center gap-3 px-2 py-1">
+          <span className="w-8 h-8 rounded-full bg-accent/15 text-accent text-sm font-semibold flex items-center justify-center shrink-0" aria-hidden>{(user?.name || user?.email || '?').charAt(0).toUpperCase()}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium truncate">{user?.name || 'Account'}</p>
+            <p className="text-xs text-secondary truncate" title={user?.email}>{user?.email}</p>
+          </div>
+          <button onClick={() => void logout()} aria-label="Log out" title="Log out" className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-black/5 dark:hover:bg-white/10">
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </>
   );
@@ -154,12 +160,12 @@ function AddButton({ compact }: { compact?: boolean }) {
       onClick={() => dialog.open()}
       aria-label="Add transaction"
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-accent text-white font-medium shadow-sm hover:opacity-90',
-        compact ? 'h-9 w-9' : 'w-full h-10 text-sm',
+        'inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-background font-medium shadow-[0_1px_2px_rgb(0_0_0/0.25),inset_0_1px_0_rgb(255_255_255/0.14)] hover:opacity-90 active:scale-[0.98] transition-all',
+        compact ? 'h-9 w-9' : 'w-full h-11 text-sm',
       )}
     >
       <Plus className="w-4 h-4" />
-      {!compact && <>Add transaction <kbd className="ml-auto mr-1 text-[10px] opacity-70">N</kbd></>}
+      {!compact && <>Add transaction <kbd className="ml-auto mr-1 text-[10px] font-medium opacity-60 border border-current/30 rounded px-1">N</kbd></>}
     </button>
   );
 }

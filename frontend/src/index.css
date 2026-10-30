@@ -6,30 +6,40 @@
 
 @layer base {
   :root {
-    --bg-main: #FFFFFF;
-    --bg-sidebar: #F9F9FB;
-    --bg-surface: #FFFFFF;
-    --text-primary: #1C1C1E;
-    --text-secondary: #8E8E93;
-    --accent-blue: #0A84FF;
-    --border-color: #E5E5EA;
-    --sidebar-width: 260px;
-    
-    /* Native macOS inspired shadows for light mode */
-    --shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+    --bg-rgb: 246 246 243;
+    --sidebar-rgb: 251 251 249;
+    --surface-rgb: 255 255 255;
+    --text-rgb: 17 19 24;
+    --muted-rgb: 107 112 128;
+    --accent-rgb: 74 91 240;
+    --border-rgb: 231 231 226;
+
+    --bg-main: rgb(var(--bg-rgb));
+    --bg-sidebar: rgb(var(--sidebar-rgb));
+    --bg-surface: rgb(var(--surface-rgb));
+    --text-primary: rgb(var(--text-rgb));
+    --text-secondary: rgb(var(--muted-rgb));
+    --accent-blue: rgb(var(--accent-rgb));
+    --border-color: rgb(var(--border-rgb));
+    --sidebar-width: 256px;
+
+    /* Hairline border plus two soft, layered shadows: depth without heaviness. */
+    --shadow-card: 0 0 0 1px rgb(17 19 24 / 0.03), 0 1px 2px rgb(17 19 24 / 0.04), 0 8px 24px -12px rgb(17 19 24 / 0.08);
+    --shadow-lift: 0 0 0 1px rgb(17 19 24 / 0.04), 0 2px 4px rgb(17 19 24 / 0.05), 0 16px 32px -14px rgb(17 19 24 / 0.16);
+    --shadow-surface: var(--shadow-card);
   }
 
   .dark {
-    --bg-main: #1C1C1E;
-    --bg-sidebar: #2C2C2E;
-    --bg-surface: #2C2C2E;
-    --text-primary: #FFFFFF;
-    --text-secondary: #98989D;
-    --accent-blue: #0A84FF;
-    --border-color: #3A3A3C;
-    
-    /* Dark mode shadow */
-    --shadow-surface: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
+    --bg-rgb: 10 11 14;
+    --sidebar-rgb: 14 16 20;
+    --surface-rgb: 20 22 27;
+    --text-rgb: 243 244 246;
+    --muted-rgb: 139 144 160;
+    --accent-rgb: 124 140 255;
+    --border-rgb: 34 37 44;
+
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.03), 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -12px rgb(0 0 0 / 0.6);
+    --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.05), 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px -14px rgb(0 0 0 / 0.8);
   }
 }
 
@@ -39,13 +49,20 @@
   padding: 0;
 }
 
+html {
+  /* Optical sizing and tidy figures: Inter's alternate digits and tabular numbers. */
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--text-primary);
   background-color: var(--bg-main);
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.006em;
 }
 
 #root {
@@ -54,20 +71,65 @@ body {
   width: 100vw;
 }
 
-/* Base custom utilities */
+::selection { background: rgb(var(--accent-rgb) / 0.2); }
+
+/* Surfaces */
 .glass-panel {
   background-color: var(--bg-surface);
-  box-shadow: var(--shadow-surface);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 18px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 a.glass-panel:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), 0 6px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-1px);
+}
+
+/* A quiet glow behind the content so the page does not feel flat. */
+.page-glow {
+  background:
+    radial-gradient(900px 360px at 85% -80px, rgb(var(--accent-rgb) / 0.07), transparent 70%),
+    var(--bg-main);
+}
+
+/* The hero card: always dark, with a soft light from one corner. */
+.hero-card {
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 20px;
+  background:
+    radial-gradient(520px 220px at 100% 0%, rgb(var(--accent-rgb) / 0.5), transparent 65%),
+    radial-gradient(380px 200px at 0% 100%, rgb(52 211 153 / 0.18), transparent 70%),
+    linear-gradient(160deg, #1b1e2b 0%, #0e1018 100%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 20px 40px -20px rgb(20 24 60 / 0.55);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 button, a { -webkit-tap-highlight-color: transparent; }
+
+/* Entry motion for pages; skipped for people who ask for less movement. */
+.page-enter { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(var(--text-rgb) / 0.06);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(var(--text-rgb) / 0.06), transparent);
+  animation: shimmer 1.4s infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
@@ -75,9 +137,3 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* Slim scrollbars that stay out of the way */
 * { scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
-
-.text-gradient {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #32D74B 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}

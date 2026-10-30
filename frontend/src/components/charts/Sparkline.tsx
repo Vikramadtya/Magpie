@@ -9,12 +9,12 @@ export default function Sparkline({ values }: { values: number[] }) {
         <AreaChart data={data} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
           <defs>
             <linearGradient id="spark" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent-blue)" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="var(--accent-blue)" stopOpacity={0} />
+              <stop offset="0%" stopColor="#A5B4FF" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="#A5B4FF" stopOpacity={0} />
             </linearGradient>
           </defs>
           <YAxis hide domain={['dataMin', 'dataMax']} />
-          <Area type="monotone" dataKey="v" stroke="var(--accent-blue)" strokeWidth={2} fill="url(#spark)" isAnimationActive={false} />
+          <Area type="monotone" dataKey="v" stroke="#C7D2FF" strokeWidth={2.25} fill="url(#spark)" isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
