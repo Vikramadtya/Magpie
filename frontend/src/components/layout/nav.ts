@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane, Inbox,
+  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane, Inbox, Users,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -9,6 +9,7 @@ export const NAV_ITEMS = [
   { path: '/accounts', label: 'Accounts', icon: Wallet },
   { path: '/budgets', label: 'Budgets', icon: PiggyBank },
   { path: '/trips', label: 'Trips', icon: Plane },
+  { path: '/household', label: 'Household', icon: Users },
   { path: '/goals', label: 'Goals', icon: Target },
   { path: '/recurring', label: 'Recurring', icon: Repeat },
   { path: '/loans', label: 'Loans', icon: Banknote },

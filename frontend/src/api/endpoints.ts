@@ -199,3 +199,22 @@ export const connectionsApi = {
   create: (ws: string, name: string) => api.post<{ token: T.ApiToken; secret: string }>(ws, '/api-tokens', { name }),
   revoke: (ws: string, id: string) => api.del(ws, `/api-tokens/${id}`),
 };
+
+const households = '/api/v1/households';
+export const householdsApi = {
+  list: () => http.get<T.Household[]>(households).then((r) => r.data),
+  create: (name: string) => http.post<T.Household>(households, { name }).then((r) => r.data),
+  invite: (id: string, email: string) => http.post(`${households}/${id}/members`, { email }).then(() => undefined),
+  accept: (id: string) => http.post(`${households}/${id}/accept`, {}).then(() => undefined),
+  leave: (id: string) => http.post(`${households}/${id}/leave`, {}).then(() => undefined),
+  remove: (id: string, memberId: string) => http.delete(`${households}/${id}/members/${memberId}`).then(() => undefined),
+  sharing: (id: string, b: { spending: boolean; netWorth: boolean; investments: boolean }) =>
+    http.put(`${households}/${id}/sharing`, b).then(() => undefined),
+  setBudget: (id: string, categoryName: string, amountMinor: number) =>
+    http.put(`${households}/${id}/budgets`, { categoryName, amountMinor }).then(() => undefined),
+  removeBudget: (id: string, categoryName: string) =>
+    http.delete(`${households}/${id}/budgets`, { params: { categoryName } }).then(() => undefined),
+  summary: (id: string, month: string) => http.get<T.HouseholdSummary>(`${households}/${id}/summary`, { params: { month } }).then((r) => r.data),
+  trips: (id: string) => http.get<T.HouseholdTrip[]>(`${households}/${id}/trips`).then((r) => r.data),
+  wealth: (id: string) => http.get<T.HouseholdWealth>(`${households}/${id}/wealth`).then((r) => r.data),
+};

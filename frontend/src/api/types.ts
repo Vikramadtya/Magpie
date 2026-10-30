@@ -192,3 +192,25 @@ export interface InboxItem {
 }
 export interface AcceptInput { accountId?: string | null; categoryId?: string | null; tripId?: string | null; noTrip?: boolean; accountAmountMinor?: number | null }
 export interface ApiToken { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }
+
+export interface HouseholdMember {
+  id: string; name: string; email: string; status: 'ACTIVE' | 'PENDING'; me: boolean;
+  shareSpending: boolean; shareNetWorth: boolean; shareInvestments: boolean;
+}
+export interface Household {
+  id: string; name: string; currency: string; myStatus: 'ACTIVE' | 'PENDING'; createdByMe: boolean; members: HouseholdMember[];
+}
+export interface MemberAmount { memberId: string; name: string; amountMinor: number }
+export interface HouseholdSummary {
+  month: string; currency: string; spentMinor: number; byMember: MemberAmount[];
+  categories: { name: string; totalMinor: number; byMember: MemberAmount[] }[];
+  budgets: { categoryName: string; amountMinor: number; spentMinor: number; remainingMinor: number }[];
+  notSharing: string[]; missingCurrencies: string[];
+}
+export interface HouseholdTrip { name: string; startDate: string; endDate: string; totalMinor: number; byMember: MemberAmount[] }
+export interface HouseholdWealth {
+  currency: string; netWorthMinor: number; netWorthByMember: MemberAmount[];
+  investmentValueMinor: number; investmentCostMinor: number;
+  holdings: { owner: string; symbol: string; name: string; valueMinor: number; costMinor: number }[];
+  notSharingNetWorth: string[]; notSharingInvestments: string[]; missingCurrencies: string[];
+}
