@@ -16,7 +16,24 @@ export function useFxQuote(amountMinor: number | null, from: string, to: string)
 
 export function useDashboard(month: string) {
   const { id } = useWorkspace();
-  return useQuery({ queryKey: qk.dashboard(id, month), queryFn: () => insightsApi.dashboard(id, month) });
+  return useQuery({
+    queryKey: qk.dashboard(id, month),
+    queryFn: () => insightsApi.dashboard(id, month),
+    // Older cached or not-yet-deployed responses may lack the newer fields; fill them so the page never breaks.
+    select: (d) => ({
+      ...d,
+      previousIncomeMinor: d.previousIncomeMinor ?? 0,
+      previousExpenseMinor: d.previousExpenseMinor ?? 0,
+      spentByOthers: d.spentByOthers ?? [],
+      topCategories: d.topCategories ?? [],
+      dailySpend: d.dailySpend ?? [],
+      previousDailySpend: d.previousDailySpend ?? [],
+      accounts: d.accounts ?? [],
+      recent: d.recent ?? [],
+      upcoming: d.upcoming ?? [],
+      missingCurrencies: d.missingCurrencies ?? [],
+    }),
+  });
 }
 
 export function useSpending(from: string, to: string) {
