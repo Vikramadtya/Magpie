@@ -1,0 +1,294 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { createContext, useCallback, useContext, type ReactNode } from 'react';
+import { toast } from 'sonner';
+import { payeesApi } from '../../api/endpoints';
+import type { Category, Transaction, TxType } from '../../api/types';
+import { useWorkspace } from '../../auth/AuthProvider';
+import { Button } from '../../components/ui/Button';
+import { Field } from '../../components/ui/Field';
+import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import { MoneyInput } from '../../components/ui/MoneyInput';
+import { Select } from '../../components/ui/Select';
+import { today } from '../../lib/dates';
+import { errorMessage } from '../../lib/http';
+import { parseMoney, toInputValue } from '../../lib/money';
+import { cn } from '../../lib/cn';
+import { qk } from '../../hooks/keys';
+import { useAccounts, useCategories, usePayees, useTags } from '../../hooks/useReference';
+import { useCreateTransaction, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
+import { useQueryClient } from '@tanstack/react-query';
+
+interface DialogApi {
+  open: (tx?: Transaction | null, preset?: Partial<{ type: TxType; accountId: string }>) => void;
+}
+const DialogContext = createContext<DialogApi | null>(null);
+
+export function useTransactionDialog() {
+  const ctx = useContext(DialogContext);
+  if (!ctx) throw new Error('useTransactionDialog needs TransactionDialogProvider');
+  return ctx;
+}
+
+export function TransactionDialogProvider({ children }: { children: ReactNode }) {
+  const { canEdit } = useWorkspace();
+  const [state, setState] = useState<{ tx: Transaction | null; preset?: { type?: TxType; accountId?: string } } | null>(null);
+  const open = useCallback<DialogApi['open']>(
+    (tx, preset) => {
+      if (!canEdit) return toast.info('You have view-only access to this workspace');
+      setState({ tx: tx ?? null, preset });
+    },
+    [canEdit],
+  );
+  const api = useMemo(() => ({ open }), [open]);
+  return (
+    <DialogContext.Provider value={api}>
+      {children}
+      {state && <TransactionForm tx={state.tx} preset={state.preset} onClose={() => setState(null)} />}
+    </DialogContext.Provider>
+  );
+}
+
+const LAST_ACCOUNT = 'keeper.lastAccount';
+const readLast = () => {
+  try {
+    return localStorage.getItem(LAST_ACCOUNT) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+interface FormProps {
+  tx: Transaction | null;
+  preset?: { type?: TxType; accountId?: string };
+  onClose: () => void;
+}
+
+function TransactionForm({ tx, preset, onClose }: FormProps) {
+  const { id: ws } = useWorkspace();
+  const qc = useQueryClient();
+  const accounts = (useAccounts().data ?? []).filter((a) => !a.archived);
+  const categories = useCategories().data ?? [];
+  const payees = usePayees().data ?? [];
+  const tags = useTags().data ?? [];
+  const create = useCreateTransaction();
+  const update = useUpdateTransaction();
+  const transfer = useTransfer();
+
+  const editing = tx !== null;
+  const isTransferLeg = tx?.type === 'TRANSFER';
+  const [type, setType] = useState<TxType>(tx?.type ?? preset?.type ?? 'EXPENSE');
+  const [accountId, setAccountId] = useState(tx?.accountId ?? preset?.accountId ?? readLast());
+  const [toAccountId, setToAccountId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [destAmount, setDestAmount] = useState('');
+  const [date, setDate] = useState(tx?.occurredOn ?? today());
+  const [categoryId, setCategoryId] = useState(tx?.categoryId ?? '');
+  const [payeeName, setPayeeName] = useState(tx?.payeeName ?? '');
+  const [note, setNote] = useState(tx?.note ?? '');
+  const [tagIds, setTagIds] = useState<string[]>(tx?.tagIds ?? []);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  // One key per dialog session: a retried submit can never create a duplicate.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+
+  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const toAccount = accounts.find((a) => a.id === toAccountId);
+  const currency = tx?.currency ?? account?.currency ?? 'USD';
+  const crossCurrency = type === 'TRANSFER' && !!toAccount && !!account && toAccount.currency !== account.currency;
+
+  useEffect(() => {
+    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
+  }, [accounts, accountId]);
+
+  useEffect(() => {
+    if (tx) setAmount(toInputValue(tx.amountMinor, tx.currency));
+  }, [tx]);
+
+  const kind = type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  const categoryOptions = useMemo(() => groupCategories(categories, kind), [categories, kind]);
+
+  const onPayeeChange = (name: string) => {
+    setPayeeName(name);
+    const known = payees.find((p) => p.name.toLowerCase() === name.trim().toLowerCase());
+    if (known?.defaultCategoryId && !categoryId) setCategoryId(known.defaultCategoryId);
+  };
+
+  const submit = async (e: FormEvent, addAnother = false) => {
+    e.preventDefault();
+    const next: Record<string, string> = {};
+    const amountMinor = parseMoney(amount, currency);
+    if (!amountMinor || amountMinor <= 0) next.amount = 'Enter an amount greater than zero';
+    if (!accountId) next.account = 'Choose an account';
+    if (type === 'TRANSFER' && !editing) {
+      if (!toAccountId) next.toAccount = 'Choose a destination';
+      else if (toAccountId === accountId) next.toAccount = 'Pick a different account';
+    }
+    const destMinor = crossCurrency ? parseMoney(destAmount, toAccount!.currency) : null;
+    if (crossCurrency && (!destMinor || destMinor <= 0)) next.destAmount = 'Enter the received amount';
+    if (!date) next.date = 'Pick a date';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setSaving(true);
+    try {
+      localStorage.setItem(LAST_ACCOUNT, accountId);
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (type === 'TRANSFER' && !editing) {
+        await transfer.mutateAsync({
+          key: idempotencyKey,
+          input: { fromAccountId: accountId, toAccountId, amountMinor: amountMinor!, destAmountMinor: destMinor, occurredOn: date, note: note || null },
+        });
+      } else {
+        let payeeId: string | null = null;
+        if (payeeName.trim() && !isTransferLeg) {
+          const known = payees.find((p) => p.name.toLowerCase() === payeeName.trim().toLowerCase());
+          payeeId = known?.id ?? (await payeesApi.create(ws, payeeName.trim())).id;
+          if (!known) void qc.invalidateQueries({ queryKey: qk.payees(ws) });
+        }
+        const input = {
+          accountId, type: (type === 'INCOME' ? 'INCOME' : 'EXPENSE') as 'INCOME' | 'EXPENSE', amountMinor: amountMinor!,
+          occurredOn: date, categoryId: categoryId || null, payeeId, note: note || null, tagIds,
+        };
+        if (editing) await update.mutateAsync({ tx: tx!, input });
+        else create.mutate({ input, key: idempotencyKey }); // optimistic: don't wait for the server
+      }
+      if (addAnother && !editing) {
+        setAmount('');
+        setNote('');
+        setDestAmount('');
+        setIdempotencyKey(crypto.randomUUID());
+        toast.success('Saved');
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedTags = new Set(tagIds);
+
+  return (
+    <Modal isOpen onClose={onClose} title={editing ? 'Edit transaction' : 'Add transaction'}>
+      <form onSubmit={(e) => submit(e)} className="space-y-4" onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && void submit(e as unknown as FormEvent)}>
+        {!editing && (
+          <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-black/5 dark:bg-white/10" role="tablist">
+            {(['EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={type === t}
+                onClick={() => {
+                  setType(t);
+                  setCategoryId('');
+                }}
+                className={cn('py-1.5 text-sm font-medium rounded-md transition-colors', type === t ? 'bg-surface shadow-sm' : 'text-secondary')}
+              >
+                {t[0] + t.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Amount" error={errors.amount}>
+            <MoneyInput autoFocus value={amount} currency={currency} onChange={setAmount} disabled={isTransferLeg} aria-label="Amount" />
+          </Field>
+          <Field label="Date" error={errors.date}>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label={type === 'TRANSFER' ? 'From account' : 'Account'} error={errors.account}>
+          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)} disabled={isTransferLeg}>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
+            ))}
+          </Select>
+        </Field>
+
+        {type === 'TRANSFER' && !editing && (
+          <>
+            <Field label="To account" error={errors.toAccount}>
+              <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+                <option value="">Select…</option>
+                {accounts.filter((a) => a.id !== accountId).map((a) => (
+                  <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
+                ))}
+              </Select>
+            </Field>
+            {crossCurrency && (
+              <Field label={`Amount received (${toAccount!.currency})`} error={errors.destAmount}>
+                <MoneyInput value={destAmount} currency={toAccount!.currency} onChange={setDestAmount} />
+              </Field>
+            )}
+          </>
+        )}
+
+        {type !== 'TRANSFER' && (
+          <>
+            <Field label="Payee">
+              <Input list="payee-options" value={payeeName} onChange={(e) => onPayeeChange(e.target.value)} placeholder="Who was it?" maxLength={160} />
+              <datalist id="payee-options">
+                {payees.map((p) => <option key={p.id} value={p.name} />)}
+              </datalist>
+            </Field>
+            <Field label="Category">
+              <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                <option value="">Uncategorized</option>
+                {categoryOptions.map((g) => (
+                  <optgroup key={g.parent.id} label={`${g.parent.icon ?? ''} ${g.parent.name}`.trim()}>
+                    <option value={g.parent.id}>{g.parent.name}</option>
+                    {g.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                ))}
+              </Select>
+            </Field>
+            {tags.length > 0 && (
+              <Field label="Tags">
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((t) => (
+                    <button
+                      type="button"
+                      key={t.id}
+                      aria-pressed={selectedTags.has(t.id)}
+                      onClick={() => setTagIds(selectedTags.has(t.id) ? tagIds.filter((x) => x !== t.id) : [...tagIds, t.id])}
+                      className={cn('px-2.5 py-1 rounded-full text-xs border', selectedTags.has(t.id) ? 'bg-accent text-white border-accent' : 'border-border text-secondary')}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
+          </>
+        )}
+
+        <Field label="Note">
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" maxLength={1000} />
+        </Field>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          {!editing && <Button type="button" variant="secondary" disabled={saving} onClick={(e) => submit(e as unknown as FormEvent, true)}>Save & add another</Button>}
+          <Button type="submit" disabled={saving}>{editing ? 'Save changes' : 'Save'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Parents with their children, for one kind (income/expense). */
+export function groupCategories(all: Category[], kind: 'INCOME' | 'EXPENSE') {
+  const ofKind = all.filter((c) => c.kind === kind);
+  return ofKind
+    .filter((c) => !c.parentId)
+    .map((parent) => ({ parent, children: ofKind.filter((c) => c.parentId === parent.id) }));
+}

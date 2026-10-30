@@ -1,33 +1,29 @@
-.PHONY: install dev-be dev-fe dev-mobile api up up-db down clean help
+.PHONY: install dev-be dev-fe test api up up-db down clean help
 
 help:
 	@echo "Keeper Commands:"
-	@echo "  make install    - Install all dependencies (NPM + Maven)"
-	@echo "  make dev-be     - Start Backend (runs tests first)"
-	@echo "  make dev-fe     - Start Web Frontend"
-	@echo "  make dev-mobile - Start Mobile App"
-	@echo "  make api        - Generate API Client"
-	@echo "  make up         - Start all services in Docker"
-	@echo "  make up-db      - Start ONLY Database in Docker"
-	@echo "  make down       - Stop all Docker containers"
-	@echo "  make clean      - Stop containers and wipe database"
+	@echo "  make install  - Install frontend (npm) and backend (Maven) dependencies"
+	@echo "  make dev-be   - Start the backend on :8080 (needs JWT_SECRET, COOKIE_SECURE=false)"
+	@echo "  make dev-fe   - Start the web frontend on :5173"
+	@echo "  make test     - Run backend and frontend tests"
+	@echo "  make up       - Start all services in Docker"
+	@echo "  make up-db    - Start ONLY the database in Docker"
+	@echo "  make down     - Stop all Docker containers"
+	@echo "  make clean    - Stop containers and wipe the database"
 
 install:
-	npm install
-	cd backend && ./mvnw clean install
+	cd frontend && npm install
+	cd backend && ./mvnw clean install -DskipTests
 
 dev-be:
-	cd backend && ./mvnw test && MICRONAUT_ENVIRONMENTS=dev ./mvnw mn:run
+	cd backend && MICRONAUT_ENVIRONMENTS=dev ./mvnw mn:run
 
 dev-fe:
-	npm run dev --workspace=web
+	cd frontend && npm run dev
 
-dev-mobile:
-	cd apps/mobile && npm run start
-
-api:
-	cd backend && ./mvnw clean compile
-	cd frontend-shared/api-client && npm run generate
+test:
+	cd backend && ./mvnw verify
+	cd frontend && npm test
 
 up:
 	docker-compose up -d

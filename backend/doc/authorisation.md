@@ -1,34 +1,21 @@
 # Authorisation Architecture
 
-Keeper utilizes stateless JWT (JSON Web Tokens) combined with Micronaut Security for robust, highly-scalable authentication.
+## Tokens
+- **Access token**: JWT, 15 minutes, kept **in memory** by the SPA and sent as `Authorization: Bearer`.
+- **Refresh token**: random 256-bit value in an `HttpOnly; SameSite=Lax` cookie scoped to `/api/v1/auth`. Stored only as a SHA-256 hash, **single use** and rotated on every refresh. Reusing an old token revokes the whole token family (theft detection).
+- Google sign-in sets the same refresh cookie and redirects to `/auth/callback`; no token is ever placed in a URL.
 
-## Security Flow
+## Tenant isolation
+Every `/api/v1/workspaces/{id}/...` request passes `WorkspaceAccessFilter`, the single choke point:
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant App as Frontend (React)
-    participant Auth as AuthController
-    participant Google as Google OAuth2
-    participant JWT as Micronaut Security
-    
-    User->>App: Clicks "Login with Google"
-    App->>Google: Authenticates
-    Google-->>App: Returns OAuth Token
-    App->>Auth: POST /auth/google {token}
-    Auth->>Google: Validates Token Signature
-    Auth->>Auth: Finds/Creates User Account
-    Auth->>JWT: Generates JWT Access & Refresh Tokens
-    JWT-->>App: Returns {accessToken, refreshToken}
-    
-    Note over User, JWT: Subsequent API Requests
-    App->>Auth: GET /api/transactions (Header: Bearer {accessToken})
-    JWT->>JWT: Validates Signature & Expiry
-    JWT-->>Auth: Injects Authenticated User Context
-    Auth-->>App: Returns 200 OK (Data)
-```
+| Caller | Result |
+|---|---|
+| Not a member | `404` (ids cannot be probed) |
+| `VIEWER` | read (`GET`) only |
+| `EDITOR` | read + write data |
+| `OWNER` | also members, invites, rename/delete workspace |
 
-## Implementation Details
-- **Token Storage**: The client stores the JWT (preferably in `HttpOnly` cookies for maximum XSS protection, or memory/local storage).
-- **Workspace Isolation**: Every user owns a `Workspace`. Every API request inherently includes the `Workspace ID` which the `SecurityRule` checks against the authenticated user's allowed workspaces to prevent Broken Object Level Authorization (BOLA).
-- **Configuration**: Managed in `application.yml` under `micronaut.security`.
+Membership is cached for 30 s and evicted when roles change. As a second layer, every repository query is scoped by `workspace_id`, and `RefChecks` rejects references (account, category, payee, tag) that belong to another workspace.
+
+## Other protections
+Bean validation on every request body, per-IP rate limits (auth 10/min, writes 240/min), security headers on all responses, RFC 7807 errors without stack traces, idempotency keys on create endpoints, optimistic locking (`version`) on transactions.

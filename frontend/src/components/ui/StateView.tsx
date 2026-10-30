@@ -1,65 +1,62 @@
-import { AlertCircle, RefreshCw, Loader2, FileX } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { AlertCircle, FileX, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Button } from './Button';
+import { cn } from '../../lib/cn';
 
-interface StateViewProps {
-  state: string;
-  error?: string | null;
-  onRetry?: () => void;
-  title?: string;
-  description?: string;
-  className?: string;
-  children?: React.ReactNode;
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn('animate-pulse rounded-lg bg-black/5 dark:bg-white/10', className)} />;
 }
 
-export function StateView({ state, error, onRetry, title, description, className, children }: StateViewProps) {
-  if (state === 'success') {
-    return <>{children}</>;
-  }
+interface Props {
+  isLoading: boolean;
+  error?: unknown;
+  isEmpty?: boolean;
+  onRetry?: () => void;
+  emptyTitle?: string;
+  emptyHint?: string;
+  emptyAction?: ReactNode;
+  skeleton?: ReactNode;
+  children: ReactNode;
+}
 
-  if (state === 'loading') {
+/** One place for the loading / error / empty / content states every list screen needs. */
+export function StateView({ isLoading, error, isEmpty, onRetry, emptyTitle, emptyHint, emptyAction, skeleton, children }: Props) {
+  if (isLoading) {
     return (
-      <div className={cn("w-full h-96 flex flex-col items-center justify-center bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-gray-100", className)}>
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-        <h3 className="text-lg font-bold text-gray-900 tracking-tight">Loading data...</h3>
-        <p className="text-gray-500 mt-1 font-medium text-sm">Please wait while we fetch the latest information.</p>
-      </div>
+      <>
+        {skeleton ?? (
+          <div className="space-y-3" aria-busy="true">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+        )}
+      </>
     );
   }
-
-  if (state === 'error') {
+  if (error) {
     return (
-      <div className={cn("w-full h-96 flex flex-col items-center justify-center bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-gray-100 p-8 text-center", className)}>
-        <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 mb-6 shadow-inner">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 tracking-tight mb-2">{title || 'Connection Failed'}</h3>
-        <p className="text-gray-500 font-medium max-w-md mx-auto mb-8">
-          {description || error || 'We were unable to securely connect to the backend server. Please verify your connection or try again.'}
-        </p>
-        
+      <div className="glass-panel p-8 text-center">
+        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
+        <p className="font-medium mb-1">Couldn't load this</p>
+        <p className="text-sm text-secondary mb-4">Check your connection and try again.</p>
         {onRetry && (
-          <button 
-            onClick={onRetry}
-            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Retry Connection
-          </button>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
         )}
       </div>
     );
   }
-
-  // empty state
-  return (
-    <div className={cn("w-full h-96 flex flex-col items-center justify-center bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-gray-100 p-8 text-center", className)}>
-      <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 mb-6 shadow-inner">
-        <FileX className="w-8 h-8" />
+  if (isEmpty) {
+    return (
+      <div className="glass-panel p-10 text-center">
+        <FileX className="w-8 h-8 text-secondary mx-auto mb-3" />
+        <p className="font-medium mb-1">{emptyTitle ?? 'Nothing here yet'}</p>
+        {emptyHint && <p className="text-sm text-secondary mb-4">{emptyHint}</p>}
+        {emptyAction}
       </div>
-      <h3 className="text-xl font-bold text-gray-900 tracking-tight mb-2">{title || 'No Data Found'}</h3>
-      <p className="text-gray-500 font-medium max-w-md mx-auto">
-        {description || "There is no information to display here yet."}
-      </p>
-    </div>
-  );
+    );
+  }
+  return <>{children}</>;
 }

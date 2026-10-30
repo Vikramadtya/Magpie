@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { env } from '../config/env';
+import { env } from '../lib/env';
 
 export function BackendWakeup() {
   const hasStarted = useRef(false);
 
   useEffect(() => {
-    if (hasStarted.current || env.USE_MOCK_API) return;
+    if (hasStarted.current) return;
     hasStarted.current = true;
 
     let toastId: string | number | undefined;

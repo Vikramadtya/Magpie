@@ -44,7 +44,7 @@
 
     <dependency>
       <groupId>io.micronaut.data</groupId>
-      <artifactId>micronaut-data-hibernate-jpa</artifactId>
+      <artifactId>micronaut-data-jdbc</artifactId>
       <scope>compile</scope>
     </dependency>
 
@@ -94,12 +94,6 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
       <scope>runtime</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -170,25 +164,17 @@
       <scope>compile</scope>
     </dependency>
 
-    <!-- Java Money API (JSR 354) implementation -->
-    <dependency>
-      <groupId>org.javamoney</groupId>
-      <artifactId>moneta</artifactId>
-      <version>1.4.4</version>
-      <type>pom</type>
-    </dependency>
-
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>postgresql</artifactId>
       <scope>test</scope>
-      <version>1.19.7</version>
+      <version>1.20.6</version>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
-      <version>1.19.7</version>
+      <version>1.20.6</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -208,13 +194,6 @@
       <artifactId>lombok</artifactId>
       <version>1.18.34</version>
       <scope>provided</scope>
-    </dependency>
-
-    <!-- MapStruct for DTO mapping -->
-    <dependency>
-      <groupId>org.mapstruct</groupId>
-      <artifactId>mapstruct</artifactId>
-      <version>1.5.5.Final</version>
     </dependency>
 
     <!-- RFC 7807 Problem Details -->
@@ -272,40 +251,6 @@
       </plugin>
 
       <plugin>
-        <groupId>org.openapitools</groupId>
-        <artifactId>openapi-generator-maven-plugin</artifactId>
-        <version>7.2.0</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>generate</goal>
-            </goals>
-            <configuration>
-              <inputSpec>${project.basedir}/src/main/resources/keeper-api.yaml</inputSpec>
-              <generatorName>java-micronaut-client</generatorName>
-              <apiPackage>com.keeper.api</apiPackage>
-              <modelPackage>com.keeper.dto</modelPackage>
-              <generateSupportingFiles>false</generateSupportingFiles>
-              <generateApiTests>false</generateApiTests>
-              <generateModelTests>false</generateModelTests>
-              <configOptions>
-                <useJakartaEe>true</useJakartaEe>
-                <generateExamples>false</generateExamples>
-
-                <generateOperationsToReturnNotImplemented>false</generateOperationsToReturnNotImplemented>
-                <reactive>false</reactive>
-                <useAuth>false</useAuth>
-                <useLombok>false</useLombok>
-                <build>maven</build>
-                <introspected>true</introspected>
-                <useOptional>false</useOptional>
-              </configOptions>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
@@ -321,11 +266,6 @@
               <groupId>org.projectlombok</groupId>
               <artifactId>lombok</artifactId>
               <version>1.18.34</version>
-            </path>
-            <path>
-              <groupId>org.mapstruct</groupId>
-              <artifactId>mapstruct-processor</artifactId>
-              <version>1.5.5.Final</version>
             </path>
             <path>
               <groupId>io.micronaut</groupId>
@@ -347,6 +287,17 @@
               <groupId>io.micronaut</groupId>
               <artifactId>micronaut-graal</artifactId>
               <version>${micronaut.core.version}</version>
+            </path>
+            <path>
+              <groupId>io.micronaut.validation</groupId>
+              <artifactId>micronaut-validation-processor</artifactId>
+              <version>${micronaut.validation.version}</version>
+              <exclusions>
+                <exclusion>
+                  <groupId>io.micronaut</groupId>
+                  <artifactId>micronaut-inject</artifactId>
+                </exclusion>
+              </exclusions>
             </path>
             <path>
               <groupId>io.micronaut</groupId>
