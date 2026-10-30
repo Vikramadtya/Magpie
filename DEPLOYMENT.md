@@ -46,7 +46,7 @@ Render will host the Micronaut Java backend and execute Flyway schema migrations
 | `FRONTEND_URL` | *Leave blank for now. We will fill this in Step 3.* |
 | `MICRONAUT_ENVIRONMENTS` | `prod` |
 
-5. Click **Create Web Service**. Wait a few minutes for the Docker container to build and deploy. Once live, copy your Render URL (e.g., `https://keeper-backend.onrender.com`).
+5. Click **Create Web Service**. Wait a few minutes for the Docker container to build and deploy. Once live, copy your Render URL (e.g., `https://magpie-baay.onrender.com`).
 
 ---
 
@@ -60,7 +60,7 @@ Vercel will build and host the React/Vite frontend on their global CDN.
    - **Project Name:** `keeper-app`
    - **Framework Preset:** `Vite` (Vercel should auto-detect this).
    - **Root Directory:** Edit this and select `frontend`.
-4. **Point the rewrites at your backend.** Edit `frontend/vercel.json` and replace `https://keeper-backend.onrender.com` with your Render URL. The browser only ever talks to your Vercel domain; Vercel forwards `/api`, `/oauth` and `/health` to Render. This keeps the HttpOnly refresh-token cookie first-party, so no cross-site cookies or wide-open CORS are needed. Leave `VITE_API_URL` unset.
+4. **Point the rewrites at your backend.** Edit `frontend/vercel.json` and replace `https://magpie-baay.onrender.com` with your Render URL. The browser only ever talks to your Vercel domain; Vercel forwards `/api`, `/oauth` and `/health` to Render. This keeps the HttpOnly refresh-token cookie first-party, so no cross-site cookies or wide-open CORS are needed. Leave `VITE_API_URL` unset.
 5. Click **Deploy**. Vercel will install dependencies, run type-checks, build the static assets, and deploy them.
 6. Once deployed, Vercel will provide you with a live domain (e.g., `https://keeper-app.vercel.app`).
 

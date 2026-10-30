@@ -1,8 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://keeper-backend.onrender.com/api/:path*" },
-    { "source": "/oauth/:path*", "destination": "https://keeper-backend.onrender.com/oauth/:path*" },
-    { "source": "/health", "destination": "https://keeper-backend.onrender.com/health" },
+    { "source": "/api/:path*", "destination": "https://magpie-baay.onrender.com/api/:path*" },
+    { "source": "/oauth/:path*", "destination": "https://magpie-baay.onrender.com/oauth/:path*" },
+    { "source": "/health", "destination": "https://magpie-baay.onrender.com/health" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
