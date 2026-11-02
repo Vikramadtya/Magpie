@@ -1,25 +1,23 @@
-import { Banknote, CalendarDays, Check, Share, X, CloudOff, CreditCard, Landmark, LogOut, PiggyBank, Store, StickyNote, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { Banknote, CalendarDays, Check, CloudOff, CreditCard, KeyRound, Landmark, LogOut, PiggyBank, Share, StickyNote, Store, TrendingUp, Wallet, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Avatar } from '../components/ui/Avatar';
 import { cn } from '../lib/cn';
 import { exponent } from '../lib/money';
+import { looksLikeKey, readKey, takeKeyFromAddress, writeKey } from './key';
 import { enqueue, flush, readOutbox, type Entry } from './outbox';
 
 interface Choices {
-  name: string;
   accounts: { id: string; name: string; type: string; currency: string }[];
   categories: { id: string; name: string; kind: 'INCOME' | 'EXPENSE'; parentId: string | null }[];
 }
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'signed-out'; clientId: string | null; message?: string }
+  | { kind: 'setup'; message?: string }
   | { kind: 'ready'; data: Choices; offline: boolean };
 
 const CACHE = 'keeper.quickadd.choices';
 const LAST_ACCOUNT = 'keeper.quickadd.account';
 const RECENT = 'keeper.quickadd.recent.';
-const HEADERS = { 'Content-Type': 'application/json', 'X-Quickadd': '1' };
 
 const read = (key: string) => {
   try {
@@ -42,27 +40,6 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-interface GoogleId {
-  accounts: { id: { initialize: (o: object) => void; renderButton: (el: HTMLElement, o: object) => void } };
-}
-declare global {
-  interface Window {
-    google?: GoogleId;
-  }
-}
-
-function loadGoogle(): Promise<void> {
-  if (window.google) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Google sign-in could not load'));
-    document.head.appendChild(s);
-  });
-}
-
 export default function QuickAdd() {
   const [state, setState] = useState<State>({ kind: 'loading' });
 
@@ -71,39 +48,48 @@ export default function QuickAdd() {
     setState({ kind: 'ready', data, offline });
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/quickadd/session', { credentials: 'same-origin' });
-      if (res.ok) return adopt((await res.json()) as Choices);
-      if (res.status === 401) {
-        const body = (await res.json().catch(() => ({}))) as { clientId?: string };
-        return setState({ kind: 'signed-out', clientId: body.clientId ?? null });
-      }
-      throw new Error(`HTTP ${res.status}`);
-    } catch {
-      // No connection: the form still works from what this phone remembers.
-      const cached = read(CACHE);
-      if (cached) {
-        try {
-          return setState({ kind: 'ready', data: JSON.parse(cached) as Choices, offline: true });
-        } catch {
-          /* fall through */
+  /** Asks Keeper's always-on endpoint for the accounts and categories this key may use. */
+  const connect = useCallback(
+    async (key: string | null) => {
+      if (!key) return setState({ kind: 'setup' });
+      try {
+        const res = await fetch('/api/quickadd/choices', { headers: { Authorization: `Bearer ${key}` } });
+        if (res.ok) {
+          writeKey(key);
+          return adopt((await res.json()) as Choices);
         }
+        if (res.status === 401) {
+          writeKey(null);
+          write(CACHE, null);
+          return setState({ kind: 'setup', message: 'That key was not accepted. It may have been revoked. Create a new one in Keeper.' });
+        }
+        throw new Error(`HTTP ${res.status}`);
+      } catch {
+        // No connection: the form still works from what this phone remembers.
+        const cached = read(CACHE);
+        if (cached && readKey()) {
+          try {
+            return setState({ kind: 'ready', data: JSON.parse(cached) as Choices, offline: true });
+          } catch {
+            /* fall through */
+          }
+        }
+        setState({ kind: 'setup', message: "Can't reach the server. Connect once to set this page up." });
       }
-      setState({ kind: 'signed-out', clientId: null, message: "Can't reach the server. Connect once to set this page up." });
-    }
-  }, [adopt]);
+    },
+    [adopt],
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void connect(takeKeyFromAddress() ?? readKey());
+  }, [connect]);
 
-  const resync = useCallback(() => void load(), [load]);
+  const resync = useCallback(() => void connect(readKey()), [connect]);
 
-  const signOut = async () => {
-    await fetch('/api/quickadd/session', { method: 'DELETE', credentials: 'same-origin', headers: HEADERS }).catch(() => undefined);
+  const disconnect = () => {
+    writeKey(null);
     write(CACHE, null);
-    void load();
+    setState({ kind: 'setup' });
   };
 
   return (
@@ -115,81 +101,47 @@ export default function QuickAdd() {
             <h1 className="text-base font-semibold tracking-tight">Quick add</h1>
           </div>
           {state.kind === 'ready' && (
-            <button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-full border border-border bg-surface pl-1 pr-3 py-1 text-xs text-secondary shadow-card" aria-label={`Sign out ${state.data.name}`}>
-              <Avatar name={state.data.name || 'You'} size={24} />
-              <LogOut className="w-3.5 h-3.5" />
+            <button type="button" onClick={disconnect} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-secondary shadow-card" aria-label="Disconnect this phone">
+              <LogOut className="w-3.5 h-3.5" /> Disconnect
             </button>
           )}
         </header>
         {state.kind === 'loading' && <div role="status" aria-label="Loading" className="mx-auto mt-24 w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />}
-        {state.kind === 'signed-out' && <SignIn clientId={state.clientId} message={state.message} />}
-        {state.kind === 'ready' && <Form data={state.data} offline={state.offline} onSignedOut={resync} />}
+        {state.kind === 'setup' && <Setup message={state.message} onKey={(k) => void connect(k)} />}
+        {state.kind === 'ready' && <Form data={state.data} offline={state.offline} onBadKey={resync} />}
       </div>
     </main>
   );
 }
 
-const SIGN_IN_PROBLEMS: Record<string, string> = {
-  no_account: 'That Google account has no Keeper account. Sign in to Keeper with Google once first.',
-  failed: 'Google sign-in did not work. Try again.',
-};
-
-/** Why the last sign-in attempt failed, passed back in the address by the sign-in endpoint. */
-function takeSignInProblem(): string | undefined {
-  const code = new URLSearchParams(window.location.search).get('signin');
-  if (!code) return undefined;
-  window.history.replaceState(null, '', window.location.pathname);
-  return SIGN_IN_PROBLEMS[code] ?? SIGN_IN_PROBLEMS.failed;
-}
-
-/** Drops this site's service worker and caches, then reloads, so the newest page is fetched. */
-async function freshStart() {
-  try {
-    const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((registrations ?? []).map((r) => r.unregister()));
-    await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
-  } finally {
-    window.location.reload();
-  }
-}
-
-function SignIn({ clientId, message }: { clientId: string | null; message?: string }) {
-  const [problem] = useState(takeSignInProblem);
-  const slot = useRef<HTMLDivElement>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!clientId) return;
-    let cancelled = false;
-    loadGoogle()
-      .then(() => {
-        if (cancelled || !slot.current || !window.google) return;
-        // Redirect mode: Google sends the browser back with the sign-in, which works on iPhone
-        // Safari and in home-screen apps where pop-up windows do not.
-        window.google.accounts.id.initialize({ client_id: clientId, ux_mode: 'redirect', login_uri: `${window.location.origin}/api/quickadd/session`, auto_select: false });
-        window.google.accounts.id.renderButton(slot.current, { theme: 'outline', size: 'large', shape: 'pill', width: 280, text: 'signin_with' });
-      })
-      .catch(() => setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
-
+/** First visit: the key comes from Keeper's Settings, as a link to open or text to paste. */
+function Setup({ message, onKey }: { message?: string; onKey: (key: string) => void }) {
+  const [text, setText] = useState('');
+  const valid = looksLikeKey(text);
   return (
-    <section className="glass-panel p-7 text-center space-y-5 mt-10">
-      <span className="mx-auto grid place-items-center w-12 h-12 rounded-2xl bg-primary text-background"><Wallet className="w-6 h-6" /></span>
+    <section className="glass-panel p-7 space-y-5 mt-6">
+      <span className="grid place-items-center w-12 h-12 rounded-2xl bg-primary text-background"><KeyRound className="w-6 h-6" /></span>
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Add spending in seconds</h2>
-        <p className="text-sm text-secondary mt-1.5">Sign in with the Google account you use for Keeper. You only do this once on this phone.</p>
+        <h2 className="text-lg font-semibold tracking-tight">Connect this phone</h2>
+        <ol className="mt-2 text-sm text-secondary list-decimal pl-5 space-y-1">
+          <li>In Keeper, open Settings, then Quick add.</li>
+          <li>Create a key and open its setup link on this phone, or paste the key below.</li>
+        </ol>
       </div>
-      {clientId ? <div ref={slot} className="flex justify-center min-h-[44px]" /> : null}
-      {failed && (
-        <div role="alert" className="space-y-3">
-          <p className="text-sm text-red-500">Google sign-in could not load. This is usually an old saved copy of the page or a content blocker.</p>
-          <button type="button" onClick={() => void freshStart()} className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium shadow-card">Clear saved copy and reload</button>
-        </div>
-      )}
-      {(problem ?? message) && <p role="alert" className="text-sm text-red-500">{problem ?? message}</p>}
+      <form onSubmit={(e) => { e.preventDefault(); if (valid) onKey(text.trim()); }} className="space-y-3">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="qak_…"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-label="Quick add key"
+          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base outline-none focus:border-accent"
+        />
+        <button type="submit" disabled={!valid} className="w-full h-12 rounded-xl bg-primary text-background font-semibold disabled:opacity-40">Connect</button>
+      </form>
+      {message && <p role="alert" className="text-sm text-red-500">{message}</p>}
     </section>
   );
 }
@@ -240,7 +192,7 @@ function InstallTip() {
   );
 }
 
-function Form({ data, offline, onSignedOut }: { data: Choices; offline: boolean; onSignedOut: () => void }) {
+function Form({ data, offline, onBadKey }: { data: Choices; offline: boolean; onBadKey: () => void }) {
   const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
   const [amount, setAmount] = useState('');
   const remembered = read(LAST_ACCOUNT);
@@ -272,9 +224,9 @@ function Form({ data, offline, onSignedOut }: { data: Choices; offline: boolean;
   const drain = useCallback(async () => {
     const out = await flush();
     setWaiting(out.left);
-    if (out.signedOut) onSignedOut();
+    if (out.badKey) onBadKey();
     return out;
-  }, [onSignedOut]);
+  }, [onBadKey]);
 
   useEffect(() => {
     void drain();

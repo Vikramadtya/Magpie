@@ -1,3 +1,5 @@
+import { readKey } from './key';
+
 /** Entries typed on the phone, kept until the server has confirmed them. */
 export interface Entry {
   key: string;
@@ -29,19 +31,18 @@ function writeOutbox(entries: Entry[], storage: Pick<Storage, 'setItem'>) {
   }
 }
 
-export type SendResult = 'sent' | 'signed-out' | 'rejected' | 'offline';
+export type SendResult = 'sent' | 'bad-key' | 'rejected' | 'offline';
 
 /** Sends one entry. The same key makes a retry safe: the server stores it once. */
 export async function send(entry: Entry, fetcher: typeof fetch = fetch): Promise<SendResult> {
   try {
     const res = await fetcher('/api/quickadd/submit', {
       method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Quickadd': '1' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${readKey() ?? ''}` },
       body: JSON.stringify(entry),
     });
     if (res.ok) return 'sent';
-    if (res.status === 401) return 'signed-out';
+    if (res.status === 401) return 'bad-key';
     if (res.status === 429 || res.status >= 500) return 'offline'; // try again later
     return 'rejected';
   } catch {
@@ -56,23 +57,23 @@ export async function send(entry: Entry, fetcher: typeof fetch = fetch): Promise
 export async function flush(
   storage: Pick<Storage, 'getItem' | 'setItem'> = localStorage,
   sender: (e: Entry) => Promise<SendResult> = send,
-): Promise<{ sent: number; left: number; signedOut: boolean; dropped: number }> {
+): Promise<{ sent: number; left: number; badKey: boolean; dropped: number }> {
   let queue = readOutbox(storage);
   let sent = 0;
   let dropped = 0;
-  let signedOut = false;
+  let badKey = false;
   while (queue.length > 0) {
     const result = await sender(queue[0]);
     if (result === 'sent') sent++;
     else if (result === 'rejected') dropped++;
     else {
-      signedOut = result === 'signed-out';
+      badKey = result === 'bad-key';
       break;
     }
     queue = queue.slice(1);
     writeOutbox(queue, storage);
   }
-  return { sent, left: queue.length, signedOut, dropped };
+  return { sent, left: queue.length, badKey, dropped };
 }
 
 export function enqueue(entry: Entry, storage: Pick<Storage, 'getItem' | 'setItem'> = localStorage) {

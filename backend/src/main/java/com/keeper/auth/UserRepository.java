@@ -36,14 +36,36 @@ public class UserRepository {
         id);
   }
 
-  public User insert(String email, String name, String passwordHash) {
+  public boolean isEmailVerified(UUID id) {
+    return db.count("SELECT count(*) FROM users WHERE id = ? AND email_verified", id) > 0;
+  }
+
+  /**
+   * Takes over an account whose email was never proved: the old password (which someone else may
+   * have chosen) stops working, every session is ended, and the email counts as verified.
+   */
+  public void claimUnverified(UUID id, String newPasswordHash) {
+    db.tx(
+        () -> {
+          db.update(
+              "UPDATE users SET password_hash = ?, email_verified = TRUE WHERE id = ?",
+              newPasswordHash,
+              id);
+          db.update(
+              "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL",
+              id);
+        });
+  }
+
+  public User insert(String email, String name, String passwordHash, boolean emailVerified) {
     UUID id = UUID.randomUUID();
     db.update(
-        "INSERT INTO users(id, email, name, password_hash) VALUES (?, ?, ?, ?)",
+        "INSERT INTO users(id, email, name, password_hash, email_verified) VALUES (?, ?, ?, ?, ?)",
         id,
         email,
         name,
-        passwordHash);
+        passwordHash,
+        emailVerified);
     return new User(id, email, name, passwordHash);
   }
 }

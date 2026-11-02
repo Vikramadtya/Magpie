@@ -19,9 +19,15 @@ public class AuthService {
   private final WorkspaceService workspaces;
   private final TokenService tokens;
   private final Db db;
+  private final LoginThrottle throttle;
 
   public AuthService(
-      UserRepository users, WorkspaceService workspaces, TokenService tokens, Db db) {
+      UserRepository users,
+      WorkspaceService workspaces,
+      TokenService tokens,
+      Db db,
+      LoginThrottle throttle) {
+    this.throttle = throttle;
     this.users = users;
     this.workspaces = workspaces;
     this.tokens = tokens;
@@ -38,27 +44,38 @@ public class AuthService {
     }
     return db.tx(
         () -> {
-          User user = users.insert(normalized, name, BCrypt.hashpw(password, BCrypt.gensalt(12)));
+          User user =
+              users.insert(normalized, name, BCrypt.hashpw(password, BCrypt.gensalt(12)), false);
           workspaces.create(user.id(), "Personal", currency == null ? "USD" : currency);
           return user;
         });
   }
 
   public User authenticate(String email, String password) {
+    long now = System.currentTimeMillis();
+    throttle.check(email, now);
     User user = users.findByEmail(email.trim()).orElse(null);
     String hash = user == null || user.passwordHash() == null ? DUMMY_HASH : user.passwordHash();
     boolean ok = BCrypt.checkpw(password, hash);
     if (user == null || !ok) {
+      throttle.failed(email, now);
       throw new UnauthorizedException("Invalid email or password");
     }
+    throttle.succeeded(email);
     return user;
   }
 
   /** Called after Google sign-in; links by verified email, creating the account on first use. */
   public User findOrCreateOauthUser(String email, String name) {
     String normalized = email.trim().toLowerCase(Locale.ROOT);
-    return users
-        .findByEmail(normalized)
+    User existing = users.findByEmail(normalized).orElse(null);
+    if (existing != null && !users.isEmailVerified(existing.id())) {
+      // Someone signed up with this email and a password without proving it is theirs. Google has
+      // just proved the email is yours, so that password is cancelled.
+      users.claimUnverified(
+          existing.id(), BCrypt.hashpw(UUID.randomUUID().toString(), BCrypt.gensalt(12)));
+    }
+    return java.util.Optional.ofNullable(existing)
         .orElseGet(
             () ->
                 db.tx(
@@ -68,7 +85,8 @@ public class AuthService {
                           users.insert(
                               normalized,
                               name,
-                              BCrypt.hashpw(UUID.randomUUID().toString(), BCrypt.gensalt(12)));
+                              BCrypt.hashpw(UUID.randomUUID().toString(), BCrypt.gensalt(12)),
+                              true);
                       workspaces.create(user.id(), "Personal", "USD");
                       return user;
                     }));

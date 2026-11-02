@@ -28,10 +28,10 @@ describe('outbox', () => {
     expect(await flush(store, async () => 'sent')).toMatchObject({ sent: 2, left: 0 });
   });
 
-  it('keeps entries and reports it when the session ended', async () => {
+  it('keeps entries and reports it when the key was refused', async () => {
     const store = memory();
     enqueue(entry('k1'), store);
-    expect(await flush(store, async () => 'signed-out')).toMatchObject({ left: 1, signedOut: true });
+    expect(await flush(store, async () => 'bad-key')).toMatchObject({ left: 1, badKey: true });
   });
 
   it('drops an entry the server rejects so it cannot block the rest', async () => {
@@ -43,10 +43,10 @@ describe('outbox', () => {
     expect(out).toMatchObject({ sent: 1, dropped: 1, left: 0 });
   });
 
-  it('maps responses: 401 signed out, 400 rejected, 5xx and network errors offline', async () => {
+  it('maps responses: 401 bad key, 400 rejected, 5xx and network errors offline', async () => {
     const respond = (status: number) => (async () => new Response(null, { status })) as unknown as typeof fetch;
     expect(await send(entry('k'), respond(200))).toBe('sent');
-    expect(await send(entry('k'), respond(401))).toBe('signed-out');
+    expect(await send(entry('k'), respond(401))).toBe('bad-key');
     expect(await send(entry('k'), respond(400))).toBe('rejected');
     expect(await send(entry('k'), respond(503))).toBe('offline');
     expect(await send(entry('k'), (async () => { throw new TypeError('network'); }) as unknown as typeof fetch)).toBe('offline');

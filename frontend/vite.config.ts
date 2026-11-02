@@ -8,19 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: {
-        // /quickadd must come from the network, not from the saved copy of the main page: that copy
-        // carries the main app's strict security headers, which block Google's sign-in script. The
-        // network copy is kept for when there is no connection.
-        navigateFallbackDenylist: [/^\/api/, /^\/oauth/, /^\/health/, /^\/quickadd/],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && url.pathname.startsWith('/quickadd'),
-            handler: 'NetworkFirst',
-            options: { cacheName: 'quickadd-page', networkTimeoutSeconds: 4 },
-          },
-        ],
-      },
+      workbox: { navigateFallbackDenylist: [/^\/api/, /^\/oauth/, /^\/health/] },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
       manifest: {
         name: 'Keeper',

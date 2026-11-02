@@ -1,38 +1,34 @@
-# Quick add from your phone (`/quickadd`)
+# Quick add: add a transaction without waiting for the server
 
-A small page that opens instantly on your phone, even while the Keeper server on Render is asleep.
-You type an amount, pick an account, and press Add. The entry waits in Keeper's **To review** list;
-nothing is recorded in your ledger until you press **Record** there.
-
-## How it works
+Keeper's server on Render sleeps when idle and takes a while to wake. Quick add sends entries to a
+small always-on function on Vercel instead. Entries wait in Keeper's **To review** list; nothing is
+recorded in your ledger until you press **Record** there.
 
 ```
-phone  ->  /quickadd (Vercel, always on)  ->  quick_captures table (Neon)
-                                                      |
-                 Keeper (Render, when awake)  <-------+   shown in "To review"
+phone page / iPhone Shortcut / Google Form  ->  Vercel function  ->  quick_captures (Neon)
+        (carry a revocable key)                                              |
+                                  Keeper (Render, when awake)  <-------------+  shown in "To review"
 ```
 
-* The page and its two server functions (`frontend/api/quickadd/`) run on Vercel, so they never wait for Render.
-* Sign-in is Google's own. The function checks Google's signed proof, finds the Keeper user with that
-  verified email, and starts a 30-day login cookie that belongs to this site only.
-* The functions connect to Neon with a **separate, very limited database role** (`quickadd`). It can
-  read account and category names for your workspace and add rows to `quick_captures`. It cannot read
-  transactions, notes, passwords or anything else.
-* Entries are saved on the phone first and sent in the background, so they are never lost if the
-  connection drops. Sending twice is harmless (each entry has a key, the server stores it once).
-* Limits: 20 entries a minute and 200 waiting entries per user.
+## Keys
+
+* Create keys in Keeper under **Settings, Quick add**. A key is shown once, stored only as a hash,
+  belongs to one user and one ledger, and can be revoked at any time.
+* A key can only add entries to To review. It cannot read accounts, transactions or anything else.
+* Limits: 20 entries a minute and 200 waiting entries per user. A repeated or double-tapped entry is
+  stored once.
 
 ## One-time setup
 
-1. **Create the database role** (Neon SQL editor, choose a strong password):
+1. **Database role** (Neon SQL editor, choose a strong password):
 
    ```sql
    CREATE ROLE quickadd LOGIN PASSWORD 'choose-a-long-random-password';
    GRANT USAGE ON SCHEMA public TO quickadd;
    ```
 
-   The grants are applied by the backend migration when it runs *after* the role exists. If the role was
-   created after the migration had already run, run this once instead:
+   The backend migrations grant this role its few permissions when they run *after* the role exists.
+   If the role was created later, run these once:
 
    ```sql
    GRANT SELECT (id, email, name, deleted_at) ON users TO quickadd;
@@ -41,45 +37,104 @@ phone  ->  /quickadd (Vercel, always on)  ->  quick_captures table (Neon)
    GRANT SELECT (id, workspace_id, parent_id, name, kind, is_archived) ON categories TO quickadd;
    GRANT INSERT ON quick_captures TO quickadd;
    GRANT SELECT (id, user_id, status, created_at, idempotency_key) ON quick_captures TO quickadd;
+   GRANT SELECT (id, user_id, workspace_id, key_hash, revoked_at) ON quick_api_keys TO quickadd;
+   GRANT UPDATE (last_used_at) ON quick_api_keys TO quickadd;
    ```
 
-2. **Vercel environment variables** (Project settings, then redeploy):
+2. **Vercel environment variable** (then redeploy): `QUICKADD_DATABASE_URL`, the Neon connection string
+   for the `quickadd` role. Nothing else is needed.
 
-   | Name | Value |
-   |---|---|
-   | `QUICKADD_DATABASE_URL` | Neon connection string for the `quickadd` role |
-   | `QUICKADD_SECRET` | 32+ random characters (`openssl rand -base64 48`), signs the login cookie |
-   | `GOOGLE_CLIENT_ID` | the same Google OAuth client ID Keeper already uses |
+3. In Keeper, open **Settings, Quick add** and create a key.
 
-3. **Google Cloud console**: in the same OAuth client add both of these (Google's button on `/quickadd`
-   needs them):
-   * *Authorized JavaScript origins*: `https://magpie-red.vercel.app`
-   * *Authorized redirect URIs*: `https://magpie-red.vercel.app/api/quickadd/session`
+## Ways to send an entry
 
-   Sign-in uses Google's redirect mode (the browser goes to Google and comes back), because pop-up
-   windows are unreliable on iPhone Safari and in home-screen apps.
+### A. The phone page
 
-4. **On the phone**: open `https://magpie-red.vercel.app/quickadd` in **Safari**, sign in once, then tap
-   the Share button, scroll to **Add to Home Screen** (if you do not see it, tap *Edit Actions* or *More*)
-   and tap Add. The icon opens Quick add directly. A home-screen app keeps its own cookies on iPhone, so
-   sign in once more the first time you open it from the icon.
+Open the setup link from the key dialog on your phone (`https://magpie-red.vercel.app/quickadd#key=…`;
+the part after `#` is never sent to any server), or open `/quickadd` and paste the key. Then use Safari's
+Share button, **Add to Home Screen**. Entries are saved on the phone first and sent in the background, so
+nothing is lost offline.
+
+### B. iPhone Shortcut (no browser)
+
+1. Shortcuts app, **+**, add these actions:
+   * **Ask for Input** (Number), prompt "Amount?"
+   * **Ask for Input** (Text), prompt "What for?"
+   * **Get Contents of URL**: URL `https://magpie-red.vercel.app/api/quickadd/submit`, Method **POST**,
+     Headers `Authorization` = `Bearer qak_…` (your key), Request Body **JSON** with `amount` = the
+     first input, `payee` = the second input, `account` = `Card` (the exact account name).
+2. Name it, then add it to the Home Screen, the Action Button or Siri ("Hey Siri, add expense").
+
+### C. Google Form
+
+A form can't call a web address itself, but a short script attached to it can.
+
+1. Create a Google Form with short-answer questions titled **Amount**, **Account**, **Category**,
+   **Payee** and **Note** (use dropdowns for Account and Category if you like; the names must match
+   Keeper's exactly, the match ignores upper and lower case).
+2. In the form, open the three-dot menu, **Script editor**, and paste:
+
+   ```js
+   function onSubmit(e) {
+     var key = PropertiesService.getScriptProperties().getProperty('KEEPER_KEY');
+     var answers = {};
+     e.response.getItemResponses().forEach(function (r) {
+       answers[r.getItem().getTitle().toLowerCase()] = r.getResponse();
+     });
+     var res = UrlFetchApp.fetch('https://magpie-red.vercel.app/api/quickadd/submit', {
+       method: 'post',
+       contentType: 'application/json',
+       headers: { Authorization: 'Bearer ' + key },
+       payload: JSON.stringify({
+         amount: answers['amount'],
+         account: answers['account'],
+         category: answers['category'],
+         payee: answers['payee'],
+         note: answers['note'],
+       }),
+       muteHttpExceptions: true,
+     });
+     if (res.getResponseCode() !== 200) {
+       MailApp.sendEmail(Session.getActiveUser().getEmail(), 'Quick add failed', res.getContentText());
+     }
+   }
+   ```
+
+3. Project Settings (gear), **Script properties**, add `KEEPER_KEY` = your key (so the key is not in the code).
+4. Triggers (clock), **Add Trigger**: function `onSubmit`, event source **From form**, event **On form submit**.
+
+Google keeps a copy of every submission in the form's responses, so use short, non-sensitive notes.
+
+### D. Anything else
+
+```bash
+curl -X POST https://magpie-red.vercel.app/api/quickadd/submit \
+  -H "Authorization: Bearer qak_…" -H "Content-Type: application/json" \
+  -d '{"amount":"450","account":"Card","category":"Food","payee":"Swiggy","note":"lunch"}'
+```
+
+Fields: `amount` (required), `account` (name) or `accountId` (optional when you have a single account),
+`category` (name) or `categoryId`, `payee`, `note`, `occurredOn` (`YYYY-MM-DD`, default today), `type`
+(`EXPENSE` by default, or `INCOME`), `key` (your own repeat-protection key, optional). An unknown
+category name does not lose the entry: it is kept and the name is added to the note. An unknown account
+returns the list of valid ones.
 
 ## Good to know
 
-* Only Google accounts whose verified email matches a Keeper user (as owner or editor) are accepted.
-  This is the same rule Keeper's own Google sign-in uses.
-* A pending entry's note is stored as plain text until you record it (the notes encryption key lives
-  on the Keeper server, not on Vercel). Keep notes short and non-sensitive.
-* Account and category names are copied to the phone so the form works offline. Signing out clears them.
-* Sign out on the page, or clear the site's data, to end a session. Sessions also expire after 30 days.
+* A pending entry's note is plain text until you record it (the encryption key lives on the Keeper
+  server, not on Vercel). Keep notes short and non-sensitive.
+* The phone page keeps the key and a copy of your account and category names on the phone. Use
+  **Disconnect** on the page to remove them. Revoke the key in Settings to cut it off everywhere.
 
 ## Undoing it
 
-Revert the commit. Because the backend already applied migration `V17`, also run this once on Neon
-**before the backend restarts on the reverted code**, or Flyway will refuse to start:
+Revert the quick-add commits. Because the backend already applied migrations `V17` and `V18`, also run
+this once on Neon **before the backend restarts on the reverted code**, or Flyway will refuse to start:
 
 ```sql
+DROP TABLE IF EXISTS quick_api_keys;
 DROP TABLE IF EXISTS quick_captures;
-DELETE FROM flyway_schema_history WHERE version = '17';
+ALTER TABLE users DROP COLUMN IF EXISTS email_verified;
+DELETE FROM flyway_schema_history WHERE version IN ('17', '18');
 DROP ROLE IF EXISTS quickadd;  -- optional
 ```

@@ -130,6 +130,8 @@ export interface QuickCapture {
   payeeText: string | null; note: string | null; status: string; createdAt: string;
 }
 export interface CaptureAccept { accountId: string; categoryId?: string | null; payee?: string | null; occurredOn?: string | null; note?: string | null }
+export interface QuickKey { id: string; label: string; prefix: string; createdAt: string; lastUsedAt: string | null }
+export interface QuickKeyCreated { key: QuickKey; secret: string }
 export interface Lot { id: string; boughtOn: string; quantity: number; costMinor: number; unitPriceMinor: number }
 export interface PurchaseInput { boughtOn: string; quantity: number; unitPriceMinor: number }
 export interface InvestmentSummary {

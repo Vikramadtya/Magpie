@@ -82,10 +82,13 @@ micronaut:
           - isAuthenticated()
   router:
     static-resources:
+      # The API docs list every endpoint, so they are off unless asked for (SWAGGER_ENABLED=true).
       swagger:
+        enabled: "${SWAGGER_ENABLED:false}"
         paths: classpath:META-INF/swagger
         mapping: /swagger/**
       swagger-ui:
+        enabled: "${SWAGGER_ENABLED:false}"
         paths: classpath:META-INF/swagger/views/swagger-ui
         mapping: /swagger-ui/**
 

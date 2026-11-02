@@ -10,7 +10,8 @@
         <encoder class="net.logstash.logback.encoder.LogstashEncoder" />
     </appender>
 
-    <logger name="io.micronaut.security" level="TRACE"/>
+    <!-- At TRACE this library logs whole login tokens and user details. Keep it at WARN. -->
+    <logger name="io.micronaut.security" level="WARN"/>
 
     <root level="info">
         <!-- Switch to JSON in production -->

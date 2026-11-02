@@ -133,4 +133,13 @@ Put the output in the `ENCRYPTION_MASTER_KEY` environment variable and redeploy.
 
 ## Quick add from your phone
 
-A page at `/quickadd` lets you add a transaction from your phone without waiting for the server to wake up. Setup (a limited database role, three Vercel variables and one Google origin) is in [docs/QUICKADD.md](docs/QUICKADD.md).
+A function on Vercel (the `/quickadd` page, an iPhone Shortcut, a Google Form script) lets you add a transaction without waiting for the server to wake up. It needs one limited database role and one Vercel variable, `QUICKADD_DATABASE_URL`; keys are created in Settings. See [docs/QUICKADD.md](docs/QUICKADD.md).
+
+## Security notes
+
+* The API documentation (`/swagger`) is off. Set `SWAGGER_ENABLED=true` only while you need it.
+* Logging of the security library is at WARN. At TRACE it prints whole login tokens into the logs.
+* Five wrong passwords lock an email for 15 minutes, on top of the per-address limit.
+* A password sign-up counts as unverified until that email signs in with Google, which then cancels the
+  password, so nobody can pre-register your email and share the account.
+* Run `npm audit` in `frontend/` now and then, and keep `JWT_SECRET` and the database password long and private.

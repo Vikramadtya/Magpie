@@ -13,6 +13,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { StateView } from '../components/ui/StateView';
+import { QuickAddKeys } from '../features/settings/QuickAddKeys';
 import { useConnections, useCreateConnection, useRevokeConnection, useSplitPeople, useSplitPersonLabel } from '../hooks/useInbox';
 import { useActivity } from '../hooks/useInsights';
 import { errorMessage } from '../lib/http';
@@ -101,6 +102,8 @@ export default function SettingsPage() {
             <Button type="submit" disabled={createConnection.isPending}>Connect an app</Button>
           </form>
         </section>
+
+        <QuickAddKeys canEdit={ws.canEdit} />
 
         <SplitPeopleSection />
 

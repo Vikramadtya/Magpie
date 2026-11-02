@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { capturesApi, connectionsApi, inboxApi, splitPeopleApi } from '../api/endpoints';
+import { capturesApi, connectionsApi, inboxApi, quickKeysApi, splitPeopleApi } from '../api/endpoints';
 import type { AcceptInput, CaptureAccept } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
@@ -76,5 +76,29 @@ export function useSplitPersonLabel() {
   return useMutation({
     mutationFn: (a: { id: string; label: string | null }) => (a.label === null ? splitPeopleApi.reset(id, a.id) : splitPeopleApi.rename(id, a.id, a.label)),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.splitPeople(id) }),
+  });
+}
+
+// ---------- keys for the quick-add endpoint ----------
+export function useQuickKeys() {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: qk.quickKeys(id), queryFn: () => quickKeysApi.list(id) });
+}
+
+export function useCreateQuickKey() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (label: string) => quickKeysApi.create(id, label),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.quickKeys(id) }),
+  });
+}
+
+export function useRevokeQuickKey() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId: string) => quickKeysApi.revoke(id, keyId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.quickKeys(id) }),
   });
 }

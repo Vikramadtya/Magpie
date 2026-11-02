@@ -192,6 +192,12 @@ export const tripsApi = {
   clear: (ws: string, id: string) => api.post<{ affected: number }>(ws, `/trips/${id}/clear`),
 };
 
+export const quickKeysApi = {
+  list: (ws: string) => api.get<T.QuickKey[]>(ws, '/quick-keys'),
+  create: (ws: string, label: string) => api.post<T.QuickKeyCreated>(ws, '/quick-keys', { label }),
+  revoke: (ws: string, id: string) => api.del(ws, `/quick-keys/${id}`),
+};
+
 export const capturesApi = {
   list: (ws: string) => api.get<T.QuickCapture[]>(ws, '/captures'),
   accept: (ws: string, id: string, b: T.CaptureAccept) => api.post<T.QuickCapture>(ws, `/captures/${id}/accept`, b),
