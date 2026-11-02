@@ -11,9 +11,10 @@ import { MoneyInput } from '../components/ui/MoneyInput';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
+import { QuickAdds } from '../features/inbox/QuickAdds';
 import { groupCategories } from '../features/transactions/TransactionDialog';
 import { useFxQuote } from '../hooks/useInsights';
-import { useAcceptItem, useApplyUpdate, useDismissItem, useInbox, useKeepItem, useRemoveRecords } from '../hooks/useInbox';
+import { useAcceptItem, useApplyUpdate, useCaptures, useDismissItem, useInbox, useKeepItem, useRemoveRecords } from '../hooks/useInbox';
 import { useAccounts, useCategories } from '../hooks/useReference';
 import { useTrips } from '../hooks/useTrips';
 import { cn } from '../lib/cn';
@@ -27,21 +28,24 @@ export default function InboxPage() {
   const inbox = useInbox(tab);
   const accounts = (useAccounts().data ?? []).filter((a) => !a.archived && !a.name.startsWith('Owed to friends'));
   const items = inbox.data ?? [];
+  const captures = useCaptures().data ?? [];
+  const showCaptures = tab === 'todo' ? captures : [];
 
   return (
     <>
-      <PageHeader title="To review" subtitle="Group expenses and settlements from your expense-split app, waiting to be recorded in your ledger" />
+      <PageHeader title="To review" subtitle="Things entered on your phone or sent by your expense-split app, waiting to be recorded in your ledger" />
       <Segmented className="mb-6" value={tab} onChange={setTab} options={[['todo', 'To review'], ['done', 'Recorded']] as const} />
       <StateView
         isLoading={inbox.isLoading}
         error={inbox.error}
         onRetry={() => void inbox.refetch()}
-        isEmpty={items.length === 0}
+        isEmpty={items.length === 0 && showCaptures.length === 0}
         emptyTitle={tab === 'todo' ? 'Nothing to review' : 'Nothing recorded yet'}
         emptyHint={tab === 'todo' ? 'Group expenses you enter in the split app show up here. Connect the app in Settings if you have not yet.' : undefined}
         emptyAction={tab === 'todo' ? <Link to="/settings"><Button variant="outline">Connect the app</Button></Link> : undefined}
         skeleton={<Skeleton className="h-28" />}
       >
+        <QuickAdds items={showCaptures} accounts={accounts} />
         <ul className="space-y-4">
           {items.map((i) => (tab === 'done' ? <DoneRow key={i.id} item={i} /> : <ReviewCard key={i.id} item={i} accounts={accounts} />))}
         </ul>

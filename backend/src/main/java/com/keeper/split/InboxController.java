@@ -23,9 +23,12 @@ public class InboxController {
   public record Count(long count) {}
 
   private final SplitAcceptService service;
+  private final com.keeper.capture.CaptureRepository captures;
 
-  public InboxController(SplitAcceptService service) {
+  public InboxController(
+      SplitAcceptService service, com.keeper.capture.CaptureRepository captures) {
     this.service = service;
+    this.captures = captures;
   }
 
   /** scope=todo (default) lists what needs a decision; scope=done lists what was accepted. */
@@ -37,7 +40,8 @@ public class InboxController {
 
   @Get("/count")
   public Count count(@PathVariable UUID workspaceId) {
-    return new Count(service.count(workspaceId));
+    // quick adds typed on the phone wait in the same list
+    return new Count(service.count(workspaceId) + captures.pendingCount(workspaceId));
   }
 
   @Post("/{id}/accept")

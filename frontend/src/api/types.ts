@@ -124,6 +124,12 @@ export interface HoldingInput {
   accountId?: string | null; symbol: string; name: string; quantity: number; costBasisMinor: number; priceMinor: number; currency: string;
   providerSymbol?: string | null; exchange?: string | null; assetType?: string | null; purchasedOn?: string | null; unitPriceMinor?: number | null;
 }
+export interface QuickCapture {
+  id: string; type: 'EXPENSE' | 'INCOME'; amountMinor: number; currency: string; occurredOn: string;
+  accountId: string | null; accountName: string | null; categoryId: string | null; categoryName: string | null;
+  payeeText: string | null; note: string | null; status: string; createdAt: string;
+}
+export interface CaptureAccept { accountId: string; categoryId?: string | null; payee?: string | null; occurredOn?: string | null; note?: string | null }
 export interface Lot { id: string; boughtOn: string; quantity: number; costMinor: number; unitPriceMinor: number }
 export interface PurchaseInput { boughtOn: string; quantity: number; unitPriceMinor: number }
 export interface InvestmentSummary {

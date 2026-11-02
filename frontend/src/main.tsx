@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import './index.css';
-import App from './App';
 import { env } from './lib/env';
 
 if (env.SENTRY_DSN) {
@@ -26,8 +25,14 @@ window.addEventListener('vite:preloadError', () => {
   window.location.reload();
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// /quickadd is a separate, tiny app: it never loads Keeper's login or talks to the main server,
+// so it opens instantly even while that server is asleep.
+const boot = window.location.pathname.startsWith('/quickadd') ? import('./quickadd/QuickAddApp') : import('./App');
+const root = createRoot(document.getElementById('root')!);
+void boot.then(({ default: Root }) =>
+  root.render(
+    <StrictMode>
+      <Root />
+    </StrictMode>,
+  ),
 );

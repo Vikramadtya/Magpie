@@ -130,3 +130,7 @@ Put the output in the `ENCRYPTION_MASTER_KEY` environment variable and redeploy.
 - **Back the key up** somewhere other than Render (a password manager). If it is lost, encrypted notes cannot be recovered.
 - **Do not change it** afterwards; rotating the master key is not supported yet.
 - Without the variable Keeper still works but stores new notes unencrypted and logs a warning.
+
+## Quick add from your phone
+
+A page at `/quickadd` lets you add a transaction from your phone without waiting for the server to wake up. Setup (a limited database role, three Vercel variables and one Google origin) is in [docs/QUICKADD.md](docs/QUICKADD.md).

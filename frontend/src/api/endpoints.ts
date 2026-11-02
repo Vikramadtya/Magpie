@@ -192,6 +192,12 @@ export const tripsApi = {
   clear: (ws: string, id: string) => api.post<{ affected: number }>(ws, `/trips/${id}/clear`),
 };
 
+export const capturesApi = {
+  list: (ws: string) => api.get<T.QuickCapture[]>(ws, '/captures'),
+  accept: (ws: string, id: string, b: T.CaptureAccept) => api.post<T.QuickCapture>(ws, `/captures/${id}/accept`, b),
+  dismiss: (ws: string, id: string) => api.post<T.QuickCapture>(ws, `/captures/${id}/dismiss`),
+};
+
 export const inboxApi = {
   list: (ws: string, scope: 'todo' | 'done') => api.get<T.InboxItem[]>(ws, '/inbox', { scope }),
   count: (ws: string) => api.get<{ count: number }>(ws, '/inbox/count'),

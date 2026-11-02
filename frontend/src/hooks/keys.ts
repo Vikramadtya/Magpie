@@ -27,6 +27,7 @@ export const qk = {
   insights: (ws: string) => ['ws', ws, 'insights'] as const,
   trips: (ws: string) => ['ws', ws, 'trips'] as const,
   inbox: (ws: string, scope: string) => ['ws', ws, 'inbox', scope] as const,
+  captures: (ws: string) => ['ws', ws, 'inbox', 'captures'] as const,
   inboxCount: (ws: string) => ['ws', ws, 'inbox', 'count'] as const,
   splitPeople: (ws: string) => ['ws', ws, 'split-people'] as const,
   connections: (ws: string) => ['ws', ws, 'connections'] as const,

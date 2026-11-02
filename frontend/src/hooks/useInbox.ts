@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { connectionsApi, inboxApi, splitPeopleApi } from '../api/endpoints';
-import type { AcceptInput } from '../api/types';
+import { capturesApi, connectionsApi, inboxApi, splitPeopleApi } from '../api/endpoints';
+import type { AcceptInput, CaptureAccept } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
 
@@ -16,6 +16,12 @@ export function useInboxCount() {
   return useQuery({ queryKey: qk.inboxCount(id), queryFn: () => inboxApi.count(id), refetchInterval: 60_000, select: (d) => d.count });
 }
 
+/** Transactions typed on the phone's quick-add page, waiting to be recorded. */
+export function useCaptures() {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: qk.captures(id), queryFn: () => capturesApi.list(id), refetchInterval: 60_000 });
+}
+
 function useInboxMutation<TArgs, TOut>(fn: (ws: string, args: TArgs) => Promise<TOut>, message?: string) {
   const { id } = useWorkspace();
   const qc = useQueryClient();
@@ -26,6 +32,8 @@ function useInboxMutation<TArgs, TOut>(fn: (ws: string, args: TArgs) => Promise<
   });
 }
 
+export const useAcceptCapture = () => useInboxMutation((ws, a: { id: string; body: CaptureAccept }) => capturesApi.accept(ws, a.id, a.body), 'Recorded');
+export const useDismissCapture = () => useInboxMutation((ws, id: string) => capturesApi.dismiss(ws, id));
 export const useAcceptItem = () => useInboxMutation((ws, a: { id: string; body: AcceptInput }) => inboxApi.accept(ws, a.id, a.body), 'Recorded');
 export const useDismissItem = () => useInboxMutation((ws, id: string) => inboxApi.dismiss(ws, id));
 export const useApplyUpdate = () => useInboxMutation((ws, a: { id: string; body: AcceptInput }) => inboxApi.applyUpdate(ws, a.id, a.body), 'Updated');

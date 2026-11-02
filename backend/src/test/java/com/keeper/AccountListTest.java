@@ -22,8 +22,14 @@ class AccountListTest extends ApiTestBase {
                       s.token(),
                       ws + "/accounts",
                       Map.of(
-                          "name", "Account " + i, "type", type, "currency", "USD",
-                          "openingBalanceMinor", 0),
+                          "name",
+                          "Account " + i,
+                          "type",
+                          type,
+                          "currency",
+                          "USD",
+                          "openingBalanceMinor",
+                          0),
                       Map.class)
                   .get("id");
       if (i == 7) card = id;
@@ -32,14 +38,21 @@ class AccountListTest extends ApiTestBase {
         s.token(),
         ws + "/transactions",
         Map.of(
-            "accountId", card, "type", "EXPENSE", "amountMinor", 4_200,
-            "occurredOn", LocalDate.now().toString()),
+            "accountId",
+            card,
+            "type",
+            "EXPENSE",
+            "amountMinor",
+            4_200,
+            "occurredOn",
+            LocalDate.now().toString()),
         Map.class);
 
     Map<?, ?> page = get(s.token(), ws + "/transactions?accountId=" + card, Map.class);
     assertEquals(1, ((List<?>) page.get("items")).size());
     assertEquals(
         -4_200,
-        ((Number) get(s.token(), ws + "/accounts/" + card, Map.class).get("balanceMinor")).intValue());
+        ((Number) get(s.token(), ws + "/accounts/" + card, Map.class).get("balanceMinor"))
+            .intValue());
   }
 }
