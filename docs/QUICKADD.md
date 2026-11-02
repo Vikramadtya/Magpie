@@ -51,11 +51,18 @@ phone  ->  /quickadd (Vercel, always on)  ->  quick_captures table (Neon)
    | `QUICKADD_SECRET` | 32+ random characters (`openssl rand -base64 48`), signs the login cookie |
    | `GOOGLE_CLIENT_ID` | the same Google OAuth client ID Keeper already uses |
 
-3. **Google Cloud console**: in the OAuth client, add `https://magpie-red.vercel.app` under
-   *Authorized JavaScript origins* (the Google button on `/quickadd` needs it).
+3. **Google Cloud console**: in the same OAuth client add both of these (Google's button on `/quickadd`
+   needs them):
+   * *Authorized JavaScript origins*: `https://magpie-red.vercel.app`
+   * *Authorized redirect URIs*: `https://magpie-red.vercel.app/api/quickadd/session`
 
-4. **On the phone**: open `https://magpie-red.vercel.app/quickadd`, sign in once, then Share and
-   *Add to Home Screen* for a one-tap icon.
+   Sign-in uses Google's redirect mode (the browser goes to Google and comes back), because pop-up
+   windows are unreliable on iPhone Safari and in home-screen apps.
+
+4. **On the phone**: open `https://magpie-red.vercel.app/quickadd` in **Safari**, sign in once, then tap
+   the Share button, scroll to **Add to Home Screen** (if you do not see it, tap *Edit Actions* or *More*)
+   and tap Add. The icon opens Quick add directly. A home-screen app keeps its own cookies on iPhone, so
+   sign in once more the first time you open it from the icon.
 
 ## Good to know
 

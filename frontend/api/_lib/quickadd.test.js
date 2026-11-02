@@ -27,6 +27,7 @@ function response() {
   res.setHeader = (k, v) => { res.headers[k.toLowerCase()] = v; };
   res.status = (n) => { res.statusCode = n; return res; };
   res.json = (b) => { res.body = b; return res; };
+  res.end = () => res;
   return res;
 }
 
@@ -72,36 +73,43 @@ describe('verifyGoogle', () => {
 describe('session', () => {
   const verify = async () => ({ email: 'asha@example.com', name: 'Asha' });
 
-  it('signs a known Google user in and returns their accounts and categories', async () => {
-    const sql = fakeSql([
-      [/FROM users u JOIN workspace_members/, [{ uid: UID, name: 'Asha', ws: WS }]],
-      [/FROM accounts WHERE workspace_id/, [{ id: ACC, name: 'Card', type: 'CREDIT_CARD', currency: 'USD' }]],
-      [/FROM categories/, [{ id: 'c1', name: 'Food', kind: 'EXPENSE', parentId: null }]],
-    ]);
+  const form = (credential, token = 'csrf-1', cookieToken = 'csrf-1') => ({
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: `g_csrf_token=${cookieToken}` },
+    body: { credential, g_csrf_token: token },
+  });
+  const knownUser = [/FROM users u JOIN workspace_members/, [{ uid: UID, name: 'Asha', ws: WS }]];
+
+  it('signs a known Google user in and sends them back to the page with a session cookie', async () => {
     const res = response();
-    await handleSession(post({ credential: 'g' }), res, { sql, env, verify });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.accounts[0].name).toBe('Card');
-    expect(res.headers['set-cookie']).toMatch(/HttpOnly; SameSite=Strict; Secure/);
+    await handleSession(form('g'), res, { sql: fakeSql([knownUser]), env, verify });
+    expect(res.statusCode).toBe(303);
+    expect(res.headers.location).toBe('/quickadd');
+    expect(res.headers['set-cookie']).toMatch(/HttpOnly; SameSite=Lax; Secure/);
   });
 
-  it('refuses a Google account that has no Keeper user', async () => {
+  it('sends a Google account with no Keeper user back with a reason and no cookie', async () => {
     const res = response();
-    await handleSession(post({ credential: 'g' }), res, { sql: fakeSql([]), env, verify });
-    expect(res.statusCode).toBe(403);
+    await handleSession(form('g'), res, { sql: fakeSql([]), env, verify });
+    expect(res.statusCode).toBe(303);
+    expect(res.headers.location).toBe('/quickadd?signin=no_account');
     expect(res.headers['set-cookie']).toBeUndefined();
   });
 
-  it('refuses a credential Google would not vouch for', async () => {
+  it('sends a credential Google would not vouch for back with a reason', async () => {
     const res = response();
-    await handleSession(post({ credential: 'bad' }), res, { sql: fakeSql([]), env, verify: async () => { throw new Error('no'); } });
-    expect(res.statusCode).toBe(401);
+    await handleSession(form('bad'), res, { sql: fakeSql([knownUser]), env, verify: async () => { throw new Error('no'); } });
+    expect(res.headers.location).toBe('/quickadd?signin=failed');
+    expect(res.headers['set-cookie']).toBeUndefined();
   });
 
-  it('refuses sign-in without the same-origin header', async () => {
-    const res = response();
-    await handleSession({ method: 'POST', headers: {}, body: { credential: 'g' } }, res, { sql: fakeSql([]), env, verify });
-    expect(res.statusCode).toBe(400);
+  it('refuses a sign-in whose CSRF token does not match the cookie', async () => {
+    for (const req of [form('g', 'a', 'b'), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: { credential: 'g' } }]) {
+      const res = response();
+      await handleSession(req, res, { sql: fakeSql([knownUser]), env, verify });
+      expect(res.statusCode).toBe(400);
+      expect(res.headers['set-cookie']).toBeUndefined();
+    }
   });
 
   it('answers a visitor who is not signed in with the client id and nothing else', async () => {

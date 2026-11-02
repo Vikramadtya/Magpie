@@ -49,7 +49,8 @@ export async function readSession(cookieHeader, secret) {
   }
 }
 
-const cookieAttrs = (env) => `Path=/api/quickadd; HttpOnly; SameSite=Strict${env.insecureCookie ? '' : '; Secure'}`;
+// Lax (not Strict) so the cookie is also accepted on the redirect back from Google's sign-in page.
+const cookieAttrs = (env) => `Path=/api/quickadd; HttpOnly; SameSite=Lax${env.insecureCookie ? '' : '; Secure'}`;
 
 export const sessionCookie = (token, env) => `${COOKIE}=${token}; Max-Age=${SESSION_SECONDS}; ${cookieAttrs(env)}`;
 export const clearCookie = (env) => `${COOKIE}=; Max-Age=0; ${cookieAttrs(env)}`;
@@ -112,6 +113,41 @@ const json = (res, status, body) => res.status(status).json(body);
 /** POST/DELETE must carry a header a plain cross-site form cannot send. */
 const sameOriginCall = (req) => req.headers['x-quickadd'] === '1';
 
+const readCookie = (header, name) =>
+  (header ?? '')
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+
+const redirect = (res, location) => {
+  res.status(303);
+  res.setHeader('Location', location);
+  res.end();
+};
+
+/**
+ * Google's sign-in button, in redirect mode, posts the credential here as a form (a popup is
+ * unreliable on iPhone Safari and in home-screen apps). Google sets a g_csrf_token cookie and sends
+ * the same value in the form; matching them stops someone else from signing you in to their account.
+ */
+async function redirectSignIn(req, res, { sql, env, verify }) {
+  const form = req.body ?? {};
+  const cookieToken = readCookie(req.headers.cookie, 'g_csrf_token');
+  if (!cookieToken || cookieToken !== form.g_csrf_token) return json(res, 400, { error: 'bad_request' });
+  let identity;
+  try {
+    identity = await verify(form.credential, env.clientId);
+  } catch {
+    return redirect(res, '/quickadd?signin=failed');
+  }
+  const user = await findUser(sql, identity.email);
+  if (!user) return redirect(res, '/quickadd?signin=no_account');
+  const token = await signSession({ uid: user.uid, ws: user.ws, name: user.name ?? identity.name }, env.secret);
+  res.setHeader('Set-Cookie', sessionCookie(token, env));
+  return redirect(res, '/quickadd');
+}
+
 export async function handleSession(req, res, { sql, env, verify = verifyGoogle }) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'GET') {
@@ -121,20 +157,7 @@ export async function handleSession(req, res, { sql, env, verify = verifyGoogle 
     }
     return json(res, 200, { name: session.name ?? '', ...(await listChoices(sql, session.ws)) });
   }
-  if (req.method === 'POST') {
-    if (!sameOriginCall(req)) return json(res, 400, { error: 'bad_request' });
-    let identity;
-    try {
-      identity = await verify(req.body?.credential, env.clientId);
-    } catch {
-      return json(res, 401, { error: 'google_rejected' });
-    }
-    const user = await findUser(sql, identity.email);
-    if (!user) return json(res, 403, { error: 'no_account' });
-    const token = await signSession({ uid: user.uid, ws: user.ws, name: user.name ?? identity.name }, env.secret);
-    res.setHeader('Set-Cookie', sessionCookie(token, env));
-    return json(res, 200, { name: user.name ?? identity.name, ...(await listChoices(sql, user.ws)) });
-  }
+  if (req.method === 'POST') return redirectSignIn(req, res, { sql, env, verify });
   if (req.method === 'DELETE') {
     if (!sameOriginCall(req)) return json(res, 400, { error: 'bad_request' });
     res.setHeader('Set-Cookie', clearCookie(env));

@@ -1,4 +1,4 @@
-import { Banknote, CalendarDays, Check, CloudOff, CreditCard, Landmark, LogOut, PiggyBank, Store, StickyNote, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { Banknote, CalendarDays, Check, Share, X, CloudOff, CreditCard, Landmark, LogOut, PiggyBank, Store, StickyNote, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Avatar } from '../components/ui/Avatar';
 import { cn } from '../lib/cn';
@@ -100,16 +100,6 @@ export default function QuickAdd() {
 
   const resync = useCallback(() => void load(), [load]);
 
-  const signIn = useCallback(
-    async (credential: string) => {
-      const res = await fetch('/api/quickadd/session', { method: 'POST', credentials: 'same-origin', headers: HEADERS, body: JSON.stringify({ credential }) });
-      if (res.ok) return adopt((await res.json()) as Choices);
-      const message = res.status === 403 ? 'That Google account has no Keeper account. Sign in to Keeper with Google first.' : 'Google sign-in failed. Try again.';
-      setState((s) => ({ kind: 'signed-out', clientId: s.kind === 'signed-out' ? s.clientId : null, message }));
-    },
-    [adopt],
-  );
-
   const signOut = async () => {
     await fetch('/api/quickadd/session', { method: 'DELETE', credentials: 'same-origin', headers: HEADERS }).catch(() => undefined);
     write(CACHE, null);
@@ -132,14 +122,28 @@ export default function QuickAdd() {
           )}
         </header>
         {state.kind === 'loading' && <div role="status" aria-label="Loading" className="mx-auto mt-24 w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />}
-        {state.kind === 'signed-out' && <SignIn clientId={state.clientId} message={state.message} onCredential={signIn} />}
+        {state.kind === 'signed-out' && <SignIn clientId={state.clientId} message={state.message} />}
         {state.kind === 'ready' && <Form data={state.data} offline={state.offline} onSignedOut={resync} />}
       </div>
     </main>
   );
 }
 
-function SignIn({ clientId, message, onCredential }: { clientId: string | null; message?: string; onCredential: (c: string) => Promise<void> }) {
+const SIGN_IN_PROBLEMS: Record<string, string> = {
+  no_account: 'That Google account has no Keeper account. Sign in to Keeper with Google once first.',
+  failed: 'Google sign-in did not work. Try again.',
+};
+
+/** Why the last sign-in attempt failed, passed back in the address by the sign-in endpoint. */
+function takeSignInProblem(): string | undefined {
+  const code = new URLSearchParams(window.location.search).get('signin');
+  if (!code) return undefined;
+  window.history.replaceState(null, '', window.location.pathname);
+  return SIGN_IN_PROBLEMS[code] ?? SIGN_IN_PROBLEMS.failed;
+}
+
+function SignIn({ clientId, message }: { clientId: string | null; message?: string }) {
+  const [problem] = useState(takeSignInProblem);
   const slot = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -149,14 +153,16 @@ function SignIn({ clientId, message, onCredential }: { clientId: string | null; 
     loadGoogle()
       .then(() => {
         if (cancelled || !slot.current || !window.google) return;
-        window.google.accounts.id.initialize({ client_id: clientId, callback: (r: { credential: string }) => void onCredential(r.credential), auto_select: false });
+        // Redirect mode: Google sends the browser back with the sign-in, which works on iPhone
+        // Safari and in home-screen apps where pop-up windows do not.
+        window.google.accounts.id.initialize({ client_id: clientId, ux_mode: 'redirect', login_uri: `${window.location.origin}/api/quickadd/session`, auto_select: false });
         window.google.accounts.id.renderButton(slot.current, { theme: 'outline', size: 'large', shape: 'pill', width: 280, text: 'signin_with' });
       })
       .catch(() => setFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [clientId, onCredential]);
+  }, [clientId]);
 
   return (
     <section className="glass-panel p-7 text-center space-y-5 mt-10">
@@ -167,7 +173,7 @@ function SignIn({ clientId, message, onCredential }: { clientId: string | null; 
       </div>
       {clientId ? <div ref={slot} className="flex justify-center min-h-[44px]" /> : null}
       {failed && <p role="alert" className="text-sm text-red-500">Google sign-in could not load. Check your connection and reload.</p>}
-      {message && <p role="alert" className="text-sm text-red-500">{message}</p>}
+      {(problem ?? message) && <p role="alert" className="text-sm text-red-500">{problem ?? message}</p>}
     </section>
   );
 }
@@ -198,6 +204,23 @@ function Chip({ selected, onClick, children, dot }: { selected: boolean; onClick
       {dot && <span className="w-2 h-2 rounded-full" style={{ background: dot }} />}
       {children}
     </button>
+  );
+}
+
+const TIP_SEEN = 'keeper.quickadd.tip';
+
+/** iPhone only, and only in the browser: how to put this page on the home screen. */
+function InstallTip() {
+  const [hidden, setHidden] = useState(() => read(TIP_SEEN) === '1');
+  const onIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const installed = (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (hidden || !onIphone || installed) return null;
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-2xl border border-border bg-surface p-3.5 text-sm shadow-card" role="note">
+      <span className="grid place-items-center w-8 h-8 shrink-0 rounded-xl bg-accent/10 text-accent"><Share className="w-4 h-4" /></span>
+      <p className="flex-1 text-secondary leading-snug"><span className="text-primary font-medium">Keep it one tap away.</span> In Safari, tap <Share className="w-3.5 h-3.5 inline -mt-0.5" /> Share, then <b className="text-primary">Add to Home Screen</b>.</p>
+      <button type="button" aria-label="Dismiss" onClick={() => { write(TIP_SEEN, '1'); setHidden(true); }} className="text-secondary p-1 -m-1"><X className="w-4 h-4" /></button>
+    </div>
   );
 }
 
@@ -288,6 +311,7 @@ function Form({ data, offline, onSignedOut }: { data: Choices; offline: boolean;
         </p>
       )}
 
+      <InstallTip />
       <section className="hero-card px-5 pt-5 pb-6 text-white">
         <div className="inline-flex p-1 rounded-full bg-white/10 text-sm font-medium" role="tablist">
           {(['EXPENSE', 'INCOME'] as const).map((t) => (

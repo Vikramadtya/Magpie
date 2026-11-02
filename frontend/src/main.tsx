@@ -27,7 +27,14 @@ window.addEventListener('vite:preloadError', () => {
 
 // /quickadd is a separate, tiny app: it never loads Keeper's login or talks to the main server,
 // so it opens instantly even while that server is asleep.
-const boot = window.location.pathname.startsWith('/quickadd') ? import('./quickadd/QuickAddApp') : import('./App');
+const isQuickAdd = window.location.pathname.startsWith('/quickadd');
+if (isQuickAdd) {
+  // Give this page its own home-screen identity: opens /quickadd and is named "Quick add".
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', '/quickadd.webmanifest');
+  document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', 'Quick add');
+  document.title = 'Quick add';
+}
+const boot = isQuickAdd ? import('./quickadd/QuickAddApp') : import('./App');
 const root = createRoot(document.getElementById('root')!);
 void boot.then(({ default: Root }) =>
   root.render(
