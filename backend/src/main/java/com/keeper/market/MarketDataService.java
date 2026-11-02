@@ -46,6 +46,7 @@ public class MarketDataService {
   public List<ProviderStatus> diagnose() {
     if (!enabled) return List.of();
     return providers.stream()
+        .filter(p -> p.handles("AAPL"))
         .map(
             p -> {
               boolean ok = p.quote("AAPL").isPresent();
@@ -60,14 +61,22 @@ public class MarketDataService {
     String key = q.toLowerCase();
     Cached<List<SecurityHit>> hit = searches.get(key);
     if (hit != null && hit.fresh(SEARCH_TTL)) return hit.value();
+    // Stocks and funds come from different sources, so results are combined; among stock sources
+    // the first one that answers wins.
+    List<SecurityHit> found = new java.util.ArrayList<>();
+    boolean stocksAnswered = false;
     for (MarketDataProvider p : providers) {
-      List<SecurityHit> found = p.search(q);
-      if (!found.isEmpty()) {
-        searches.put(key, new Cached<>(found, Instant.now()));
-        return found;
+      boolean fundSource = !p.handles("AAPL");
+      if (!fundSource && stocksAnswered) continue;
+      List<SecurityHit> part = p.search(q);
+      if (!part.isEmpty()) {
+        found.addAll(part);
+        if (!fundSource) stocksAnswered = true;
       }
     }
-    return List.of();
+    if (found.isEmpty()) return List.of();
+    searches.put(key, new Cached<>(found, Instant.now()));
+    return found;
   }
 
   /** Drops the cached quote so the next lookup goes to the market (used by an explicit refresh). */
@@ -80,6 +89,7 @@ public class MarketDataService {
     Cached<Quote> hit = quotes.get(symbol);
     if (hit != null && hit.fresh(QUOTE_TTL)) return Optional.of(hit.value());
     for (MarketDataProvider p : providers) {
+      if (!p.handles(symbol)) continue;
       Optional<Quote> q = p.quote(symbol);
       if (q.isPresent()) {
         quotes.put(symbol, new Cached<>(q.get(), Instant.now()));

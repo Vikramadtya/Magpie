@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
-import { Download, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
+import { Download, Layers, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
@@ -25,7 +25,7 @@ import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
-import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices } from '../hooks/useExtras';
+import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices, useLots, useAddPurchase, useRemovePurchase } from '../hooks/useExtras';
 import { buildPriceScript, parsePriceCsv } from '../lib/priceScript';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../lib/money';
 
@@ -38,6 +38,7 @@ export default function InvestmentsPage() {
   const [pricing, setPricing] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<Holding | null>(null);
   const [offline, setOffline] = useState(false);
+  const [buying, setBuying] = useState<Holding | null>(null);
   const del = useDeleteHolding();
   const refresh = useRefreshHoldings();
   const refreshOne = useRefreshHolding();
@@ -127,18 +128,19 @@ export default function InvestmentsPage() {
                 <tr key={h.id} className="border-b border-border/60 last:border-0 group hover:bg-primary/[0.02]">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <Avatar name={h.symbol} size={36} />
-                      <div className="min-w-0"><p className="font-semibold">{h.symbol}</p><p className="text-xs text-secondary truncate">{h.name}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
+                      <Avatar name={h.symbol.startsWith('MF:') ? h.name : h.symbol} size={36} />
+                      <div className="min-w-0"><p className="font-semibold">{h.symbol.startsWith('MF:') ? h.name : h.symbol}</p><p className="text-xs text-secondary truncate">{h.symbol.startsWith('MF:') ? 'Mutual fund' : h.name}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity > 0 ? formatMoney(Math.round(h.costBasisMinor / h.quantity), h.currency) : '—'}<p className="text-xs text-secondary mt-0.5">{h.purchasedOn ? `Bought ${format(parseISO(h.purchasedOn), 'd MMM yyyy')}` : 'Date not set'}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity > 0 ? formatMoney(Math.round(h.costBasisMinor / h.quantity), h.currency) : '—'}<p className="text-xs text-secondary mt-0.5">{h.lotCount > 1 ? `${h.lotCount} buys · since ${format(parseISO(h.purchasedOn!), 'd MMM yyyy')}` : h.purchasedOn ? `Bought ${format(parseISO(h.purchasedOn), 'd MMM yyyy')}` : 'Date not set'}</p></td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>Manual</Badge>}{h.priceUpdatedAt ? `Updated ${format(new Date(h.priceUpdatedAt), 'd MMM, HH:mm')}` : h.priceAsOf ? `As of ${format(parseISO(h.priceAsOf), 'd MMM yyyy')}` : ''}</p></td>
                   <td className="px-3 py-3.5 text-right tabular-nums font-medium">{formatMoney(h.marketValueMinor, h.currency)}</td>
                   <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
                     {canEdit && (
                       <div className="inline-flex items-center gap-0.5">
+                        <IconButton label="Purchases" onClick={() => setBuying(h)}><Layers className="w-4 h-4" /></IconButton>
                         <IconButton label="Refresh this price" disabled={refreshOne.isPending && refreshOne.variables === h.id} onClick={() => refreshOne.mutate(h.id, { onSuccess: (x) => (x.priceSource === 'LIVE' ? toast.success(`${x.symbol} updated`) : toast.error(`No live price found for ${x.symbol}`)), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 ${refreshOne.isPending && refreshOne.variables === h.id ? 'animate-spin' : ''}`} /></IconButton>
                         <span className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                         <IconButton label="Update price by hand" onClick={() => setPricing(h)}><Tag className="w-4 h-4" /></IconButton>
@@ -155,6 +157,7 @@ export default function InvestmentsPage() {
         </div>
       </StateView>
       {editing && <HoldingModal holding={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
+      {buying && <PurchasesModal holding={buying} canEdit={canEdit} onClose={() => setBuying(null)} />}
       {offline && <OfflinePricesModal holdings={list} onClose={() => setOffline(false)} />}
       {pricing && <PriceModal holding={pricing} onClose={() => setPricing(null)} />}
       <ConfirmDialog open={!!deleting} title={`Remove ${deleting?.symbol}?`} message="This only removes the holding record." confirmLabel="Remove" onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />
@@ -168,8 +171,9 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
   const cur = holding?.currency ?? currency;
   const [symbol, setSymbol] = useState(holding?.symbol ?? '');
   const [name, setName] = useState(holding?.name ?? '');
-  const [quantity, setQuantity] = useState(holding ? String(holding.quantity) : '');
-  const [cost, setCost] = useState(holding ? toInputValue(holding.costBasisMinor, cur) : '');
+  const [quantity, setQuantity] = useState('');
+  const firstBuy = !holding || holding.lotCount === 0;
+  const [paid, setPaid] = useState('');
   const [price, setPrice] = useState(holding ? toInputValue(holding.priceMinor, cur) : '');
   const [currencyCode, setCurrencyCode] = useState(cur);
   const [accountId, setAccountId] = useState(holding?.accountId ?? '');
@@ -188,7 +192,7 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
     setPicking(true);
     try {
       const q = await marketApi.quote(hit.symbol);
-      setSymbol(hit.symbol.replace(/^\^/, ''));
+      if (!(hit.type === 'MUTUALFUND' && symbol.trim())) setSymbol(hit.symbol.replace(/^\^/, ''));
       setName(q.name ?? hit.name);
       setLinked({ providerSymbol: hit.symbol, exchange: q.exchange ?? hit.exchange, assetType: hit.type });
       if (q.available && q.currency && q.priceMinor != null) {
@@ -208,11 +212,11 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const q = Number(quantity);
-    const costMinor = parseMoney(cost || '0', currencyCode);
+    const paidMinor = parseMoney(paid || '0', currencyCode);
     const priceMinor = parseMoney(price || '0', currencyCode);
     if (!symbol.trim() || !name.trim()) return setError('Symbol and name are required');
-    if (!(q >= 0) || costMinor === null || priceMinor === null) return setError('Check quantity, cost and price');
-    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: costMinor, priceMinor, currency: currencyCode, providerSymbol: linked?.providerSymbol ?? null, exchange: linked?.exchange ?? null, assetType: linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
+    if (!(q >= 0) || paidMinor === null || priceMinor === null) return setError('Check quantity, buy price and current price');
+    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: 0, unitPriceMinor: paidMinor, priceMinor, currency: currencyCode, providerSymbol: linked?.providerSymbol ?? null, exchange: linked?.exchange ?? null, assetType: linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
   };
 
   return (
@@ -225,7 +229,7 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
           </div>
         ) : (
           <div>
-            <Field label="Find a stock, ETF or index" hint="Search by name or ticker, e.g. Reliance, TCS, Apple, Nifty 50. Picking one keeps the price live.">
+            <Field label="Find a stock, ETF or index" hint="Search by name or ticker, e.g. Reliance, TCS, Apple, Nifty 50, or a mutual fund like Parag Parikh Flexi Cap. Picking one keeps the price live. For a fund, type your own symbol (such as the Google Finance code) first and it will be kept.">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-secondary" />
                 <Input className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" autoFocus={!holding} />
@@ -252,12 +256,16 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
           <Field label="Currency"><Select value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} disabled={!!holding}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
         </div>
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} /></Field>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Quantity"><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>
-          <Field label="Total cost"><MoneyInput value={cost} currency={currencyCode} onChange={setCost} /></Field>
-          <Field label="Price / unit"><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
-        </div>
-        <Field label="Date bought (optional)"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
+        <Field label="Current price / unit"><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
+        {firstBuy ? (
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Units bought"><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>
+            <Field label="Bought at / unit"><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
+            <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
+          </div>
+        ) : (
+          <p className="text-sm text-secondary">{holding.lotCount} purchase{holding.lotCount === 1 ? '' : 's'} recorded. Add or remove buys with the <Layers className="w-3.5 h-3.5 inline" /> button on the holding.</p>
+        )}
         {accounts.length > 0 && <Field label="Account (optional)"><Select value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">None</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></div>
       </form>
@@ -319,6 +327,58 @@ function OfflinePricesModal({ holdings, onClose }: { holdings: Holding[]; onClos
           <li className="flex items-start gap-3"><Badge>2</Badge><div className="flex-1"><p className="mb-2">Run it. It needs Python 3 and writes <code>prices.csv</code> next to it.</p><code className="block rounded-lg bg-primary/[0.06] px-3 py-2 text-xs">python3 keeper_prices.py</code></div></li>
           <li className="flex items-start gap-3"><Badge>3</Badge><div className="flex-1"><p className="mb-2">Upload the CSV to update your prices.</p><input ref={input} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => { void send(e.target.files?.[0]); e.target.value = ''; }} /><Button disabled={upload.isPending} onClick={() => input.current?.click()}><Upload className="w-4 h-4 mr-2" />{upload.isPending ? 'Updating…' : 'Upload prices.csv'}</Button></div></li>
         </ol>
+      </div>
+    </Modal>
+  );
+}
+
+/** Every purchase of a holding, with room to record another one. */
+function PurchasesModal({ holding, canEdit, onClose }: { holding: Holding; canEdit: boolean; onClose: () => void }) {
+  const lots = useLots(holding.id);
+  const add = useAddPurchase();
+  const remove = useRemovePurchase();
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [qty, setQty] = useState('');
+  const [price, setPrice] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const q = Number(qty);
+    const unit = parseMoney(price || '0', holding.currency);
+    if (!(q > 0) || unit === null || unit <= 0 || !date) return setError('Enter the date, units and price paid');
+    setError('');
+    add.mutate({ holdingId: holding.id, body: { boughtOn: date, quantity: q, unitPriceMinor: unit } }, {
+      onSuccess: () => { setQty(''); setPrice(''); toast.success('Purchase added'); },
+      onError: (err) => toast.error(errorMessage(err)),
+    });
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Purchases · ${holding.symbol.startsWith('MF:') ? holding.name : holding.symbol}`}>
+      <div className="space-y-4">
+        {lots.isLoading ? <p className="text-sm text-secondary">Loading…</p> : (lots.data ?? []).length === 0 ? <p className="text-sm text-secondary">No purchases recorded yet.</p> : (
+          <ul className="divide-y divide-border rounded-lg border border-border text-sm">
+            {(lots.data ?? []).map((l) => (
+              <li key={l.id} className="flex items-center justify-between gap-3 p-3">
+                <div><p className="font-medium">{format(parseISO(l.boughtOn), 'd MMM yyyy')}</p><p className="text-xs text-secondary">{l.quantity} units at {formatMoney(l.unitPriceMinor, holding.currency)}</p></div>
+                <div className="flex items-center gap-1"><span className="tabular-nums">{formatMoney(l.costMinor, holding.currency)}</span>
+                  {canEdit && <IconButton label="Remove purchase" onClick={() => remove.mutate({ holdingId: holding.id, lotId: l.id })}><Trash2 className="w-4 h-4" /></IconButton>}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEdit && (
+          <form onSubmit={submit} className="space-y-3">
+            <p className="text-sm font-medium">Add another purchase</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Date" error={error}><Input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} /></Field>
+              <Field label="Units"><Input inputMode="decimal" value={qty} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQty(e.target.value)} /></Field>
+              <Field label="Price / unit"><MoneyInput value={price} currency={holding.currency} onChange={setPrice} /></Field>
+            </div>
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={add.isPending}>Add purchase</Button></div>
+          </form>
+        )}
       </div>
     </Modal>
   );

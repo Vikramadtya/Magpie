@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { forecastApi, holdingsApi, loansApi, marketApi } from '../api/endpoints';
 import { useWorkspace } from '../auth/AuthProvider';
+import type { PurchaseInput } from '../api/types';
 import { invalidateMoney, qk } from './keys';
 
 // ---------- loans ----------
@@ -82,3 +83,23 @@ export function useUploadPrices() {
     },
   });
 }
+
+export function useLots(holdingId: string | null) {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: [...qk.holdings(id), holdingId, 'lots'], queryFn: () => holdingsApi.lots(id, holdingId!), enabled: !!holdingId });
+}
+
+function usePurchaseMutation<TArgs>(fn: (ws: string, args: TArgs) => Promise<unknown>) {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: TArgs) => fn(id, args),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.holdings(id) });
+      void qc.invalidateQueries({ queryKey: qk.investments(id) });
+    },
+  });
+}
+
+export const useAddPurchase = () => usePurchaseMutation((ws, a: { holdingId: string; body: PurchaseInput }) => holdingsApi.addLot(ws, a.holdingId, a.body));
+export const useRemovePurchase = () => usePurchaseMutation((ws, a: { holdingId: string; lotId: string }) => holdingsApi.removeLot(ws, a.holdingId, a.lotId));

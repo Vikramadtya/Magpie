@@ -94,4 +94,54 @@ class PriceUploadTest extends ApiTestBase {
             Map.class);
     assertEquals("2025-03-14", created.get("purchasedOn"));
   }
+
+  @Test
+  void aHoldingIsTheSumOfItsPurchases() {
+    Session s = register("lots");
+    String base = "/api/v1/workspaces/" + s.workspaceId() + "/holdings";
+    Map<?, ?> h =
+        post(
+            s.token(),
+            base,
+            Map.of(
+                "symbol",
+                "ZZLOT",
+                "name",
+                "Lots",
+                "quantity",
+                10,
+                "unitPriceMinor",
+                1000,
+                "priceMinor",
+                1500,
+                "currency",
+                "USD",
+                "purchasedOn",
+                "2025-01-10"),
+            Map.class);
+    String id = (String) h.get("id");
+    assertEquals(10_000, ((Number) h.get("costBasisMinor")).intValue());
+
+    Map<?, ?> after =
+        post(
+            s.token(),
+            base + "/" + id + "/lots",
+            Map.of("boughtOn", "2025-06-01", "quantity", 5, "unitPriceMinor", 1200),
+            Map.class);
+    assertEquals(16_000, ((Number) after.get("costBasisMinor")).intValue());
+    assertEquals(15, ((Number) after.get("quantity")).intValue());
+    assertEquals("2025-01-10", after.get("purchasedOn"));
+    assertEquals(2, ((Number) after.get("lotCount")).intValue());
+
+    var lots = getList(s.token(), base + "/" + id + "/lots");
+    assertEquals(2, lots.size());
+    String firstLot = (String) lots.get(0).get("id");
+    Map<?, ?> removed =
+        http()
+            .retrieve(
+                HttpRequest.DELETE(base + "/" + id + "/lots/" + firstLot).bearerAuth(s.token()),
+                Map.class);
+    assertEquals(6_000, ((Number) removed.get("costBasisMinor")).intValue());
+    assertEquals("2025-06-01", removed.get("purchasedOn"));
+  }
 }

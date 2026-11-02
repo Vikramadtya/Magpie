@@ -26,4 +26,10 @@ describe('buildPriceScript', () => {
     expect(script).toContain('TCS.BO');
     expect(script).toContain('prices.csv');
   });
+
+  it('looks funds up by scheme code', () => {
+    const script = buildPriceScript([holding('MF:122639', 'INR', 'MF:122639')]);
+    expect(script).toContain('MF:122639');
+    expect(script).not.toContain('MF:122639.NS');
+  });
 });

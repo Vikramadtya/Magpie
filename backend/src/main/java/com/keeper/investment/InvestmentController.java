@@ -50,7 +50,8 @@ public class InvestmentController {
       String assetType,
       String priceSource,
       java.time.Instant priceUpdatedAt,
-      LocalDate purchasedOn) {}
+      LocalDate purchasedOn,
+      int lotCount) {}
 
   @Serdeable
   public record Request(
@@ -65,8 +66,61 @@ public class InvestmentController {
       @Size(max = 40) String providerSymbol,
       @Size(max = 40) String exchange,
       @Size(max = 20) String assetType,
-      /** When the position was bought; optional. */
-      LocalDate purchasedOn) {}
+      /** When the first purchase was made; optional. */
+      LocalDate purchasedOn,
+      /** Price paid per unit; when set it decides the first purchase's cost. */
+      @Min(0) @Max(1_000_000_000_000L) Long unitPriceMinor) {}
+
+  @Serdeable
+  public record PurchaseRequest(
+      @jakarta.validation.constraints.NotNull LocalDate boughtOn,
+      @jakarta.validation.constraints.NotNull @DecimalMin(value = "0", inclusive = false)
+          BigDecimal quantity,
+      @Min(0) @Max(1_000_000_000_000L) long unitPriceMinor) {}
+
+  @Get("/holdings/{id}/lots")
+  public List<HoldingLots.Lot> purchases(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    get(workspaceId, id);
+    return lots.list(workspaceId, id);
+  }
+
+  @Post("/holdings/{id}/lots")
+  public Holding addPurchase(
+      @PathVariable UUID workspaceId, @PathVariable UUID id, @Valid @Body PurchaseRequest body) {
+    get(workspaceId, id);
+    lots.add(
+        workspaceId,
+        id,
+        body.boughtOn(),
+        body.quantity(),
+        HoldingLots.costOf(body.quantity(), body.unitPriceMinor()));
+    return get(workspaceId, id);
+  }
+
+  @Put("/holdings/{id}/lots/{lotId}")
+  public Holding editPurchase(
+      @PathVariable UUID workspaceId,
+      @PathVariable UUID id,
+      @PathVariable UUID lotId,
+      @Valid @Body PurchaseRequest body) {
+    get(workspaceId, id);
+    lots.update(
+        workspaceId,
+        id,
+        lotId,
+        body.boughtOn(),
+        body.quantity(),
+        HoldingLots.costOf(body.quantity(), body.unitPriceMinor()));
+    return get(workspaceId, id);
+  }
+
+  @Delete("/holdings/{id}/lots/{lotId}")
+  public Holding removePurchase(
+      @PathVariable UUID workspaceId, @PathVariable UUID id, @PathVariable UUID lotId) {
+    get(workspaceId, id);
+    lots.remove(workspaceId, id, lotId);
+    return get(workspaceId, id);
+  }
 
   @Serdeable
   public record PriceRequest(@Min(0) @Max(1_000_000_000_000L) long priceMinor) {}
@@ -85,7 +139,8 @@ public class InvestmentController {
 
   private static final String SELECT =
       "SELECT id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of, "
-          + "ROUND(quantity * price_minor) AS value, provider_symbol, exchange, asset_type, price_source, price_updated_at, purchased_on "
+          + "ROUND(quantity * price_minor) AS value, provider_symbol, exchange, asset_type, price_source, price_updated_at, purchased_on, "
+          + "(SELECT count(*) FROM holding_lots x WHERE x.holding_id = holdings.id) AS lots "
           + "FROM holdings WHERE workspace_id = ? ";
 
   private final Db db;
@@ -93,13 +148,16 @@ public class InvestmentController {
   private final FxConverter fx;
   private final com.keeper.market.MarketDataService market;
   private final HoldingRefresher refresher;
+  private final HoldingLots lots;
 
   public InvestmentController(
       Db db,
       RefChecks refs,
       FxConverter fx,
       com.keeper.market.MarketDataService market,
-      HoldingRefresher refresher) {
+      HoldingRefresher refresher,
+      HoldingLots lots) {
+    this.lots = lots;
     this.db = db;
     this.refs = refs;
     this.fx = fx;
@@ -129,7 +187,8 @@ public class InvestmentController {
         rs.getObject("price_updated_at", java.time.OffsetDateTime.class) == null
             ? null
             : rs.getObject("price_updated_at", java.time.OffsetDateTime.class).toInstant(),
-        rs.getObject("purchased_on", LocalDate.class));
+        rs.getObject("purchased_on", LocalDate.class),
+        rs.getInt("lots"));
   }
 
   @Get("/holdings")
@@ -174,8 +233,8 @@ public class InvestmentController {
         body.accountId(),
         body.symbol().toUpperCase().trim(),
         body.name().trim(),
-        body.quantity() == null ? BigDecimal.ZERO : body.quantity(),
-        body.costBasisMinor(),
+        BigDecimal.ZERO,
+        0L,
         r.priceMinor(),
         r.currency(),
         LocalDate.now(),
@@ -184,8 +243,24 @@ public class InvestmentController {
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",
         r.fetched() ? java.time.Instant.now() : null,
-        body.purchasedOn());
+        null);
+    firstPurchase(workspaceId, id, body);
     return get(workspaceId, id);
+  }
+
+  /** The opening purchase entered with a new holding; later ones are added as purchases. */
+  private void firstPurchase(UUID ws, UUID holdingId, Request body) {
+    if (body.quantity() == null || body.quantity().signum() <= 0) return;
+    long cost =
+        body.unitPriceMinor() != null
+            ? HoldingLots.costOf(body.quantity(), body.unitPriceMinor())
+            : body.costBasisMinor();
+    lots.add(
+        ws,
+        holdingId,
+        body.purchasedOn() == null ? LocalDate.now() : body.purchasedOn(),
+        body.quantity(),
+        cost);
   }
 
   @Put("/holdings/{id}")
@@ -206,27 +281,26 @@ public class InvestmentController {
             body.providerSymbol(),
             body.exchange(),
             body.assetType(),
-            body.purchasedOn());
+            body.purchasedOn(),
+            body.unitPriceMinor());
     Resolved r = resolve(keep);
     long price = r.fetched() ? r.priceMinor() : body.priceMinor();
     db.update(
-        "UPDATE holdings SET account_id = ?, symbol = ?, name = ?, quantity = ?, cost_basis_minor = ?, price_minor = ?, "
-            + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, purchased_on = ?, "
+        "UPDATE holdings SET account_id = ?, symbol = ?, name = ?, price_minor = ?, "
+            + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, "
             + "price_updated_at = CASE WHEN ? THEN NOW() ELSE price_updated_at END WHERE workspace_id = ? AND id = ?",
         body.accountId(),
         body.symbol().toUpperCase().trim(),
         body.name().trim(),
-        body.quantity() == null ? BigDecimal.ZERO : body.quantity(),
-        body.costBasisMinor(),
         price,
         r.providerSymbol(),
         blank(body.exchange()),
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",
-        body.purchasedOn(),
         r.fetched(),
         workspaceId,
         id);
+    if (current.lotCount() == 0) firstPurchase(workspaceId, id, body);
     return get(workspaceId, id);
   }
 

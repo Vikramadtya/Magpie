@@ -10,6 +10,11 @@ import java.util.Optional;
 public interface MarketDataProvider {
   String name();
 
+  /** Whether this source can price the symbol; funds use their own prefix. */
+  default boolean handles(String symbol) {
+    return !symbol.startsWith("MF:");
+  }
+
   List<SecurityHit> search(String query);
 
   Optional<Quote> quote(String symbol);

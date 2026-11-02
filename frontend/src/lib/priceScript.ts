@@ -5,6 +5,7 @@ export interface UploadedPrice { symbol: string; price: number; currency?: strin
 /** Where to look a holding up: its linked symbol, or the Indian exchange suffixes for rupee holdings. */
 function lookups(h: Holding): string[] {
   const base = (h.providerSymbol ?? h.symbol).trim().toUpperCase();
+  if (base.startsWith('MF:')) return [base];
   return h.currency === 'INR' && !base.includes('.') ? [`${base}.NS`, `${base}.BO`] : [base];
 }
 
@@ -24,15 +25,19 @@ import csv, json, urllib.parse, urllib.request
 
 HOLDINGS = json.loads(${JSON.stringify(JSON.stringify(items))})
 URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d"
+FUND_URL = "https://api.mfapi.in/mf/{}/latest"
+HEADERS = {"User-Agent": "Keeper-price-script/1.0 (personal use)"}
+
+
+def get(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=15) as res:
+        return json.load(res)
 
 
 def quote(symbol):
-    req = urllib.request.Request(
-        URL.format(urllib.parse.quote(symbol)),
-        headers={"User-Agent": "Keeper-price-script/1.0 (personal use)"},
-    )
-    with urllib.request.urlopen(req, timeout=15) as res:
-        meta = json.load(res)["chart"]["result"][0]["meta"]
+    if symbol.startswith("MF:"):  # Indian mutual fund: latest NAV
+        return float(get(FUND_URL.format(symbol[3:]))["data"][0]["nav"]), "INR"
+    meta = get(URL.format(urllib.parse.quote(symbol)))["chart"]["result"][0]["meta"]
     return meta["regularMarketPrice"], meta.get("currency")
 
 

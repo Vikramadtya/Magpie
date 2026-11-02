@@ -118,12 +118,14 @@ export interface Holding {
   id: string; accountId: string | null; symbol: string; name: string; quantity: number; costBasisMinor: number;
   priceMinor: number; currency: string; priceAsOf: string | null; marketValueMinor: number; gainMinor: number;
   providerSymbol: string | null; exchange: string | null; assetType: string | null;
-  priceSource: 'MANUAL' | 'LIVE'; priceUpdatedAt: string | null; purchasedOn: string | null;
+  priceSource: 'MANUAL' | 'LIVE'; priceUpdatedAt: string | null; purchasedOn: string | null; lotCount: number;
 }
 export interface HoldingInput {
   accountId?: string | null; symbol: string; name: string; quantity: number; costBasisMinor: number; priceMinor: number; currency: string;
-  providerSymbol?: string | null; exchange?: string | null; assetType?: string | null; purchasedOn?: string | null;
+  providerSymbol?: string | null; exchange?: string | null; assetType?: string | null; purchasedOn?: string | null; unitPriceMinor?: number | null;
 }
+export interface Lot { id: string; boughtOn: string; quantity: number; costMinor: number; unitPriceMinor: number }
+export interface PurchaseInput { boughtOn: string; quantity: number; unitPriceMinor: number }
 export interface InvestmentSummary {
   currency: string; valueMinor: number; costMinor: number; gainMinor: number; gainPercent: number;
   allocation: { symbol: string; valueMinor: number; percent: number }[];
