@@ -105,7 +105,7 @@ export default function TransactionsPage() {
               <Button variant={selecting ? 'secondary' : 'outline'} size="sm" onClick={() => setSelecting(!selecting)}>
                 <CheckSquare className="w-4 h-4 mr-2" />{selecting ? 'Done' : 'Select'}
               </Button>
-              <Button size="sm" onClick={() => dialog.open()}>Add</Button>
+              <Button size="sm" onClick={() => dialog.open(null, filters.accountId ? { accountId: filters.accountId } : undefined)}>Add</Button>
             </>
           )
         }

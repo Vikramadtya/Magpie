@@ -128,8 +128,10 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   }, [trips, editing, tripId]);
 
   useEffect(() => {
-    if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-  }, [accounts, accountId]);
+    // A remembered account that is gone or archived must not stay selected behind the dropdown.
+    const known = accounts.some((a) => a.id === accountId);
+    if ((!accountId || (!tx && !known)) && accounts[0]) setAccountId(accounts[0].id);
+  }, [accounts, accountId, tx]);
 
   useEffect(() => {
     if (!tx) return;
