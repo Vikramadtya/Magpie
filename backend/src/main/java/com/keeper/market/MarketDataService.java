@@ -66,6 +66,11 @@ public class MarketDataService {
     return List.of();
   }
 
+  /** Drops the cached quote so the next lookup goes to the market (used by an explicit refresh). */
+  public void forget(String symbol) {
+    if (symbol != null) quotes.remove(symbol);
+  }
+
   public Optional<Quote> quote(String symbol) {
     if (!enabled || symbol == null || symbol.isBlank()) return Optional.empty();
     Cached<Quote> hit = quotes.get(symbol);

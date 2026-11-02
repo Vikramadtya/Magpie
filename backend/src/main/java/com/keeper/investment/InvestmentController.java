@@ -226,8 +226,16 @@ public class InvestmentController {
   /** Re-fetches live prices for every linked holding right now. */
   @Post("/holdings/refresh")
   public List<Holding> refresh(@PathVariable UUID workspaceId) {
-    refresher.refreshWorkspace(workspaceId);
+    refresher.refreshNow(workspaceId, null);
     return list(workspaceId);
+  }
+
+  /** Re-fetches the live price of a single holding right now. */
+  @Post("/holdings/{id}/refresh")
+  public Holding refreshOne(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    get(workspaceId, id);
+    refresher.refreshNow(workspaceId, id);
+    return get(workspaceId, id);
   }
 
   private static String blank(String s) {

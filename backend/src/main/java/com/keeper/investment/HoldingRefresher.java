@@ -74,14 +74,15 @@ public class HoldingRefresher {
   }
 
   /** Tries to link hand-entered holdings to a live price; remembers when it last tried. */
-  private int linkManual(UUID ws) {
+  private int linkManual(UUID ws, UUID onlyId) {
     int linked = 0;
     var rows =
         db.list(
             "SELECT id, symbol, currency FROM holdings WHERE workspace_id = ? AND provider_symbol IS NULL "
-                + "AND price_source = 'MANUAL'",
+                + "AND price_source = 'MANUAL'"
+                + (onlyId == null ? "" : " AND id = ?"),
             rs -> new Row(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
-            ws);
+            onlyId == null ? new Object[] {ws} : new Object[] {ws, onlyId});
     for (Row row : rows) {
       Optional<Found> found = findLive(row.symbol(), row.currency());
       db.update("UPDATE holdings SET link_checked_at = NOW() WHERE id = ?", row.id());
@@ -99,8 +100,28 @@ public class HoldingRefresher {
 
   /** Synchronously refreshes one workspace; returns how many holdings got a new price. */
   public int refreshWorkspace(UUID ws) {
-    int linked = linkManual(ws);
+    int linked = linkManual(ws, null);
     return linked + apply(rows("workspace_id = ?", ws));
+  }
+
+  /**
+   * An explicit "refresh now": ignores recently cached quotes so the price really comes from the
+   * market. {@code onlyId} limits it to one holding.
+   */
+  public int refreshNow(UUID ws, UUID onlyId) {
+    var scope =
+        db.list(
+            "SELECT id, COALESCE(provider_symbol, symbol), currency FROM holdings WHERE workspace_id = ?"
+                + (onlyId == null ? "" : " AND id = ?"),
+            rs -> new Row(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
+            onlyId == null ? new Object[] {ws} : new Object[] {ws, onlyId});
+    scope.forEach(r -> market.forget(r.symbol()));
+    int linked = linkManual(ws, onlyId);
+    return linked
+        + apply(
+            onlyId == null
+                ? rows("workspace_id = ?", ws)
+                : rows("workspace_id = ? AND id = ?", ws, onlyId));
   }
 
   /** Fire-and-forget refresh if any live holding's price is older than 30 minutes. */
@@ -132,7 +153,7 @@ public class HoldingRefresher {
       db.list(
               "SELECT DISTINCT workspace_id FROM holdings WHERE price_source = 'MANUAL' AND provider_symbol IS NULL",
               rs -> rs.getObject(1, UUID.class))
-          .forEach(this::linkManual);
+          .forEach(w -> linkManual(w, null));
       apply(rows("TRUE"));
     } catch (RuntimeException e) {
       LOG.warn("Holding price refresh failed: {}", e.getMessage());

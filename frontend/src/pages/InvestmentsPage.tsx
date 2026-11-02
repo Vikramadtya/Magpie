@@ -1,3 +1,4 @@
+import { formatDistanceToNow } from 'date-fns';
 import { Pencil, Plus, RefreshCw, Search, Tag, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
@@ -24,7 +25,7 @@ import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
-import { useMarketSearch, useRefreshHoldings } from '../hooks/useExtras';
+import { useMarketSearch, useRefreshHolding, useRefreshHoldings } from '../hooks/useExtras';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../lib/money';
 
 
@@ -37,6 +38,7 @@ export default function InvestmentsPage() {
   const [deleting, setDeleting] = useState<Holding | null>(null);
   const del = useDeleteHolding();
   const refresh = useRefreshHoldings();
+  const refreshOne = useRefreshHolding();
   const list = holdings.data ?? [];
   const hasLive = list.some((h) => h.priceSource === 'LIVE');
   const stale = list.some((h) => h.priceSource === 'LIVE' && (!h.priceUpdatedAt || Date.now() - new Date(h.priceUpdatedAt).getTime() > 30 * 60_000));
@@ -47,6 +49,8 @@ export default function InvestmentsPage() {
     return () => clearTimeout(t);
   }, [stale, holdings]);
   const s = summary.data;
+  const stamps = list.filter((h) => h.priceSource === 'LIVE' && h.priceUpdatedAt).map((h) => new Date(h.priceUpdatedAt!).getTime());
+  const updatedAt = stamps.length ? new Date(Math.min(...stamps)) : null;
 
   const fetchLive = () =>
     refresh.mutate(undefined, {
@@ -67,11 +71,11 @@ export default function InvestmentsPage() {
 
   return (
     <>
-      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Fetch live prices</Button>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
+      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <div className="flex items-center gap-3">{updatedAt && <span className="text-xs text-secondary hidden sm:inline">Updated {formatDistanceToNow(updatedAt, { addSuffix: true })}</span>}<Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button></div>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
       {list.length > 0 && !hasLive && !holdings.isLoading && (
         <div role="status" className="glass-panel p-4 mb-6 flex flex-wrap items-center gap-3 border-accent/40">
           <Tag className="w-4 h-4 text-accent shrink-0" />
-          <p className="text-sm flex-1 min-w-[14rem]">These prices were entered by hand, so they don't move on their own. Keeper will look for live prices by symbol; press <strong>Fetch live prices</strong> to try now.</p>
+          <p className="text-sm flex-1 min-w-[14rem]">These prices were entered by hand, so they don't move on their own. Keeper will look for live prices by symbol; press <strong>Refresh prices</strong> to try now.</p>
         </div>
       )}
       <StateView isLoading={holdings.isLoading} error={holdings.error} onRetry={() => void holdings.refetch()} isEmpty={list.length === 0} emptyTitle="No holdings yet" emptyHint="Track stocks, funds or crypto by entering quantity, cost and the current price." emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add holding</Button>}>
@@ -130,10 +134,13 @@ export default function InvestmentsPage() {
                   <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
                     {canEdit && (
-                      <div className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                        <IconButton label="Update price" onClick={() => setPricing(h)}><Tag className="w-4 h-4" /></IconButton>
+                      <div className="inline-flex items-center gap-0.5">
+                        <IconButton label="Refresh this price" disabled={refreshOne.isPending && refreshOne.variables === h.id} onClick={() => refreshOne.mutate(h.id, { onSuccess: (x) => (x.priceSource === 'LIVE' ? toast.success(`${x.symbol} updated`) : toast.error(`No live price found for ${x.symbol}`)), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 ${refreshOne.isPending && refreshOne.variables === h.id ? 'animate-spin' : ''}`} /></IconButton>
+                        <span className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <IconButton label="Update price by hand" onClick={() => setPricing(h)}><Tag className="w-4 h-4" /></IconButton>
                         <IconButton label="Edit" onClick={() => setEditing(h)}><Pencil className="w-4 h-4" /></IconButton>
                         <IconButton label="Remove" onClick={() => setDeleting(h)}><Trash2 className="w-4 h-4" /></IconButton>
+                        </span>
                       </div>
                     )}
                   </td>

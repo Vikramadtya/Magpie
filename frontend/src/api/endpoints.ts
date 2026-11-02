@@ -149,6 +149,7 @@ export const holdingsApi = {
   create: (ws: string, b: T.HoldingInput) => api.post<T.Holding>(ws, '/holdings', b),
   update: (ws: string, id: string, b: T.HoldingInput) => api.put<T.Holding>(ws, `/holdings/${id}`, b),
   refresh: (ws: string) => api.post<T.Holding[]>(ws, '/holdings/refresh'),
+  refreshOne: (ws: string, id: string) => api.post<T.Holding>(ws, `/holdings/${id}/refresh`),
   setPrice: (ws: string, id: string, priceMinor: number) => api.put<T.Holding>(ws, `/holdings/${id}/price`, { priceMinor }),
   remove: (ws: string, id: string) => api.del(ws, `/holdings/${id}`),
 };

@@ -47,6 +47,18 @@ export function useMarketSearch(q: string) {
   });
 }
 
+export function useRefreshHolding() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (holdingId: string) => holdingsApi.refreshOne(id, holdingId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.holdings(id) });
+      void qc.invalidateQueries({ queryKey: qk.investments(id) });
+    },
+  });
+}
+
 export function useRefreshHoldings() {
   const { id } = useWorkspace();
   const qc = useQueryClient();
