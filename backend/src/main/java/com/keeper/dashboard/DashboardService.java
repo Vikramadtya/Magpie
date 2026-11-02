@@ -42,7 +42,9 @@ public class DashboardService {
       List<com.keeper.analytics.AnalyticsService.CategorySpend> topCategories,
       /** Spending per day of the month and of the month before, for the pace chart. */
       List<Long> dailySpend,
-      List<Long> previousDailySpend) {}
+      List<Long> previousDailySpend,
+      /** Market value of holdings; already included in assets and net worth. */
+      long investmentsMinor) {}
 
   /** What someone else spent from the owner's accounts this month. */
   @Serdeable
@@ -88,6 +90,9 @@ public class DashboardService {
       if (a.balanceMinor() >= 0 && !isLiability(a)) assets += inBase;
       else liabilities += inBase;
     }
+
+    long investments = investmentValue(ws, converter);
+    assets += investments;
 
     AtomicLong income = new AtomicLong();
     AtomicLong expense = new AtomicLong();
@@ -148,7 +153,21 @@ public class DashboardService {
             .limit(5)
             .toList(),
         daily(ws, month),
-        daily(ws, month.minusMonths(1)));
+        daily(ws, month.minusMonths(1)),
+        investments);
+  }
+
+  /** Holdings at today's price, in the base currency. */
+  private long investmentValue(UUID ws, com.keeper.fx.FxConverter.Converter converter) {
+    AtomicLong total = new AtomicLong();
+    db.list(
+        "SELECT currency, SUM(ROUND(quantity * price_minor))::bigint FROM holdings WHERE workspace_id = ? GROUP BY currency",
+        rs -> {
+          total.addAndGet(converter.toBase(rs.getLong(2), rs.getString(1)));
+          return null;
+        },
+        ws);
+    return total.get();
   }
 
   /** {income, expense} of your own money for a month. */

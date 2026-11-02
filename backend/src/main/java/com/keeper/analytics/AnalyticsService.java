@@ -132,6 +132,34 @@ public class AnalyticsService {
         first.atDay(1),
         ws);
 
+    // Investments: past months at what was paid (from the purchase dates), this month at market
+    // value.
+    Map<String, Map<String, Long>> boughtByMonth = new TreeMap<>();
+    db.list(
+        "SELECT h.currency, to_char(date_trunc('month', l.bought_on), 'YYYY-MM'), SUM(l.cost_minor) "
+            + "FROM holding_lots l JOIN holdings h ON h.id = l.holding_id WHERE l.workspace_id = ? GROUP BY 1, 2",
+        rs -> {
+          boughtByMonth
+              .computeIfAbsent(rs.getString(2), k -> new LinkedHashMap<>())
+              .put(rs.getString(1), rs.getLong(3));
+          return null;
+        },
+        ws);
+    Map<String, Long> invested = new LinkedHashMap<>();
+    boughtByMonth.forEach(
+        (month, byCurrency) -> {
+          if (month.compareTo(first.toString()) < 0)
+            byCurrency.forEach((cur, v) -> invested.merge(cur, v, Long::sum));
+        });
+    Map<String, Long> marketValue = new LinkedHashMap<>();
+    db.list(
+        "SELECT currency, SUM(ROUND(quantity * price_minor))::bigint FROM holdings WHERE workspace_id = ? GROUP BY currency",
+        rs -> {
+          marketValue.put(rs.getString(1), rs.getLong(2));
+          return null;
+        },
+        ws);
+
     Map<String, Long> running = new LinkedHashMap<>(startByCurrency);
     List<NetWorthPoint> points = new ArrayList<>();
     for (YearMonth m = first; !m.isAfter(last); m = m.plusMonths(1)) {
@@ -140,6 +168,11 @@ public class AnalyticsService {
           .forEach((cur, d) -> running.merge(cur, d, Long::sum));
       long total = 0;
       for (var e : running.entrySet()) total += converter.toBase(e.getValue(), e.getKey());
+      boughtByMonth
+          .getOrDefault(m.toString(), Map.of())
+          .forEach((cur, v) -> invested.merge(cur, v, Long::sum));
+      for (var e : (m.equals(last) ? marketValue : invested).entrySet())
+        total += converter.toBase(e.getValue(), e.getKey());
       points.add(new NetWorthPoint(m.toString(), total));
     }
     return new Report<>(converter.base(), points, List.copyOf(converter.missing()));

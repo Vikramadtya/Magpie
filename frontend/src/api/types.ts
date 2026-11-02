@@ -90,7 +90,7 @@ export interface Upcoming {
 }
 
 export interface Dashboard {
-  month: string; currency: string; netWorthMinor: number; assetsMinor: number; liabilitiesMinor: number;
+  month: string; currency: string; netWorthMinor: number; investmentsMinor: number; assetsMinor: number; liabilitiesMinor: number;
   incomeMinor: number; expenseMinor: number; previousIncomeMinor: number; previousExpenseMinor: number; savingsRatePercent: number;
   accounts: Account[]; recent: Transaction[]; budgets: BudgetSummary; upcoming: Upcoming[];
   /** Currencies with no exchange rate yet; their amounts were not converted. */

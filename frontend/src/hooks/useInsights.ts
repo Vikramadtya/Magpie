@@ -25,6 +25,7 @@ export function useDashboard(month: string) {
       previousIncomeMinor: d.previousIncomeMinor ?? 0,
       previousExpenseMinor: d.previousExpenseMinor ?? 0,
       spentByOthers: d.spentByOthers ?? [],
+      investmentsMinor: d.investmentsMinor ?? 0,
       topCategories: d.topCategories ?? [],
       dailySpend: d.dailySpend ?? [],
       previousDailySpend: d.previousDailySpend ?? [],

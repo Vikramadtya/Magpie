@@ -96,6 +96,32 @@ class PriceUploadTest extends ApiTestBase {
   }
 
   @Test
+  void netWorthIncludesHoldingsAtMarketValue() {
+    Session s = register("worth");
+    String ws = "/api/v1/workspaces/" + s.workspaceId();
+    post(
+        s.token(),
+        ws + "/holdings",
+        Map.of(
+            "symbol",
+            "ZZNW",
+            "name",
+            "Worth",
+            "quantity",
+            10,
+            "unitPriceMinor",
+            1000,
+            "priceMinor",
+            1500,
+            "currency",
+            "USD"),
+        Map.class);
+    Map<?, ?> d = get(s.token(), ws + "/dashboard", Map.class);
+    assertEquals(15_000, ((Number) d.get("investmentsMinor")).intValue());
+    assertEquals(15_000, ((Number) d.get("netWorthMinor")).intValue());
+  }
+
+  @Test
   void aHoldingIsTheSumOfItsPurchases() {
     Session s = register("lots");
     String base = "/api/v1/workspaces/" + s.workspaceId() + "/holdings";

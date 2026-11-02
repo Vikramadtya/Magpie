@@ -119,7 +119,7 @@ function NetWorthHero({ d, points }: { d: Dashboard; points: number[] }) {
       <p className="text-4xl font-semibold mt-1.5 tabular-nums tracking-[-0.03em]">{formatMoney(d.netWorthMinor, d.currency)}</p>
       <p className="text-xs text-white/60 mt-2 flex items-center gap-1.5 flex-wrap">
         {points.length > 1 && <><Delta onDark current={points[points.length - 1]} previous={points[0]} /> over 6 months · </>}
-        Assets {formatMoney(d.assetsMinor, d.currency)} · Debts {formatMoney(Math.abs(d.liabilitiesMinor), d.currency)}
+        Assets {formatMoney(d.assetsMinor, d.currency)}{d.investmentsMinor > 0 && <> (incl. investments {formatMoney(d.investmentsMinor, d.currency)})</>} · Debts {formatMoney(Math.abs(d.liabilitiesMinor), d.currency)}
       </p>
       <div className="mt-auto pt-3">
         <Suspense fallback={<Skeleton className="h-16" />}>{points.length > 1 ? <Sparkline values={points} /> : <div className="h-16" />}</Suspense>
