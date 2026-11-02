@@ -128,8 +128,8 @@ export default function InvestmentsPage() {
                 <tr key={h.id} className="border-b border-border/60 last:border-0 group hover:bg-primary/[0.02]">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <Avatar name={h.symbol.startsWith('MF:') ? h.name : h.symbol} size={36} />
-                      <div className="min-w-0"><p className="font-semibold">{h.symbol.startsWith('MF:') ? h.name : h.symbol}</p><p className="text-xs text-secondary truncate">{h.symbol.startsWith('MF:') ? 'Mutual fund' : h.name}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
+                      <Avatar name={h.name} size={36} />
+                      <div className="min-w-0"><p className="font-semibold truncate">{h.name}</p><p className="text-xs text-secondary truncate">{h.symbol.startsWith('MF:') ? 'Mutual fund' : h.symbol}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
@@ -355,7 +355,7 @@ function PurchasesModal({ holding, canEdit, onClose }: { holding: Holding; canEd
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={`Purchases · ${holding.symbol.startsWith('MF:') ? holding.name : holding.symbol}`}>
+    <Modal isOpen onClose={onClose} title={`Purchases · ${holding.name}`}>
       <div className="space-y-4">
         {lots.isLoading ? <p className="text-sm text-secondary">Loading…</p> : (lots.data ?? []).length === 0 ? <p className="text-sm text-secondary">No purchases recorded yet.</p> : (
           <ul className="divide-y divide-border rounded-lg border border-border text-sm">
