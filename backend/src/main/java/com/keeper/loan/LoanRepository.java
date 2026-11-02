@@ -1,7 +1,7 @@
 package com.keeper.loan;
 
 import com.keeper.common.db.Db;
-import com.keeper.common.db.RowMapper;
+import com.keeper.crypto.FieldCrypto;
 import jakarta.inject.Singleton;
 import java.time.LocalDate;
 import java.util.List;
@@ -29,31 +29,33 @@ public class LoanRepository {
           + "AND t.direction = CASE WHEN l.direction = 'BORROWED' THEN -1 ELSE 1 END), 0) AS repaid "
           + "FROM loans l WHERE l.workspace_id = ? AND l.deleted_at IS NULL ";
 
-  private static final RowMapper<Row> MAPPER =
-      rs ->
-          new Row(
-              rs.getObject("id", UUID.class),
-              rs.getString("person"),
-              rs.getString("direction"),
-              rs.getLong("principal_minor"),
-              rs.getString("currency"),
-              rs.getObject("occurred_on", LocalDate.class),
-              rs.getObject("due_on", LocalDate.class),
-              rs.getString("note"),
-              rs.getLong("repaid"));
+  private Row toRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+    return new Row(
+        rs.getObject("id", UUID.class),
+        rs.getString("person"),
+        rs.getString("direction"),
+        rs.getLong("principal_minor"),
+        rs.getString("currency"),
+        rs.getObject("occurred_on", LocalDate.class),
+        rs.getObject("due_on", LocalDate.class),
+        crypto.open(rs.getString("note")),
+        rs.getLong("repaid"));
+  }
 
   private final Db db;
+  private final FieldCrypto crypto;
 
-  public LoanRepository(Db db) {
+  public LoanRepository(Db db, FieldCrypto crypto) {
     this.db = db;
+    this.crypto = crypto;
   }
 
   public List<Row> findAll(UUID ws) {
-    return db.list(SELECT + "ORDER BY l.occurred_on DESC, l.created_at DESC", MAPPER, ws);
+    return db.list(SELECT + "ORDER BY l.occurred_on DESC, l.created_at DESC", this::toRow, ws);
   }
 
   public Optional<Row> find(UUID ws, UUID id) {
-    return db.one(SELECT + "AND l.id = ?", MAPPER, ws, id);
+    return db.one(SELECT + "AND l.id = ?", this::toRow, ws, id);
   }
 
   public UUID insert(
@@ -78,7 +80,7 @@ public class LoanRepository {
         currency,
         date,
         due,
-        note,
+        crypto.seal(ws, note),
         actor);
     return id;
   }

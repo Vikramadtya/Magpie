@@ -22,6 +22,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class ApiTestBase implements TestPropertyProvider {
 
+  /** 32 bytes, base64: switches field encryption on for every integration test. */
+  protected static final String TEST_MASTER_KEY = "dGVzdC1tYXN0ZXIta2V5LTMyLWJ5dGVzLWxvbmctISE=";
+
   /** Set TEST_DB_URL (jdbc:...) to reuse a running Postgres instead of starting a container. */
   private static final String EXTERNAL_URL = System.getenv("TEST_DB_URL");
 
@@ -38,12 +41,17 @@ public abstract class ApiTestBase implements TestPropertyProvider {
   public Map<String, String> getProperties() {
     if (POSTGRES == null) {
       return Map.of(
-          "datasources.default.url", EXTERNAL_URL,
-          "datasources.default.username", System.getenv().getOrDefault("TEST_DB_USER", "postgres"),
+          "keeper.crypto.master-key",
+          TEST_MASTER_KEY,
+          "datasources.default.url",
+          EXTERNAL_URL,
+          "datasources.default.username",
+          System.getenv().getOrDefault("TEST_DB_USER", "postgres"),
           "datasources.default.password",
-              System.getenv().getOrDefault("TEST_DB_PASSWORD", "password"));
+          System.getenv().getOrDefault("TEST_DB_PASSWORD", "password"));
     }
     return Map.of(
+        "keeper.crypto.master-key", TEST_MASTER_KEY,
         "datasources.default.url", POSTGRES.getJdbcUrl(),
         "datasources.default.username", POSTGRES.getUsername(),
         "datasources.default.password", POSTGRES.getPassword());

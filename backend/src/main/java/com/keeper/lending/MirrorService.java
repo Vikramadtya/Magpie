@@ -4,6 +4,7 @@ import com.keeper.account.AccountRepository;
 import com.keeper.auth.User;
 import com.keeper.auth.UserRepository;
 import com.keeper.common.db.Db;
+import com.keeper.crypto.FieldCrypto;
 import com.keeper.payee.PayeeRepository;
 import com.keeper.person.PersonRepository;
 import com.keeper.transaction.EntryListener;
@@ -29,6 +30,7 @@ public class MirrorService implements EntryListener {
   private record Copy(UUID id, UUID ownerWs, UUID accountId, long amount) {}
 
   private final Db db;
+  private final FieldCrypto crypto;
   private final TransactionRepository transactions;
   private final AccountRepository accounts;
   private final PayeeRepository payees;
@@ -43,7 +45,9 @@ public class MirrorService implements EntryListener {
       PayeeRepository payees,
       PersonRepository people,
       UserRepository users,
-      Normaliser normaliser) {
+      Normaliser normaliser,
+      FieldCrypto crypto) {
+    this.crypto = crypto;
     this.db = db;
     this.transactions = transactions;
     this.accounts = accounts;
@@ -102,7 +106,7 @@ public class MirrorService implements EntryListener {
                       + "version = version + 1, updated_at = NOW() WHERE id = ?",
                   e.amountMinor(),
                   e.occurredOn(),
-                  e.note(),
+                  crypto.seal(c.ownerWs(), e.note()),
                   categoryNamed(c.ownerWs(), e.categoryName()),
                   payeeNamed(c.ownerWs(), e.payeeName()),
                   e.origAmountMinor(),

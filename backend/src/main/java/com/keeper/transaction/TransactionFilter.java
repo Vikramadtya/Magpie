@@ -41,7 +41,8 @@ public record TransactionFilter(
     if (q != null && !q.isBlank()) {
       String like =
           "%" + q.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
-      where.and("(t.note ILIKE ? OR p.name ILIKE ?)", like, like);
+      // Notes are encrypted, so only the payee can be searched on the server.
+      where.and("p.name ILIKE ?", like);
     }
     return where;
   }

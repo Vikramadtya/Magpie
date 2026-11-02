@@ -3,6 +3,7 @@ package com.keeper.transaction;
 import com.keeper.common.Actor;
 import com.keeper.common.db.Db;
 import com.keeper.common.exception.ResourceNotFoundException;
+import com.keeper.crypto.FieldCrypto;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -32,17 +33,19 @@ public class CommentController {
       "SELECT c.id, c.user_id, u.name, c.body, c.created_at FROM transaction_comments c JOIN users u ON u.id = c.user_id ";
 
   private final Db db;
+  private final FieldCrypto crypto;
 
-  public CommentController(Db db) {
+  public CommentController(Db db, FieldCrypto crypto) {
     this.db = db;
+    this.crypto = crypto;
   }
 
-  private static Comment map(java.sql.ResultSet rs) throws java.sql.SQLException {
+  private Comment map(java.sql.ResultSet rs) throws java.sql.SQLException {
     return new Comment(
         rs.getObject("id", UUID.class),
         rs.getObject("user_id", UUID.class),
         rs.getString("name"),
-        rs.getString("body"),
+        crypto.open(rs.getString("body")),
         rs.getObject("created_at", OffsetDateTime.class).toInstant());
   }
 
@@ -50,7 +53,7 @@ public class CommentController {
   public List<Comment> list(@PathVariable UUID workspaceId, @PathVariable UUID transactionId) {
     return db.list(
         SELECT + "WHERE c.workspace_id = ? AND c.transaction_id = ? ORDER BY c.created_at",
-        CommentController::map,
+        this::map,
         workspaceId,
         transactionId);
   }
@@ -74,7 +77,7 @@ public class CommentController {
         workspaceId,
         transactionId,
         Actor.id(auth),
-        body.body().trim());
-    return db.one(SELECT + "WHERE c.id = ?", CommentController::map, id).orElseThrow();
+        crypto.seal(workspaceId, body.body().trim()));
+    return db.one(SELECT + "WHERE c.id = ?", this::map, id).orElseThrow();
   }
 }

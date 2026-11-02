@@ -1,6 +1,7 @@
 package com.keeper.transaction;
 
 import com.keeper.common.db.Db;
+import com.keeper.crypto.FieldCrypto;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
 import java.io.IOException;
@@ -16,10 +17,12 @@ public class RevisionService {
 
   private final Db db;
   private final JsonMapper json;
+  private final FieldCrypto crypto;
 
-  public RevisionService(Db db, JsonMapper json) {
+  public RevisionService(Db db, JsonMapper json, FieldCrypto crypto) {
     this.db = db;
     this.json = json;
+    this.crypto = crypto;
   }
 
   public void record(UUID ws, UUID actor, String action, TransactionView before) {
@@ -29,11 +32,24 @@ public class RevisionService {
           ws,
           before.id(),
           action,
-          json.writeValueAsString(before),
+          sealed(ws, json.writeValueAsString(before)),
           actor);
     } catch (IOException e) {
       throw new IllegalStateException("Could not store revision", e);
     }
+  }
+
+  /** Stored as {"enc": "<sealed json>"} so the column stays valid JSON. */
+  private String sealed(UUID ws, String snapshot) throws IOException {
+    if (!crypto.enabled()) return snapshot;
+    return json.writeValueAsString(java.util.Map.of("enc", crypto.seal(ws, snapshot)));
+  }
+
+  private String opened(String stored) throws IOException {
+    if (!stored.contains("\"enc\"")) return stored;
+    var wrapper = json.readValue(stored, java.util.Map.class);
+    Object enc = wrapper.get("enc");
+    return enc instanceof String s ? crypto.open(s) : stored;
   }
 
   /** The most recent change to this transaction that has not been undone yet. */
@@ -46,7 +62,7 @@ public class RevisionService {
             return new Revision(
                 rs.getLong(1),
                 rs.getString(2),
-                json.readValue(rs.getString(3), TransactionView.class));
+                json.readValue(opened(rs.getString(3)), TransactionView.class));
           } catch (IOException e) {
             throw new IllegalStateException("Corrupt revision", e);
           }

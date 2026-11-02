@@ -1,7 +1,7 @@
 package com.keeper.trip;
 
 import com.keeper.common.db.Db;
-import com.keeper.common.db.RowMapper;
+import com.keeper.crypto.FieldCrypto;
 import jakarta.inject.Singleton;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,31 +28,33 @@ public class TripRepository {
           + "LEFT JOIN transactions x ON x.trip_id = t.id AND x.deleted_at IS NULL AND x.type = 'EXPENSE' AND x.loan_id IS NULL "
           + "WHERE t.workspace_id = ? ";
 
-  private static final RowMapper<Row> MAPPER =
-      rs ->
-          new Row(
-              rs.getObject("id", UUID.class),
-              rs.getString("name"),
-              rs.getObject("start_date", LocalDate.class),
-              rs.getObject("end_date", LocalDate.class),
-              rs.getObject("budget_minor", Long.class),
-              rs.getString("notes"),
-              rs.getLong("spent"),
-              rs.getInt("n"));
+  private Row toRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+    return new Row(
+        rs.getObject("id", UUID.class),
+        rs.getString("name"),
+        rs.getObject("start_date", LocalDate.class),
+        rs.getObject("end_date", LocalDate.class),
+        rs.getObject("budget_minor", Long.class),
+        crypto.open(rs.getString("notes")),
+        rs.getLong("spent"),
+        rs.getInt("n"));
+  }
 
   private final Db db;
+  private final FieldCrypto crypto;
 
-  public TripRepository(Db db) {
+  public TripRepository(Db db, FieldCrypto crypto) {
     this.db = db;
+    this.crypto = crypto;
   }
 
   public List<Row> findAll(UUID ws) {
     return db.list(
-        SELECT + "GROUP BY t.id ORDER BY t.start_date DESC, t.created_at DESC", MAPPER, ws);
+        SELECT + "GROUP BY t.id ORDER BY t.start_date DESC, t.created_at DESC", this::toRow, ws);
   }
 
   public Optional<Row> find(UUID ws, UUID id) {
-    return db.one(SELECT + "AND t.id = ? GROUP BY t.id", MAPPER, ws, id);
+    return db.one(SELECT + "AND t.id = ? GROUP BY t.id", this::toRow, ws, id);
   }
 
   public UUID insert(
@@ -66,7 +68,7 @@ public class TripRepository {
         start,
         end,
         budget,
-        notes);
+        crypto.seal(ws, notes));
     return id;
   }
 
@@ -78,7 +80,7 @@ public class TripRepository {
         start,
         end,
         budget,
-        notes,
+        crypto.seal(ws, notes),
         ws,
         id);
   }

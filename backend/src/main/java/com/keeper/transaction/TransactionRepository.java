@@ -3,6 +3,7 @@ package com.keeper.transaction;
 import com.keeper.common.db.Db;
 import com.keeper.common.db.RowMapper;
 import com.keeper.common.db.SqlWhere;
+import com.keeper.crypto.FieldCrypto;
 import jakarta.inject.Singleton;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -59,39 +60,39 @@ public class TransactionRepository {
           + "LEFT JOIN loans l ON l.id = t.loan_id LEFT JOIN trips tr ON tr.id = t.trip_id LEFT JOIN people pe ON pe.id = t.spent_by ";
   private static final String SELECT = "SELECT " + COLUMNS + FROM;
 
-  static final RowMapper<TransactionView> VIEW =
-      rs ->
-          new TransactionView(
-              rs.getObject("id", UUID.class),
-              rs.getObject("account_id", UUID.class),
-              rs.getString("account_name"),
-              rs.getString("type"),
-              rs.getInt("direction"),
-              rs.getLong("amount_minor"),
-              rs.getString("currency"),
-              rs.getObject("occurred_on", LocalDate.class),
-              rs.getObject("category_id", UUID.class),
-              rs.getString("category_name"),
-              rs.getObject("payee_id", UUID.class),
-              rs.getString("payee_name"),
-              rs.getString("note"),
-              uuids(rs, "tag_ids"),
-              rs.getObject("transfer_id", UUID.class),
-              rs.getInt("version"),
-              rs.getObject("created_by", UUID.class),
-              rs.getObject("created_at", OffsetDateTime.class).toInstant(),
-              rs.getObject("orig_amount_minor", Long.class),
-              rs.getString("orig_currency"),
-              rs.getObject("loan_id", UUID.class),
-              rs.getString("loan_person"),
-              rs.getObject("base_amount_minor", Long.class),
-              rs.getString("base_currency"),
-              rs.getBigDecimal("base_fx_rate"),
-              rs.getBoolean("base_overridden"),
-              rs.getObject("trip_id", UUID.class),
-              rs.getString("trip_name"),
-              rs.getObject("spent_by", UUID.class),
-              rs.getString("spent_by_name"));
+  private TransactionView toView(java.sql.ResultSet rs) throws SQLException {
+    return new TransactionView(
+        rs.getObject("id", UUID.class),
+        rs.getObject("account_id", UUID.class),
+        rs.getString("account_name"),
+        rs.getString("type"),
+        rs.getInt("direction"),
+        rs.getLong("amount_minor"),
+        rs.getString("currency"),
+        rs.getObject("occurred_on", LocalDate.class),
+        rs.getObject("category_id", UUID.class),
+        rs.getString("category_name"),
+        rs.getObject("payee_id", UUID.class),
+        rs.getString("payee_name"),
+        crypto.open(rs.getString("note")),
+        uuids(rs, "tag_ids"),
+        rs.getObject("transfer_id", UUID.class),
+        rs.getInt("version"),
+        rs.getObject("created_by", UUID.class),
+        rs.getObject("created_at", OffsetDateTime.class).toInstant(),
+        rs.getObject("orig_amount_minor", Long.class),
+        rs.getString("orig_currency"),
+        rs.getObject("loan_id", UUID.class),
+        rs.getString("loan_person"),
+        rs.getObject("base_amount_minor", Long.class),
+        rs.getString("base_currency"),
+        rs.getBigDecimal("base_fx_rate"),
+        rs.getBoolean("base_overridden"),
+        rs.getObject("trip_id", UUID.class),
+        rs.getString("trip_name"),
+        rs.getObject("spent_by", UUID.class),
+        rs.getString("spent_by_name"));
+  }
 
   private static List<UUID> uuids(java.sql.ResultSet rs, String col) throws SQLException {
     Object[] arr = (Object[]) rs.getArray(col).getArray();
@@ -115,9 +116,11 @@ public class TransactionRepository {
               rs.getObject("loan_id", UUID.class));
 
   private final Db db;
+  private final FieldCrypto crypto;
 
-  public TransactionRepository(Db db) {
+  public TransactionRepository(Db db, FieldCrypto crypto) {
     this.db = db;
+    this.crypto = crypto;
   }
 
   // ---------- reads ----------
@@ -131,20 +134,23 @@ public class TransactionRepository {
     }
     return db.list(
         SELECT + "WHERE " + where.sql() + " ORDER BY t.occurred_on DESC, t.id DESC LIMIT ?",
-        VIEW,
+        this::toView,
         where.argsWith(limit + 1));
   }
 
   public Optional<TransactionView> find(UUID ws, UUID id) {
     return db.one(
-        SELECT + "WHERE t.workspace_id = ? AND t.id = ? AND t.deleted_at IS NULL", VIEW, ws, id);
+        SELECT + "WHERE t.workspace_id = ? AND t.id = ? AND t.deleted_at IS NULL",
+        this::toView,
+        ws,
+        id);
   }
 
   public List<TransactionView> findTransferLegs(UUID ws, UUID transferId) {
     return db.list(
         SELECT
             + "WHERE t.workspace_id = ? AND t.transfer_id = ? AND t.deleted_at IS NULL ORDER BY t.direction",
-        VIEW,
+        this::toView,
         ws,
         transferId);
   }
@@ -153,13 +159,14 @@ public class TransactionRepository {
     return db.list(
         SELECT
             + "WHERE t.workspace_id = ? AND t.loan_id = ? AND t.deleted_at IS NULL ORDER BY t.occurred_on, t.created_at",
-        VIEW,
+        this::toView,
         ws,
         loanId);
   }
 
   public Optional<TransactionView> findByIdempotencyKey(UUID ws, String key) {
-    return db.one(SELECT + "WHERE t.workspace_id = ? AND t.idempotency_key = ?", VIEW, ws, key);
+    return db.one(
+        SELECT + "WHERE t.workspace_id = ? AND t.idempotency_key = ?", this::toView, ws, key);
   }
 
   /** Recently deleted rows (for the restore list). */
@@ -168,7 +175,7 @@ public class TransactionRepository {
         SELECT
             + "WHERE t.workspace_id = ? AND t.deleted_at IS NOT NULL AND t.deleted_at > NOW() - INTERVAL '30 days' "
             + "ORDER BY t.deleted_at DESC LIMIT ?",
-        VIEW,
+        this::toView,
         ws,
         limit);
   }
@@ -236,7 +243,7 @@ public class TransactionRepository {
         i.occurredOn(),
         i.categoryId(),
         i.payeeId(),
-        i.note(),
+        crypto.seal(i.workspaceId(), i.note()),
         i.transferId(),
         o.recurringRuleId(),
         o.importHash(),
@@ -285,7 +292,7 @@ public class TransactionRepository {
         date,
         categoryId,
         payeeId,
-        note,
+        crypto.seal(ws, note),
         actor,
         origAmountMinor,
         origCurrency,
@@ -313,7 +320,7 @@ public class TransactionRepository {
         v.occurredOn(),
         v.categoryId(),
         v.payeeId(),
-        v.note(),
+        crypto.seal(ws, v.note()),
         actor,
         v.origAmountMinor(),
         v.origCurrency(),
@@ -344,7 +351,7 @@ public class TransactionRepository {
         "UPDATE transactions SET occurred_on = ?, note = ?, updated_by = ?, updated_at = NOW(), version = version + 1 "
             + "WHERE workspace_id = ? AND transfer_id = ?",
         date,
-        note,
+        crypto.seal(ws, note),
         actor,
         ws,
         transferId);

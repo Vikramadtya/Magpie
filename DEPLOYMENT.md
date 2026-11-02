@@ -112,3 +112,21 @@ looked up as `SYMBOL.BSE` automatically. Holdings that no source can price stay 
 ### Prices from your own computer
 
 If the server cannot reach any market data source, open **Investments → From my computer**. Download `keeper_prices.py`, run `python3 keeper_prices.py` (Python 3, no packages needed), and upload the `prices.csv` it writes. Keeper matches each row to a holding by symbol and converts the price into the holding's currency. The endpoint is `POST /api/v1/workspaces/{id}/holdings/prices`.
+
+## Encrypting your data
+
+Keeper encrypts free-text fields before they are written to the database, so a leaked database or backup does not expose them. Each workspace gets its own random AES-256-GCM key; those keys are stored only in wrapped form, encrypted by one master key that you keep in the server environment.
+
+Encrypted: transaction notes, comments, loan notes, trip notes and the undo history of edited transactions. Not encrypted: amounts, dates, names of accounts, categories, payees and people, and sign-in details, because the dashboards, budgets and search compute on them in the database. Search matches payee names only, since notes can no longer be searched on the server.
+
+Set it up once on Render:
+
+```bash
+openssl rand -base64 32
+```
+
+Put the output in the `ENCRYPTION_MASTER_KEY` environment variable and redeploy. On start Keeper encrypts the notes you already have.
+
+- **Back the key up** somewhere other than Render (a password manager). If it is lost, encrypted notes cannot be recovered.
+- **Do not change it** afterwards; rotating the master key is not supported yet.
+- Without the variable Keeper still works but stores new notes unencrypted and logs a warning.

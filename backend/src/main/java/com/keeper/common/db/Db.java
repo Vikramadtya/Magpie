@@ -37,6 +37,14 @@ public class Db {
     return transactions.executeWrite(status -> work.get());
   }
 
+  /** Runs the block in its own transaction that commits even if the caller's later rolls back. */
+  public <T> T independently(Supplier<T> work) {
+    return transactions.execute(
+        io.micronaut.transaction.TransactionDefinition.of(
+            io.micronaut.transaction.TransactionDefinition.Propagation.REQUIRES_NEW),
+        status -> work.get());
+  }
+
   public void tx(Runnable work) {
     transactions.executeWrite(
         status -> {

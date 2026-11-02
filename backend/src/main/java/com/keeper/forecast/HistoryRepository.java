@@ -1,6 +1,7 @@
 package com.keeper.forecast;
 
 import com.keeper.common.db.Db;
+import com.keeper.crypto.FieldCrypto;
 import jakarta.inject.Singleton;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,9 +25,11 @@ public class HistoryRepository {
       UUID recurringRuleId) {}
 
   private final Db db;
+  private final FieldCrypto crypto;
 
-  public HistoryRepository(Db db) {
+  public HistoryRepository(Db db, FieldCrypto crypto) {
     this.db = db;
+    this.crypto = crypto;
   }
 
   /**
@@ -81,7 +84,7 @@ public class HistoryRepository {
                 rs.getString(5),
                 rs.getObject(6, UUID.class),
                 rs.getString(7),
-                rs.getString(8),
+                crypto.open(rs.getString(8)),
                 rs.getObject(9, UUID.class)),
         ws,
         from);
