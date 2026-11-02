@@ -112,7 +112,7 @@ export default function TransactionsPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 mb-5 [&>*]:min-w-0">
-        <Input className="col-span-2" placeholder="Search notes and payees…" value={search} onChange={(e) => { setSearch(e.target.value); setParam('q', e.target.value); }} aria-label="Search" />
+        <Input className="col-span-2" placeholder="Search payees…" value={search} onChange={(e) => { setSearch(e.target.value); setParam('q', e.target.value); }} aria-label="Search" />
         <Select value={filters.accountId ?? ''} onChange={(e) => setParam('account', e.target.value)} aria-label="Account">
           <option value="">All accounts</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
