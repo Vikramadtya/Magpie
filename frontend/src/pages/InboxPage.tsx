@@ -55,7 +55,7 @@ function DoneRow({ item }: { item: InboxItem }) {
     <li className="glass-panel p-4 flex items-center gap-3 text-sm">
       <Avatar name={item.groupName ?? item.counterparty ?? item.title ?? 'S'} />
       <span className="flex-1 min-w-0">
-        <span className="block font-medium truncate">{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : 'Shared expense')}</span>
+        <span className="block font-medium truncate">{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : item.kind === 'TRANSFER' ? `Transfer with ${item.counterparty}` : 'Shared expense')}</span>
         <span className="block text-xs text-secondary">{item.groupName ? `${item.groupName} · ` : ''}{prettyDate(item.occurredOn)}</span>
       </span>
       <span className="text-right tabular-nums"><span className="block font-semibold">{formatMoney(item.totalMinor, item.currency)}</span>{item.myShareMinor != null && item.kind === 'EXPENSE' && <span className="block text-xs text-secondary">your share {formatMoney(item.myShareMinor, item.currency)}</span>}</span>
@@ -81,7 +81,7 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
   const removeRecords = useRemoveRecords();
   const keep = useKeepItem();
 
-  const needsAccount = item.kind === 'SETTLEMENT' || item.paidByMe === true;
+  const needsAccount = item.kind !== 'EXPENSE' || item.paidByMe === true;
   const [accountId, setAccountId] = useState(() => {
     const saved = remembered(item);
     return accounts.some((a) => a.id === saved) ? saved : item.accountId && accounts.some((a) => a.id === item.accountId) ? item.accountId : '';
@@ -126,6 +126,11 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
 
   const others = item.shares.filter((s) => s.shareMinor > 0);
   const summary = (() => {
+    if (item.kind === 'TRANSFER') {
+      return item.direction === 'PAID'
+        ? `You gave ${item.counterparty} ${formatMoney(item.totalMinor, item.currency)}. It is recorded as a loan to them, not as spending.`
+        : `${item.counterparty} gave you ${formatMoney(item.totalMinor, item.currency)}. It is recorded as a loan from them, not as income.`;
+    }
     if (item.kind === 'SETTLEMENT') {
       return item.direction === 'RECEIVED'
         ? `${item.counterparty} paid you ${formatMoney(item.totalMinor, item.currency)}. It will repay what they owe you; it is not income.`
@@ -146,7 +151,7 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-medium">{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : 'Shared expense')}</p>
+          <p className="font-medium">{item.title ?? (item.kind === 'SETTLEMENT' ? `Settlement with ${item.counterparty}` : item.kind === 'TRANSFER' ? `Transfer with ${item.counterparty}` : 'Shared expense')}</p>
           <p className="text-xs text-secondary mt-0.5 flex items-center gap-2">
             {prettyDate(item.occurredOn)}
             {item.groupName && <span className="inline-flex items-center gap-1 text-accent"><Plane className="w-3 h-3" />{item.groupName}</span>}
@@ -162,7 +167,7 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
         <>
           <div className="grid sm:grid-cols-2 gap-3">
             {needsAccount && (
-              <Field label={item.kind === 'SETTLEMENT' && item.direction === 'RECEIVED' ? 'Received into' : item.kind === 'SETTLEMENT' ? 'Paid from' : 'Paid with'}>
+              <Field label={item.kind !== 'EXPENSE' && item.direction === 'RECEIVED' ? 'Received into' : item.kind !== 'EXPENSE' ? 'Paid from' : 'Paid with'}>
                 <Select value={accountId} onChange={(e) => { setAccountId(e.target.value); setChargedTouched(false); }} aria-label="Account">
                   <option value="">Choose…</option>
                   {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}

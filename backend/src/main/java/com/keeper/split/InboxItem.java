@@ -21,6 +21,7 @@ public record InboxItem(
     Long myShareMinor,
     String title,
     String counterparty,
+    String counterpartyId,
     String direction,
     List<Share> shares,
     String status,
@@ -30,5 +31,5 @@ public record InboxItem(
 
   /** What one friend owes for an expense. */
   @Serdeable
-  public record Share(String name, long shareMinor) {}
+  public record Share(String name, long shareMinor, String personId) {}
 }

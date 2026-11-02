@@ -101,9 +101,27 @@ changed in Keeper until the owner chooses to apply it.
 ## Version 1.1 (additions; v1 items keep working)
 
 ### Same ids on both sides
-Every person is identified by the split app's own stable `personId` (never by name). The connection is
-bound to one person: the first request carries `"me": {"personId": "...", "name": "..."}` and Keeper stores
-it on the connection. Names are only labels; renaming someone never merges or splits their loans.
+Every person is identified by the split app's own stable `personId` (never by name).
+
+**1. Introduce yourself once, when connecting.**
+
+```
+POST {address}/connect
+{ "me": { "personId": "u_asha", "name": "Asha", "email": "asha@example.com" } }
+→ { "linked": true, "emailMatched": true }
+```
+
+The connection is now bound to that person. Saying the same thing again is fine; a different `personId`
+is refused (`409`), so ids cannot drift: disconnect in Keeper and connect again to change it.
+`emailMatched` only tells the owner whether the email equals their Keeper email; it does not block linking.
+`GET /ping` reports `"linked": true` once this is done.
+
+**2. Keeper keeps a mapping table** (`split_people`, one row per friend the split app mentions), keyed by
+`personId`, holding the split app's name and email and the **label** Keeper uses for that friend's loans.
+Every share carries `personId` (and optionally `email`); a settlement or transfer carries `counterpartyId`
+(and optionally `counterpartyEmail`). Rows are created and their name/email refreshed automatically. The
+label follows the split app's name until the owner edits it in Settings, after which it stays put. Two
+friends given the same label are treated as one person. Names are only labels; they never decide who is who.
 
 ### Several payers
 An expense lists what each person **paid** and what each person **owes**, in the currency's minor unit:
@@ -127,6 +145,18 @@ An expense lists what each person **paid** and what each person **owes**, in the
 or participant, from their own point of view (`me` differs per connection), so every payer is told their part.
 Keeper works out the rest: money you paid beyond your share becomes loans to the people who are short;
 your share of what others paid goes to "Owed to friends".
+
+### Transfer (money given to or received from a friend)
+Money handed to a friend outside any split, such as lending cash:
+
+```json
+{ "type": "TRANSFER", "externalId": "tr_77", "version": "1", "occurredOn": "2026-03-12",
+  "currency": "EUR", "totalMinor": 25000, "direction": "PAID",
+  "counterparty": "Ravi", "counterpartyId": "u_ravi", "title": "Cash for the trip" }
+```
+
+`direction` is `PAID` (you gave) or `RECEIVED` (you got). Keeper records a **loan** (to them or from them),
+which is neither spending nor income. Repaying it is a normal settlement.
 
 ### Currency
 `currency` is an ISO 4217 code and `totalMinor`, `paidMinor`, `shareMinor` use **that currency's real minor

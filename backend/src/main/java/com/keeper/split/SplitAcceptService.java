@@ -51,6 +51,7 @@ public class SplitAcceptService {
       @Positive @Max(1_000_000_000_000L) Long accountAmountMinor) {}
 
   private final SplitInboxRepository inbox;
+  private final SplitPeopleRepository people;
   private final AccountRepository accounts;
   private final TransactionService transactions;
   private final TripRepository trips;
@@ -61,6 +62,7 @@ public class SplitAcceptService {
 
   public SplitAcceptService(
       SplitInboxRepository inbox,
+      SplitPeopleRepository people,
       AccountRepository accounts,
       TransactionService transactions,
       TripRepository trips,
@@ -69,6 +71,7 @@ public class SplitAcceptService {
       Audit audit,
       Db db) {
     this.inbox = inbox;
+    this.people = people;
     this.accounts = accounts;
     this.transactions = transactions;
     this.trips = trips;
@@ -158,9 +161,11 @@ public class SplitAcceptService {
 
   private SplitInboxRepository.Created apply(UUID ws, UUID actor, InboxItem item, AcceptRequest r) {
     AcceptRequest req = r == null ? new AcceptRequest(null, null, null, false, null) : r;
-    return "EXPENSE".equals(item.kind())
-        ? applyExpense(ws, actor, item, req)
-        : applySettlement(ws, actor, item, req);
+    return switch (item.kind()) {
+      case "EXPENSE" -> applyExpense(ws, actor, item, req);
+      case "TRANSFER" -> applyTransfer(ws, actor, item, req);
+      default -> applySettlement(ws, actor, item, req);
+    };
   }
 
   private SplitInboxRepository.Created applyExpense(
@@ -191,7 +196,7 @@ public class SplitAcceptService {
                 ws,
                 actor,
                 new LoanController.CreateRequest(
-                    item.shares().get(i).name(),
+                    label(ws, item.shares().get(i).personId(), item.shares().get(i).name()),
                     "LENT",
                     account.id(),
                     portion,
@@ -209,19 +214,44 @@ public class SplitAcceptService {
     return new SplitInboxRepository.Created(owed, tripId, txIds, loanIds);
   }
 
+  /**
+   * Money handed to a friend (PAID) or received from one (RECEIVED) outside any split. It is a
+   * loan, so it is neither spending nor income.
+   */
+  private SplitInboxRepository.Created applyTransfer(
+      UUID ws, UUID actor, InboxItem item, AcceptRequest r) {
+    Account account = requireAccount(ws, r);
+    long amount = inAccount(item, account, r);
+    String who = label(ws, item.counterpartyId(), item.counterparty());
+    String note =
+        (item.title() != null && !item.title().isBlank()) ? item.title() : "Transfer with " + who;
+    var loan =
+        loans.create(
+            ws,
+            actor,
+            new LoanController.CreateRequest(
+                who,
+                "PAID".equals(item.direction()) ? "LENT" : "BORROWED",
+                account.id(),
+                amount,
+                item.occurredOn(),
+                null,
+                note));
+    return new SplitInboxRepository.Created(account.id(), null, List.of(), List.of(loan.id()));
+  }
+
   private SplitInboxRepository.Created applySettlement(
       UUID ws, UUID actor, InboxItem item, AcceptRequest r) {
     Account account = requireAccount(ws, r);
     long totalAccount = inAccount(item, account, r);
+    String who = label(ws, item.counterpartyId(), item.counterparty());
     String note =
-        (item.title() != null && !item.title().isBlank())
-            ? item.title()
-            : "Settlement with " + item.counterparty();
+        (item.title() != null && !item.title().isBlank()) ? item.title() : "Settlement with " + who;
     List<UUID> txIds = new ArrayList<>();
 
     if ("RECEIVED".equals(item.direction())) {
       long remaining = totalAccount;
-      for (var loan : loans.openLentTo(ws, item.counterparty(), account.currency())) {
+      for (var loan : loans.openLentTo(ws, who, account.currency())) {
         if (remaining <= 0) break;
         long pay = Math.min(remaining, loan.outstandingMinor());
         txIds.add(
@@ -234,7 +264,7 @@ public class SplitAcceptService {
       }
       if (remaining > 0) {
         throw new BusinessRuleException(
-            item.counterparty()
+            who
                 + " owes you less than "
                 + money(totalAccount, account.currency())
                 + " in Keeper yet. Accept the related expenses first, then this payment.");
@@ -259,6 +289,11 @@ public class SplitAcceptService {
                 note));
     txIds.add(legs.get(0).id());
     return new SplitInboxRepository.Created(account.id(), null, txIds, List.of());
+  }
+
+  /** The name Keeper uses for a friend: the owner's label for that split-app person, if any. */
+  private String label(UUID ws, String personId, String fallback) {
+    return people.labelFor(ws, personId).orElse(fallback);
   }
 
   private UUID expense(

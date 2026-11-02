@@ -30,12 +30,26 @@ import java.util.List;
 public class IngestController {
 
   @Serdeable
-  public record Share(@NotBlank @Size(max = 160) String name, @PositiveOrZero long shareMinor) {}
+  public record Share(
+      @NotBlank @Size(max = 160) String name,
+      @PositiveOrZero long shareMinor,
+      @Size(max = 100) String personId,
+      @Size(max = 255) String email) {}
+
+  /** The split-app person this connection speaks for. */
+  @Serdeable
+  public record Me(
+      @NotBlank @Size(max = 100) String personId,
+      @NotBlank @Size(max = 160) String name,
+      @Size(max = 255) String email) {}
+
+  @Serdeable
+  public record Connect(@NotNull @Valid Me me) {}
 
   /** An expense or a settlement. Fields that don't apply to the type are ignored. */
   @Serdeable
   public record Item(
-      @NotNull @Pattern(regexp = "^(EXPENSE|SETTLEMENT)$") String type,
+      @NotNull @Pattern(regexp = "^(EXPENSE|SETTLEMENT|TRANSFER)$") String type,
       @NotBlank @Size(max = 100) String externalId,
       @Size(max = 80) String version,
       @Size(max = 100) String groupId,
@@ -49,13 +63,16 @@ public class IngestController {
       @Size(max = 50) List<@Valid Share> shares,
       @Pattern(regexp = "^(RECEIVED|PAID)$") String direction,
       @Size(max = 160) String counterparty,
+      @Size(max = 100) String counterpartyId,
+      @Size(max = 255) String counterpartyEmail,
       Boolean deleted) {}
 
   @Serdeable
   public record Items(@NotEmpty @Size(max = 200) List<@Valid Item> items) {}
 
   @Serdeable
-  public record Ping(boolean ok, String ledger, String currency, int interfaceVersion) {}
+  public record Ping(
+      boolean ok, String ledger, String currency, int interfaceVersion, boolean linked) {}
 
   @Serdeable
   public record Results(List<SplitIngestService.Result> results) {}
@@ -77,9 +94,24 @@ public class IngestController {
     var owner = authenticate(authorization);
     return db.one(
             "SELECT name, base_currency FROM workspaces WHERE id = ?",
-            rs -> new Ping(true, rs.getString(1), rs.getString(2), 1),
+            rs -> new Ping(true, rs.getString(1), rs.getString(2), 1, tokens.isLinked(owner)),
             owner.workspaceId())
         .orElseThrow(() -> new UnauthorizedException("Unknown ledger"));
+  }
+
+  /**
+   * Introduces the split-app person behind this connection. Their id is the one used for "me" in
+   * every item, so both apps agree on who is who.
+   */
+  @Post("/connect")
+  public ApiTokenService.Link connect(
+      @Nullable @Header("Authorization") String authorization, @Valid @Body Connect body) {
+    var owner = authenticate(authorization);
+    return tokens.link(
+        owner,
+        body.me().personId().trim(),
+        body.me().name().trim(),
+        body.me().email() == null ? null : body.me().email().trim());
   }
 
   @Post("/split")

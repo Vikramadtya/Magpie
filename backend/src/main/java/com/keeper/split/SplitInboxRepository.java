@@ -31,6 +31,7 @@ public class SplitInboxRepository {
       Long myShareMinor,
       String title,
       String counterparty,
+      String counterpartyId,
       String direction,
       List<InboxItem.Share> shares) {}
 
@@ -41,7 +42,7 @@ public class SplitInboxRepository {
 
   private static final String COLS =
       "id, kind, external_id, group_ref, group_name, occurred_on, currency, total_minor, paid_by_me, my_share_minor, title, "
-          + "counterparty, direction, shares::text, status, account_id, trip_id, received_at";
+          + "counterparty, counterparty_id, direction, shares::text, status, account_id, trip_id, received_at";
 
   private final Db db;
   private final JsonMapper json;
@@ -66,11 +67,12 @@ public class SplitInboxRepository {
                 rs.getString(11),
                 rs.getString(12),
                 rs.getString(13),
-                shares(rs.getString(14)),
-                rs.getString(15),
-                rs.getObject(16, UUID.class),
+                rs.getString(14),
+                shares(rs.getString(15)),
+                rs.getString(16),
                 rs.getObject(17, UUID.class),
-                rs.getObject(18, OffsetDateTime.class).toInstant());
+                rs.getObject(18, UUID.class),
+                rs.getObject(19, OffsetDateTime.class).toInstant());
   }
 
   private List<InboxItem.Share> shares(String text) {
@@ -104,7 +106,7 @@ public class SplitInboxRepository {
   public void insert(UUID ws, Incoming i) {
     db.update(
         "INSERT INTO split_inbox(workspace_id, source, external_id, kind, group_ref, group_name, occurred_on, currency, total_minor, "
-            + "paid_by_me, my_share_minor, title, counterparty, direction, shares, external_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?)",
+            + "paid_by_me, my_share_minor, title, counterparty, counterparty_id, direction, shares, external_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?)",
         ws,
         SOURCE,
         i.externalId(),
@@ -118,6 +120,7 @@ public class SplitInboxRepository {
         i.myShareMinor(),
         i.title(),
         i.counterparty(),
+        i.counterpartyId(),
         i.direction(),
         write(i.shares()),
         i.version());
@@ -127,7 +130,7 @@ public class SplitInboxRepository {
   public void update(UUID id, Incoming i, String status) {
     db.update(
         "UPDATE split_inbox SET group_ref = ?, group_name = ?, occurred_on = ?, currency = ?, total_minor = ?, paid_by_me = ?, "
-            + "my_share_minor = ?, title = ?, counterparty = ?, direction = ?, shares = ?::jsonb, external_version = ?, "
+            + "my_share_minor = ?, title = ?, counterparty = ?, counterparty_id = ?, direction = ?, shares = ?::jsonb, external_version = ?, "
             + "status = ?, updated_at = NOW() WHERE id = ?",
         i.groupId(),
         i.groupName(),
@@ -138,6 +141,7 @@ public class SplitInboxRepository {
         i.myShareMinor(),
         i.title(),
         i.counterparty(),
+        i.counterpartyId(),
         i.direction(),
         write(i.shares()),
         i.version(),

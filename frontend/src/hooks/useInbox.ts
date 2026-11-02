@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { connectionsApi, inboxApi } from '../api/endpoints';
+import { connectionsApi, inboxApi, splitPeopleApi } from '../api/endpoints';
 import type { AcceptInput } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
@@ -53,5 +53,20 @@ export function useRevokeConnection() {
   return useMutation({
     mutationFn: (tokenId: string) => connectionsApi.revoke(id, tokenId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.connections(id) }),
+  });
+}
+
+// ---------- who the split app's people are in Keeper ----------
+export function useSplitPeople() {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: qk.splitPeople(id), queryFn: () => splitPeopleApi.list(id) });
+}
+
+export function useSplitPersonLabel() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { id: string; label: string | null }) => (a.label === null ? splitPeopleApi.reset(id, a.id) : splitPeopleApi.rename(id, a.id, a.label)),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.splitPeople(id) }),
   });
 }

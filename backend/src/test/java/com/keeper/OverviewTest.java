@@ -61,7 +61,7 @@ class OverviewTest extends ApiTestBase {
     LocalDate lastMonth = now.minusMonths(1).atDay(1);
     add(s, account, "INCOME", 500_000, thisMonth, null);
     add(s, account, "EXPENSE", 120_000, thisMonth, cat);
-    add(s, account, "EXPENSE", 80_000, lastMonth, cat);
+    add(s, account, "EXPENSE", 80_000, lastMonth.plusDays(14), cat);
 
     Map<?, ?> o =
         get(

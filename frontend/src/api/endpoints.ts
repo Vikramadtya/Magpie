@@ -195,6 +195,12 @@ export const inboxApi = {
   keep: (ws: string, id: string) => api.post<T.InboxItem>(ws, `/inbox/${id}/keep`),
 };
 
+export const splitPeopleApi = {
+  list: (ws: string) => api.get<T.SplitPerson[]>(ws, '/split-people'),
+  rename: (ws: string, id: string, label: string) => api.put<void>(ws, `/split-people/${id}`, { label }),
+  reset: (ws: string, id: string) => api.del(ws, `/split-people/${id}/label`),
+};
+
 export const connectionsApi = {
   list: (ws: string) => api.get<T.ApiToken[]>(ws, '/api-tokens'),
   create: (ws: string, name: string) => api.post<{ token: T.ApiToken; secret: string }>(ws, '/api-tokens', { name }),

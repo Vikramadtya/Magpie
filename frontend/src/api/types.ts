@@ -188,13 +188,18 @@ export interface TripInput { name: string; startDate: string; endDate: string; b
 // ---------- split app inbox ----------
 export interface InboxShare { name: string; shareMinor: number }
 export interface InboxItem {
-  id: string; kind: 'EXPENSE' | 'SETTLEMENT'; externalId: string; groupId: string | null; groupName: string | null;
+  id: string; kind: 'EXPENSE' | 'SETTLEMENT' | 'TRANSFER'; externalId: string; groupId: string | null; groupName: string | null;
   occurredOn: string; currency: string; totalMinor: number; paidByMe: boolean | null; myShareMinor: number | null;
   title: string | null; counterparty: string | null; direction: 'RECEIVED' | 'PAID' | null; shares: InboxShare[];
   status: 'PENDING' | 'ACCEPTED' | 'DISMISSED' | 'CHANGED' | 'REMOVED'; accountId: string | null; tripId: string | null; receivedAt: string;
 }
 export interface AcceptInput { accountId?: string | null; categoryId?: string | null; tripId?: string | null; noTrip?: boolean; accountAmountMinor?: number | null }
-export interface ApiToken { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }
+export interface ApiToken {
+  id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null;
+  /** The split-app person this connection is bound to, once it has introduced itself. */
+  externalName: string | null; externalEmail: string | null; emailMatched: boolean;
+}
+export interface SplitPerson { id: string; externalId: string; name: string; email: string | null; label: string; labelEdited: boolean }
 
 export interface HouseholdMember {
   id: string; name: string; email: string; status: 'ACTIVE' | 'PENDING'; me: boolean;

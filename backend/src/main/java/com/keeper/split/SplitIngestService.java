@@ -22,9 +22,11 @@ public class SplitIngestService {
   public record Result(String externalId, String type, String outcome, String message) {}
 
   private final SplitInboxRepository inbox;
+  private final SplitPeopleRepository people;
 
-  public SplitIngestService(SplitInboxRepository inbox) {
+  public SplitIngestService(SplitInboxRepository inbox, SplitPeopleRepository people) {
     this.inbox = inbox;
+    this.people = people;
   }
 
   public List<Result> ingest(UUID ws, List<IngestController.Item> items) {
@@ -57,6 +59,7 @@ public class SplitIngestService {
     }
 
     SplitInboxRepository.Incoming in = validate(item);
+    rememberPeople(ws, item);
     if (existing.isEmpty()) {
       inbox.insert(ws, in);
       return result(item, "RECEIVED", null);
@@ -80,7 +83,12 @@ public class SplitIngestService {
       throw new BadRequestException("totalMinor must be positive");
     List<InboxItem.Share> shares = new ArrayList<>();
     if (item.shares() != null)
-      item.shares().forEach(s -> shares.add(new InboxItem.Share(s.name().trim(), s.shareMinor())));
+      item.shares()
+          .forEach(
+              s ->
+                  shares.add(
+                      new InboxItem.Share(
+                          s.name().trim(), s.shareMinor(), blankToNull(s.personId()))));
 
     if (expense) {
       if (item.paidByMe() == null)
@@ -98,9 +106,10 @@ public class SplitIngestService {
       }
     } else {
       if (item.direction() == null)
-        throw new BadRequestException("direction (RECEIVED or PAID) is required for a settlement");
+        throw new BadRequestException(
+            "direction (RECEIVED or PAID) is required for a settlement or transfer");
       if (item.counterparty() == null || item.counterparty().isBlank())
-        throw new BadRequestException("counterparty is required for a settlement");
+        throw new BadRequestException("counterparty is required for a settlement or transfer");
     }
     String version =
         item.version() == null || item.version().isBlank()
@@ -119,8 +128,31 @@ public class SplitIngestService {
         expense ? item.myShareMinor() : null,
         item.title(),
         expense ? null : item.counterparty().trim(),
+        expense ? null : blankToNull(item.counterpartyId()),
         expense ? null : item.direction(),
         shares);
+  }
+
+  /** Keeps the split-app people table up to date with everyone this item names. */
+  private void rememberPeople(UUID ws, IngestController.Item item) {
+    if (item.shares() != null) {
+      for (var s : item.shares()) {
+        if (blankToNull(s.personId()) != null) {
+          people.upsert(ws, s.personId().trim(), s.name().trim(), blankToNull(s.email()));
+        }
+      }
+    }
+    if (!"EXPENSE".equals(item.type()) && blankToNull(item.counterpartyId()) != null) {
+      people.upsert(
+          ws,
+          item.counterpartyId().trim(),
+          item.counterparty().trim(),
+          blankToNull(item.counterpartyEmail()));
+    }
+  }
+
+  private static String blankToNull(String s) {
+    return s == null || s.isBlank() ? null : s.trim();
   }
 
   /**
@@ -138,6 +170,7 @@ public class SplitIngestService {
               + i.title()
               + i.direction()
               + i.counterparty()
+              + i.counterpartyId()
               + i.groupId()
               + i.groupName()
               + shares;

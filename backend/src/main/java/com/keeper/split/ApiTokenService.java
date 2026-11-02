@@ -22,12 +22,24 @@ public class ApiTokenService {
 
   @Serdeable
   public record TokenView(
-      UUID id, String name, String prefix, Instant createdAt, Instant lastUsedAt) {}
+      UUID id,
+      String name,
+      String prefix,
+      Instant createdAt,
+      Instant lastUsedAt,
+      /** The split-app person this connection is bound to, once it has introduced itself. */
+      String externalName,
+      String externalEmail,
+      boolean emailMatched) {}
 
   @Serdeable
   public record Created(TokenView token, String secret) {}
 
-  public record Owner(UUID workspaceId, UUID userId) {}
+  public record Owner(UUID workspaceId, UUID userId, UUID tokenId) {}
+
+  /** Result of introducing the split-app person on a connection. */
+  @Serdeable
+  public record Link(boolean linked, boolean emailMatched) {}
 
   private final Db db;
   private final SecureRandom random = new SecureRandom();
@@ -55,7 +67,7 @@ public class ApiTokenService {
 
   public List<TokenView> list(UUID ws) {
     return db.list(
-        "SELECT id, name, prefix, created_at, last_used_at FROM api_tokens WHERE workspace_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
+        "SELECT id, name, prefix, created_at, last_used_at, external_name, external_email, email_matched FROM api_tokens WHERE workspace_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
         rs ->
             new TokenView(
                 rs.getObject(1, UUID.class),
@@ -64,7 +76,10 @@ public class ApiTokenService {
                 rs.getObject(4, OffsetDateTime.class).toInstant(),
                 rs.getObject(5, OffsetDateTime.class) == null
                     ? null
-                    : rs.getObject(5, OffsetDateTime.class).toInstant()),
+                    : rs.getObject(5, OffsetDateTime.class).toInstant(),
+                rs.getString(6),
+                rs.getString(7),
+                rs.getBoolean(8)),
         ws);
   }
 
@@ -78,8 +93,12 @@ public class ApiTokenService {
       return Optional.empty();
     Optional<Owner> owner =
         db.one(
-            "SELECT workspace_id, user_id FROM api_tokens WHERE token_hash = ? AND revoked_at IS NULL",
-            rs -> new Owner(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)),
+            "SELECT workspace_id, user_id, id FROM api_tokens WHERE token_hash = ? AND revoked_at IS NULL",
+            rs ->
+                new Owner(
+                    rs.getObject(1, UUID.class),
+                    rs.getObject(2, UUID.class),
+                    rs.getObject(3, UUID.class)),
             TokenService.hash(secret));
     owner.ifPresent(
         o ->
@@ -87,5 +106,48 @@ public class ApiTokenService {
                 "UPDATE api_tokens SET last_used_at = NOW() WHERE token_hash = ?",
                 TokenService.hash(secret)));
     return owner;
+  }
+
+  public boolean isLinked(Owner owner) {
+    return db.one(
+            "SELECT 1 FROM api_tokens WHERE id = ? AND external_user_id IS NOT NULL",
+            rs -> 1,
+            owner.tokenId())
+        .isPresent();
+  }
+
+  /**
+   * Binds this connection to one split-app person. A connection can't be re-pointed at someone else
+   * (revoke it and connect again), so ids can never drift. The email is compared with the Keeper
+   * user's only to tell the owner whether the two accounts look like the same person.
+   */
+  public Link link(Owner owner, String externalId, String name, String email) {
+    var current =
+        db.one(
+                "SELECT external_user_id FROM api_tokens WHERE id = ?",
+                rs -> rs.getString(1) == null ? "" : rs.getString(1),
+                owner.tokenId())
+            .orElse("");
+    if (!current.isEmpty() && !current.equals(externalId)) {
+      throw new com.keeper.common.exception.ConflictException(
+          "This connection already belongs to another person. Disconnect it in Keeper and connect again.");
+    }
+    boolean matched =
+        email != null
+            && db.one(
+                    "SELECT 1 FROM users WHERE id = ? AND lower(email) = lower(?)",
+                    rs -> 1,
+                    owner.userId(),
+                    email)
+                .isPresent();
+    db.update(
+        "UPDATE api_tokens SET external_user_id = ?, external_name = ?, external_email = ?, email_matched = ?, "
+            + "linked_at = COALESCE(linked_at, NOW()) WHERE id = ?",
+        externalId,
+        name,
+        email,
+        matched,
+        owner.tokenId());
+    return new Link(true, matched);
   }
 }

@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { workspaceApi } from '../api/endpoints';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
+import { Avatar } from '../components/ui/Avatar';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Field } from '../components/ui/Field';
 import { Input } from '../components/ui/Input';
@@ -11,7 +13,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { StateView } from '../components/ui/StateView';
-import { useConnections, useCreateConnection, useRevokeConnection } from '../hooks/useInbox';
+import { useConnections, useCreateConnection, useRevokeConnection, useSplitPeople, useSplitPersonLabel } from '../hooks/useInbox';
 import { useActivity } from '../hooks/useInsights';
 import { errorMessage } from '../lib/http';
 import { CURRENCIES } from '../lib/money';
@@ -76,7 +78,12 @@ export default function SettingsPage() {
                   <span className="w-9 h-9 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0"><Link2 className="w-4 h-4" /></span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium">{c.name} <span className="text-xs text-secondary font-normal">· {c.prefix}…</span></p>
-                    <p className="text-xs text-secondary">{c.lastUsedAt ? `Last sent items ${new Date(c.lastUsedAt).toLocaleString()}` : 'Not used yet'}</p>
+                    <p className="text-xs text-secondary flex items-center gap-1.5 flex-wrap">
+                      {c.externalName
+                        ? <>Linked to {c.externalName}{c.externalEmail ? ` (${c.externalEmail})` : ''} {c.emailMatched ? <Badge tone="good">Same email</Badge> : <Badge tone="warn">Email differs</Badge>}</>
+                        : <>Not linked to a person yet</>}
+                      <span>· {c.lastUsedAt ? `last sent items ${new Date(c.lastUsedAt).toLocaleString()}` : 'not used yet'}</span>
+                    </p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => revokeConnection.mutate(c.id)} disabled={revokeConnection.isPending}>Disconnect</Button>
                 </li>
@@ -95,6 +102,8 @@ export default function SettingsPage() {
           </form>
         </section>
 
+        <SplitPeopleSection />
+
         <section className="glass-panel p-6">
           <h2 className="font-semibold mb-3">Recent activity</h2>
           {activity.data?.length === 0 && <p className="text-sm text-secondary">No activity yet.</p>}
@@ -110,6 +119,38 @@ export default function SettingsPage() {
       </div>
       {created && <ConnectionCode secret={created.secret} endpoint={endpoint} onClose={() => setCreated(null)} />}
     </>
+  );
+}
+
+/** The table that says which Keeper name belongs to which split-app person. */
+function SplitPeopleSection() {
+  const people = useSplitPeople();
+  const label = useSplitPersonLabel();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const list = people.data ?? [];
+  if (list.length === 0) return null;
+  return (
+    <section className="glass-panel p-6">
+      <h2 className="font-semibold mb-1">People from your split app</h2>
+      <p className="text-sm text-secondary mb-4">Each friend is matched by the split app's own id, so renames never mix people up. The name below is what Keeper uses for their loans. Give two friends the same name to treat them as one person.</p>
+      <ul className="divide-y divide-border">
+        {list.map((p) => {
+          const value = drafts[p.id] ?? p.label;
+          return (
+            <li key={p.id} className="py-3 flex flex-wrap items-center gap-3">
+              <Avatar name={p.name} />
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="text-sm font-medium truncate">{p.name}</p>
+                <p className="text-xs text-secondary truncate">{p.email ?? p.externalId}</p>
+              </div>
+              <Input className="w-48" value={value} maxLength={160} aria-label={`Keeper name for ${p.name}`} onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })} />
+              <Button size="sm" variant="outline" disabled={label.isPending || !value.trim() || value.trim() === p.label} onClick={() => label.mutate({ id: p.id, label: value.trim() }, { onSuccess: () => setDrafts(({ [p.id]: _, ...rest }) => rest) })}>Save</Button>
+              {p.labelEdited && <Button size="sm" variant="ghost" onClick={() => label.mutate({ id: p.id, label: null })}>Reset</Button>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
