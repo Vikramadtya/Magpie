@@ -62,9 +62,9 @@ export function useHoldings() {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.holdings(id), queryFn: () => holdingsApi.list(id) });
 }
-export function useInvestmentSummary() {
+export function useInvestmentSummary(kind: 'market' | 'assets' = 'market') {
   const { id } = useWorkspace();
-  return useQuery({ queryKey: qk.investments(id), queryFn: () => holdingsApi.summary(id) });
+  return useQuery({ queryKey: [...qk.investments(id), kind], queryFn: () => holdingsApi.summary(id, kind) });
 }
 
 function useHoldingMutation<TArgs>(fn: (ws: string, args: TArgs) => Promise<unknown>) {

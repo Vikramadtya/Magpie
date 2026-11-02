@@ -170,4 +170,36 @@ class PriceUploadTest extends ApiTestBase {
     assertEquals(6_000, ((Number) removed.get("costBasisMinor")).intValue());
     assertEquals("2025-06-01", removed.get("purchasedOn"));
   }
+
+  @Test
+  void goldAndLandAreKeptApartFromMarketHoldings() {
+    Session s = register("assets");
+    String ws = "/api/v1/workspaces/" + s.workspaceId();
+    Map<?, ?> gold =
+        post(
+            s.token(),
+            ws + "/holdings",
+            Map.of(
+                "name",
+                "Gold coins",
+                "assetType",
+                "GOLD",
+                "quantity",
+                20,
+                "unitPriceMinor",
+                600_000,
+                "priceMinor",
+                700_000,
+                "currency",
+                "INR"),
+            Map.class);
+    assertEquals("GOLD", gold.get("assetType"));
+    assertEquals("MANUAL", gold.get("priceSource"));
+    assertEquals("GOLD COINS", gold.get("symbol"));
+
+    Map<?, ?> assets = get(s.token(), ws + "/investments/summary?kind=assets", Map.class);
+    Map<?, ?> market = get(s.token(), ws + "/investments/summary", Map.class);
+    assertEquals(20 * 700_000L, ((Number) assets.get("valueMinor")).longValue());
+    assertEquals(0, ((Number) market.get("valueMinor")).longValue());
+  }
 }

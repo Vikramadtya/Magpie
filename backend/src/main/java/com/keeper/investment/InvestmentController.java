@@ -56,7 +56,8 @@ public class InvestmentController {
   @Serdeable
   public record Request(
       UUID accountId,
-      @NotBlank @Size(max = 20) String symbol,
+      /** Optional for gold, land and other things without a ticker; the name is used instead. */
+      @Size(max = 20) String symbol,
       @NotBlank @Size(max = 160) String name,
       @DecimalMin("0") BigDecimal quantity,
       @Min(0) @Max(1_000_000_000_000L) long costBasisMinor,
@@ -203,10 +204,13 @@ public class InvestmentController {
 
   private Resolved resolve(Request body) {
     String currency = body.currency() == null ? "USD" : body.currency().toUpperCase();
+    if (HoldingRefresher.isOwnValueKind(body.assetType())) {
+      return new Resolved(body.priceMinor(), currency, false, false, null);
+    }
     if (body.providerSymbol() == null || body.providerSymbol().isBlank()) {
       // Typed by hand: still look for a live price under the same symbol, so nobody has to know
       // that picking from search is what makes a holding live.
-      var found = refresher.findLive(body.symbol(), currency);
+      var found = refresher.findLive(symbolOf(body), currency);
       if (found.isEmpty()) return new Resolved(body.priceMinor(), currency, false, false, null);
       return new Resolved(found.get().minor(), currency, true, true, found.get().providerSymbol());
     }
@@ -231,7 +235,7 @@ public class InvestmentController {
         id,
         workspaceId,
         body.accountId(),
-        body.symbol().toUpperCase().trim(),
+        symbolOf(body),
         body.name().trim(),
         BigDecimal.ZERO,
         0L,
@@ -290,7 +294,7 @@ public class InvestmentController {
             + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, "
             + "price_updated_at = CASE WHEN ? THEN NOW() ELSE price_updated_at END WHERE workspace_id = ? AND id = ?",
         body.accountId(),
-        body.symbol().toUpperCase().trim(),
+        symbolOf(body),
         body.name().trim(),
         price,
         r.providerSymbol(),
@@ -341,6 +345,13 @@ public class InvestmentController {
     return get(workspaceId, id);
   }
 
+  /** The ticker, or for things without one the name, shortened to fit. */
+  private static String symbolOf(Request body) {
+    String s = body.symbol() == null || body.symbol().isBlank() ? body.name() : body.symbol();
+    String t = s.toUpperCase().trim();
+    return t.length() > 20 ? t.substring(0, 20).trim() : t;
+  }
+
   private static String blank(String s) {
     return s == null || s.isBlank() ? null : s.trim();
   }
@@ -364,12 +375,16 @@ public class InvestmentController {
   }
 
   @Get("/investments/summary")
-  public Summary summary(@PathVariable UUID workspaceId) {
+  public Summary summary(
+      @PathVariable UUID workspaceId,
+      @io.micronaut.http.annotation.QueryValue(defaultValue = "market") String kind) {
+    boolean assets = "assets".equals(kind);
     var converter = fx.forWorkspace(workspaceId);
     long value = 0;
     long cost = 0;
     List<Slice> slices = new ArrayList<>();
     for (Holding h : list(workspaceId)) {
+      if (HoldingRefresher.isOwnValueKind(h.assetType()) != assets) continue;
       long v = converter.toBase(h.marketValueMinor(), h.currency());
       value += v;
       cost += converter.toBase(h.costBasisMinor(), h.currency());

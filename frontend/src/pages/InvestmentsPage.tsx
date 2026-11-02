@@ -27,13 +27,19 @@ import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, us
 import { useAccounts } from '../hooks/useReference';
 import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices, useLots, useAddPurchase, useRemovePurchase } from '../hooks/useExtras';
 import { buildPriceScript, parsePriceCsv } from '../lib/priceScript';
+import { ASSET_KINDS, assetKind } from '../lib/assetKinds';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../lib/money';
 
 
 export default function InvestmentsPage() {
+  return <HoldingsView assets={false} />;
+}
+
+/** Stocks and funds (assets=false) or gold, land and other things you value yourself (assets=true). */
+export function HoldingsView({ assets }: { assets: boolean }) {
   const { canEdit, baseCurrency } = useWorkspace();
   const holdings = useHoldings();
-  const summary = useInvestmentSummary();
+  const summary = useInvestmentSummary(assets ? 'assets' : 'market');
   const [editing, setEditing] = useState<Holding | 'new' | null>(null);
   const [pricing, setPricing] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<Holding | null>(null);
@@ -42,8 +48,9 @@ export default function InvestmentsPage() {
   const del = useDeleteHolding();
   const refresh = useRefreshHoldings();
   const refreshOne = useRefreshHolding();
-  const list = holdings.data ?? [];
-  const hasLive = list.some((h) => h.priceSource === 'LIVE');
+  const list = (holdings.data ?? []).filter((h) => !!assetKind(h.assetType) === assets);
+  const market = list.filter((h) => !assetKind(h.assetType));
+  const hasLive = market.some((h) => h.priceSource === 'LIVE');
   const stale = list.some((h) => h.priceSource === 'LIVE' && (!h.priceUpdatedAt || Date.now() - new Date(h.priceUpdatedAt).getTime() > 30 * 60_000));
   // The server refreshes stale prices in the background; look again shortly.
   useEffect(() => {
@@ -75,14 +82,14 @@ export default function InvestmentsPage() {
 
   return (
     <>
-      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <div className="flex items-center gap-3">{updatedAt && <span className="text-xs text-secondary hidden sm:inline">Updated {formatDistanceToNow(updatedAt, { addSuffix: true })}</span>}<Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button>{canEdit && <Button variant="outline" onClick={() => setOffline(true)}><Upload className="w-4 h-4 mr-2" />From my computer</Button>}</div>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
-      {list.length > 0 && !hasLive && !holdings.isLoading && (
+      <PageHeader title={assets ? 'Assets' : 'Investments'} subtitle={assets ? 'Gold, land and other things you own' : 'Stocks and mutual funds with live prices'} actions={<>{market.length > 0 && <div className="flex items-center gap-3">{updatedAt && <span className="text-xs text-secondary hidden sm:inline">Updated {formatDistanceToNow(updatedAt, { addSuffix: true })}</span>}<Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button>{canEdit && <Button variant="outline" onClick={() => setOffline(true)}><Upload className="w-4 h-4 mr-2" />From my computer</Button>}</div>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
+      {market.length > 0 && !hasLive && !holdings.isLoading && (
         <div role="status" className="glass-panel p-4 mb-6 flex flex-wrap items-center gap-3 border-accent/40">
           <Tag className="w-4 h-4 text-accent shrink-0" />
           <p className="text-sm flex-1 min-w-[14rem]">These prices were entered by hand, so they don't move on their own. Keeper will look for live prices by symbol; press <strong>Refresh prices</strong> to try now.</p>
         </div>
       )}
-      <StateView isLoading={holdings.isLoading} error={holdings.error} onRetry={() => void holdings.refetch()} isEmpty={list.length === 0} emptyTitle="No holdings yet" emptyHint="Track stocks, funds or crypto by entering quantity, cost and the current price." emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add holding</Button>}>
+      <StateView isLoading={holdings.isLoading} error={holdings.error} onRetry={() => void holdings.refetch()} isEmpty={list.length === 0} emptyTitle={assets ? 'No assets yet' : 'No holdings yet'} emptyHint={assets ? 'Add gold, land, a vehicle or anything else you own, with what you paid and what it is worth now.' : 'Track stocks and mutual funds by entering quantity, what you paid and the current price.'} emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add holding</Button>}>
         {s && (
           <div className="grid lg:grid-cols-3 gap-4 mb-6">
             <div className="hero-card p-6 lg:col-span-2 flex flex-col justify-between gap-6">
@@ -129,19 +136,19 @@ export default function InvestmentsPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <Avatar name={h.name} size={36} />
-                      <div className="min-w-0"><p className="font-semibold truncate">{h.name}</p><p className="text-xs text-secondary truncate">{h.symbol.startsWith('MF:') ? 'Mutual fund' : h.symbol}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
+                      <div className="min-w-0"><p className="font-semibold truncate">{h.name}</p><p className="text-xs text-secondary truncate">{assetKind(h.assetType)?.label ?? (h.symbol.startsWith('MF:') ? 'Mutual fund' : h.symbol)}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
                     </div>
                   </td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{assetKind(h.assetType)?.single ? '' : h.quantity}</td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity > 0 ? formatMoney(Math.round(h.costBasisMinor / h.quantity), h.currency) : '—'}<p className="text-xs text-secondary mt-0.5">{h.lotCount > 1 ? `${h.lotCount} buys · since ${format(parseISO(h.purchasedOn!), 'd MMM yyyy')}` : h.purchasedOn ? `Bought ${format(parseISO(h.purchasedOn), 'd MMM yyyy')}` : 'Date not set'}</p></td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>Manual</Badge>}{h.priceUpdatedAt ? `Updated ${format(new Date(h.priceUpdatedAt), 'd MMM, HH:mm')}` : h.priceAsOf ? `As of ${format(parseISO(h.priceAsOf), 'd MMM yyyy')}` : ''}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>{assetKind(h.assetType) ? 'Your value' : 'Manual'}</Badge>}{h.priceUpdatedAt ? `Updated ${format(new Date(h.priceUpdatedAt), 'd MMM, HH:mm')}` : h.priceAsOf ? `As of ${format(parseISO(h.priceAsOf), 'd MMM yyyy')}` : ''}</p></td>
                   <td className="px-3 py-3.5 text-right tabular-nums font-medium">{formatMoney(h.marketValueMinor, h.currency)}</td>
                   <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
                     {canEdit && (
                       <div className="inline-flex items-center gap-0.5">
                         <IconButton label="Purchases" onClick={() => setBuying(h)}><Layers className="w-4 h-4" /></IconButton>
-                        <IconButton label="Refresh this price" disabled={refreshOne.isPending && refreshOne.variables === h.id} onClick={() => refreshOne.mutate(h.id, { onSuccess: (x) => (x.priceSource === 'LIVE' ? toast.success(`${x.symbol} updated`) : toast.error(`No live price found for ${x.symbol}`)), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 ${refreshOne.isPending && refreshOne.variables === h.id ? 'animate-spin' : ''}`} /></IconButton>
+                        {!assetKind(h.assetType) && <IconButton label="Refresh this price" disabled={refreshOne.isPending && refreshOne.variables === h.id} onClick={() => refreshOne.mutate(h.id, { onSuccess: (x) => (x.priceSource === 'LIVE' ? toast.success(`${x.symbol} updated`) : toast.error(`No live price found for ${x.symbol}`)), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 ${refreshOne.isPending && refreshOne.variables === h.id ? 'animate-spin' : ''}`} /></IconButton>}
                         <span className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                         <IconButton label="Update price by hand" onClick={() => setPricing(h)}><Tag className="w-4 h-4" /></IconButton>
                         <IconButton label="Edit" onClick={() => setEditing(h)}><Pencil className="w-4 h-4" /></IconButton>
@@ -156,7 +163,7 @@ export default function InvestmentsPage() {
           </table>
         </div>
       </StateView>
-      {editing && <HoldingModal holding={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
+      {editing && <HoldingModal assets={assets} holding={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
       {buying && <PurchasesModal holding={buying} canEdit={canEdit} onClose={() => setBuying(null)} />}
       {offline && <OfflinePricesModal holdings={list} onClose={() => setOffline(false)} />}
       {pricing && <PriceModal holding={pricing} onClose={() => setPricing(null)} />}
@@ -165,10 +172,12 @@ export default function InvestmentsPage() {
   );
 }
 
-function HoldingModal({ holding, currency, onClose }: { holding: Holding | null; currency: string; onClose: () => void }) {
+function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean; holding: Holding | null; currency: string; onClose: () => void }) {
   const accounts = (useAccounts().data ?? []).filter((a) => a.type === 'INVESTMENT');
   const save = useSaveHolding();
   const cur = holding?.currency ?? currency;
+  const [kind, setKind] = useState(assetKind(holding?.assetType)?.id ?? (assets ? 'GOLD' : 'MARKET'));
+  const own = assetKind(kind);
   const [symbol, setSymbol] = useState(holding?.symbol ?? '');
   const [name, setName] = useState(holding?.name ?? '');
   const [quantity, setQuantity] = useState('');
@@ -211,18 +220,19 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const q = Number(quantity);
+    const q = own?.single ? 1 : Number(quantity);
     const paidMinor = parseMoney(paid || '0', currencyCode);
     const priceMinor = parseMoney(price || '0', currencyCode);
-    if (!symbol.trim() || !name.trim()) return setError('Symbol and name are required');
+    if (!name.trim() || (!own && !symbol.trim())) return setError(own ? 'Give it a name' : 'Symbol and name are required');
     if (!(q >= 0) || paidMinor === null || priceMinor === null) return setError('Check quantity, buy price and current price');
-    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: 0, unitPriceMinor: paidMinor, priceMinor, currency: currencyCode, providerSymbol: linked?.providerSymbol ?? null, exchange: linked?.exchange ?? null, assetType: linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
+    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: own ? '' : symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: 0, unitPriceMinor: paidMinor, priceMinor, currency: currencyCode, providerSymbol: own ? null : linked?.providerSymbol ?? null, exchange: own ? null : linked?.exchange ?? null, assetType: own ? own.id : linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={holding ? `Edit ${holding.symbol}` : 'Add holding'}>
+    <Modal isOpen onClose={onClose} title={holding ? `Edit ${holding.name}` : 'Add holding'}>
       <form onSubmit={submit} className="space-y-4">
-        {linked ? (
+        {!holding && assets && <Field label="What are you adding?"><Select value={kind} onChange={(e) => setKind(e.target.value)}>{ASSET_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>}
+        {own ? null : linked ? (
           <div className="rounded-lg border border-border p-3 text-sm flex items-center justify-between gap-3">
             <span>Live price from <strong>{linked.providerSymbol}</strong>{linked.exchange ? ` · ${linked.exchange}` : ''}{linked.assetType ? ` · ${linked.assetType.toLowerCase()}` : ''}</span>
             <button type="button" className="text-accent" onClick={() => setLinked(null)}>Enter price by hand</button>
@@ -252,15 +262,15 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Symbol" error={error}><Input value={symbol} onChange={(e) => setSymbol(e.target.value)} maxLength={20} /></Field>
-          <Field label="Currency"><Select value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} disabled={!!holding}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
+          {own ? <Field label="Currency"><Select value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} disabled={!!holding}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field> : <Field label="Symbol" error={error}><Input value={symbol} onChange={(e) => setSymbol(e.target.value)} maxLength={20} /></Field>}
+          {!own && <Field label="Currency"><Select value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} disabled={!!holding}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>}
         </div>
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} /></Field>
-        <Field label="Current price / unit"><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
+        <Field label={own ? (own.single ? 'Current value' : `Current value / ${own.unit}`) : 'Current price / unit'}><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
         {firstBuy ? (
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Units bought"><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>
-            <Field label="Bought at / unit"><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
+          <div className={`grid gap-3 ${own?.single ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {!own?.single && <Field label={own ? `${own.unit[0].toUpperCase()}${own.unit.slice(1)}s bought` : 'Units bought'}><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>}
+            <Field label={own ? (own.single ? 'Paid' : `Bought at / ${own.unit}`) : 'Bought at / unit'}><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
             <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
           </div>
         ) : (

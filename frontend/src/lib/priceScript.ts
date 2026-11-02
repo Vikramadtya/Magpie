@@ -1,4 +1,5 @@
 import type { Holding } from '../api/types';
+import { assetKind } from './assetKinds';
 
 export interface UploadedPrice { symbol: string; price: number; currency?: string }
 
@@ -14,7 +15,7 @@ function lookups(h: Holding): string[] {
  * from the user's own computer and writes prices.csv for upload.
  */
 export function buildPriceScript(holdings: Holding[]): string {
-  const items = holdings.map((h) => ({ symbol: h.symbol, currency: h.currency, lookups: lookups(h) }));
+  const items = holdings.filter((h) => !assetKind(h.assetType)).map((h) => ({ symbol: h.symbol, currency: h.currency, lookups: lookups(h) }));
   return `#!/usr/bin/env python3
 """Fetches current prices for your Keeper holdings and writes prices.csv.
 

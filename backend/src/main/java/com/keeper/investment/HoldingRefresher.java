@@ -31,6 +31,16 @@ public class HoldingRefresher {
 
   private record Row(UUID id, String symbol, String currency) {}
 
+  /** Things with no market quote (gold, land, ...): their value is whatever the owner says. */
+  public static final String OWN_VALUE_KINDS = "('GOLD','SILVER','PROPERTY','VEHICLE','OTHER')";
+
+  public static boolean isOwnValueKind(String assetType) {
+    return assetType != null && OWN_VALUE_KINDS.contains("'" + assetType + "'");
+  }
+
+  private static final String MARKET_ONLY =
+      " AND (asset_type IS NULL OR asset_type NOT IN " + OWN_VALUE_KINDS + ")";
+
   private final Db db;
   private final MarketDataService market;
   private final FxConverter fx;
@@ -81,6 +91,7 @@ public class HoldingRefresher {
         db.list(
             "SELECT id, symbol, currency FROM holdings WHERE workspace_id = ? AND provider_symbol IS NULL "
                 + "AND price_source = 'MANUAL'"
+                + MARKET_ONLY
                 + (onlyId == null ? "" : " AND id = ?"),
             rs -> new Row(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
             onlyId == null ? new Object[] {ws} : new Object[] {ws, onlyId});
@@ -181,6 +192,9 @@ public class HoldingRefresher {
                 + "(price_source = 'LIVE' AND provider_symbol IS NOT NULL "
                 + "AND (price_updated_at IS NULL OR price_updated_at < NOW() - INTERVAL '30 minutes')) "
                 + "OR (price_source = 'MANUAL' AND provider_symbol IS NULL "
+                + "AND (asset_type IS NULL OR asset_type NOT IN "
+                + OWN_VALUE_KINDS
+                + ") "
                 + "AND (link_checked_at IS NULL OR link_checked_at < NOW() - INTERVAL '6 hours')))",
             ws);
     if (stale == 0 || !inFlight.add(ws)) return;
@@ -199,7 +213,8 @@ public class HoldingRefresher {
     if (!market.isEnabled()) return;
     try {
       db.list(
-              "SELECT DISTINCT workspace_id FROM holdings WHERE price_source = 'MANUAL' AND provider_symbol IS NULL",
+              "SELECT DISTINCT workspace_id FROM holdings WHERE price_source = 'MANUAL' AND provider_symbol IS NULL"
+                  + MARKET_ONLY,
               rs -> rs.getObject(1, UUID.class))
           .forEach(w -> linkManual(w, null));
       apply(rows("TRUE"));

@@ -145,7 +145,7 @@ export const importApi = {
 
 export const holdingsApi = {
   list: (ws: string) => api.get<T.Holding[]>(ws, '/holdings'),
-  summary: (ws: string) => api.get<T.InvestmentSummary>(ws, '/investments/summary'),
+  summary: (ws: string, kind: 'market' | 'assets') => api.get<T.InvestmentSummary>(ws, '/investments/summary', { kind }),
   create: (ws: string, b: T.HoldingInput) => api.post<T.Holding>(ws, '/holdings', b),
   update: (ws: string, id: string, b: T.HoldingInput) => api.put<T.Holding>(ws, `/holdings/${id}`, b),
   refresh: (ws: string) => api.post<T.Holding[]>(ws, '/holdings/refresh'),
