@@ -30,6 +30,20 @@ public class MarketController {
     this.market = market;
   }
 
+  @Serdeable
+  public record Status(
+      boolean enabled, boolean live, List<MarketDataService.ProviderStatus> providers) {}
+
+  /** Whether live prices can be fetched from this server right now. */
+  @Get("/status")
+  public Status status() {
+    var providers = market.diagnose();
+    return new Status(
+        market.isEnabled(),
+        providers.stream().anyMatch(MarketDataService.ProviderStatus::ok),
+        providers);
+  }
+
   /** Look a security up by name or ticker so the exact instrument is chosen, not typed. */
   @Get("/search")
   public List<SecurityHit> search(@QueryValue @NotBlank @Size(min = 2, max = 60) String q) {

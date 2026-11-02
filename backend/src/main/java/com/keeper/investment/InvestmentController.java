@@ -135,18 +135,25 @@ public class InvestmentController {
   }
 
   /** The price and currency a holding should start with: live if an exact instrument was chosen. */
-  private record Resolved(long priceMinor, String currency, boolean live, boolean fetched) {}
+  private record Resolved(
+      long priceMinor, String currency, boolean live, boolean fetched, String providerSymbol) {}
 
   private Resolved resolve(Request body) {
     String currency = body.currency() == null ? "USD" : body.currency().toUpperCase();
     if (body.providerSymbol() == null || body.providerSymbol().isBlank()) {
-      return new Resolved(body.priceMinor(), currency, false, false);
+      // Typed by hand: still look for a live price under the same symbol, so nobody has to know
+      // that picking from search is what makes a holding live.
+      var found = refresher.findLive(body.symbol(), currency);
+      if (found.isEmpty()) return new Resolved(body.priceMinor(), currency, false, false, null);
+      return new Resolved(found.get().minor(), currency, true, true, found.get().providerSymbol());
     }
     var quote = market.quote(body.providerSymbol());
-    if (quote.isEmpty()) return new Resolved(body.priceMinor(), currency, true, false);
+    if (quote.isEmpty()) {
+      return new Resolved(body.priceMinor(), currency, true, false, body.providerSymbol().trim());
+    }
     String quoteCurrency = quote.get().currency() == null ? currency : quote.get().currency();
     long minor = refresher.priceIn(quote.get(), quoteCurrency).orElse(body.priceMinor());
-    return new Resolved(minor, quoteCurrency, true, true);
+    return new Resolved(minor, quoteCurrency, true, true, body.providerSymbol().trim());
   }
 
   @Post("/holdings")
@@ -168,7 +175,7 @@ public class InvestmentController {
         r.priceMinor(),
         r.currency(),
         LocalDate.now(),
-        blank(body.providerSymbol()),
+        r.providerSymbol(),
         blank(body.exchange()),
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",
@@ -206,7 +213,7 @@ public class InvestmentController {
         body.quantity() == null ? BigDecimal.ZERO : body.quantity(),
         body.costBasisMinor(),
         price,
-        blank(body.providerSymbol()),
+        r.providerSymbol(),
         blank(body.exchange()),
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",

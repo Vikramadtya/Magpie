@@ -48,9 +48,59 @@ public class HoldingRefresher {
     this.executor = executor;
   }
 
+  /** A live price found for a symbol, expressed in the holding's currency. */
+  public record Found(String providerSymbol, long minor) {}
+
+  /**
+   * Looks for a live price under the symbol as typed (and the Indian exchanges' suffixes for INR).
+   * It is only accepted when the market quotes the same currency, which keeps a ticker that means
+   * something else abroad from being linked by mistake.
+   */
+  public Optional<Found> findLive(String symbol, String currency) {
+    if (!market.isEnabled() || symbol == null || symbol.isBlank()) return Optional.empty();
+    String base = symbol.trim().toUpperCase();
+    List<String> candidates = new java.util.ArrayList<>(List.of(base));
+    if ("INR".equals(currency) && !base.contains(".")) {
+      candidates.add(base + ".NS");
+      candidates.add(base + ".BO");
+    }
+    for (String candidate : candidates) {
+      Optional<Quote> q = market.quote(candidate);
+      if (q.isEmpty() || !currency.equals(q.get().currency())) continue;
+      OptionalLong minor = priceIn(q.get(), currency);
+      if (minor.isPresent()) return Optional.of(new Found(candidate, minor.getAsLong()));
+    }
+    return Optional.empty();
+  }
+
+  /** Tries to link hand-entered holdings to a live price; remembers when it last tried. */
+  private int linkManual(UUID ws) {
+    int linked = 0;
+    var rows =
+        db.list(
+            "SELECT id, symbol, currency FROM holdings WHERE workspace_id = ? AND provider_symbol IS NULL "
+                + "AND price_source = 'MANUAL'",
+            rs -> new Row(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
+            ws);
+    for (Row row : rows) {
+      Optional<Found> found = findLive(row.symbol(), row.currency());
+      db.update("UPDATE holdings SET link_checked_at = NOW() WHERE id = ?", row.id());
+      if (found.isEmpty()) continue;
+      db.update(
+          "UPDATE holdings SET provider_symbol = ?, price_source = 'LIVE', price_minor = ?, price_as_of = CURRENT_DATE, "
+              + "price_updated_at = NOW() WHERE id = ?",
+          found.get().providerSymbol(),
+          found.get().minor(),
+          row.id());
+      linked++;
+    }
+    return linked;
+  }
+
   /** Synchronously refreshes one workspace; returns how many holdings got a new price. */
   public int refreshWorkspace(UUID ws) {
-    return apply(rows("workspace_id = ?", ws));
+    int linked = linkManual(ws);
+    return linked + apply(rows("workspace_id = ?", ws));
   }
 
   /** Fire-and-forget refresh if any live holding's price is older than 30 minutes. */
@@ -58,8 +108,11 @@ public class HoldingRefresher {
     if (!market.isEnabled()) return;
     long stale =
         db.count(
-            "SELECT count(*) FROM holdings WHERE workspace_id = ? AND price_source = 'LIVE' AND provider_symbol IS NOT NULL "
-                + "AND (price_updated_at IS NULL OR price_updated_at < NOW() - INTERVAL '30 minutes')",
+            "SELECT count(*) FROM holdings WHERE workspace_id = ? AND ("
+                + "(price_source = 'LIVE' AND provider_symbol IS NOT NULL "
+                + "AND (price_updated_at IS NULL OR price_updated_at < NOW() - INTERVAL '30 minutes')) "
+                + "OR (price_source = 'MANUAL' AND provider_symbol IS NULL "
+                + "AND (link_checked_at IS NULL OR link_checked_at < NOW() - INTERVAL '6 hours')))",
             ws);
     if (stale == 0 || !inFlight.add(ws)) return;
     executor.execute(
@@ -76,6 +129,10 @@ public class HoldingRefresher {
   public void refreshAll() {
     if (!market.isEnabled()) return;
     try {
+      db.list(
+              "SELECT DISTINCT workspace_id FROM holdings WHERE price_source = 'MANUAL' AND provider_symbol IS NULL",
+              rs -> rs.getObject(1, UUID.class))
+          .forEach(this::linkManual);
       apply(rows("TRUE"));
     } catch (RuntimeException e) {
       LOG.warn("Holding price refresh failed: {}", e.getMessage());

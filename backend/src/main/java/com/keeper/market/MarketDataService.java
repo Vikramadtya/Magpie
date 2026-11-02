@@ -39,6 +39,17 @@ public class MarketDataService {
     return enabled;
   }
 
+  /** What each provider says right now, so an operator can see why prices are not arriving. */
+  @io.micronaut.serde.annotation.Serdeable
+  public record ProviderStatus(String provider, boolean ok) {}
+
+  public List<ProviderStatus> diagnose() {
+    if (!enabled) return List.of();
+    return providers.stream()
+        .map(p -> new ProviderStatus(p.name(), p.quote("AAPL").isPresent()))
+        .toList();
+  }
+
   public List<SecurityHit> search(String query) {
     String q = query == null ? "" : query.trim();
     if (!enabled || q.length() < 2) return List.of();

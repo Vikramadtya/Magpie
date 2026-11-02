@@ -48,9 +48,32 @@ export default function InvestmentsPage() {
   }, [stale, holdings]);
   const s = summary.data;
 
+  const fetchLive = () =>
+    refresh.mutate(undefined, {
+      onSuccess: async (after) => {
+        const live = after.filter((h) => h.priceSource === 'LIVE').length;
+        if (live > 0) return toast.success(`${live} of ${after.length} holdings now have live prices`);
+        try {
+          const status = await marketApi.status();
+          toast.error(status.live
+            ? "None of these symbols was found on the market. Edit a holding and pick the exact instrument from search."
+            : "Live prices can't be reached from the server right now. Your last prices are kept; try again in a few minutes.");
+        } catch {
+          toast.error('Could not check the market data service.');
+        }
+      },
+      onError: (e) => toast.error(errorMessage(e)),
+    });
+
   return (
     <>
-      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{hasLive && <Button variant="outline" disabled={refresh.isPending} onClick={() => refresh.mutate(undefined, { onSuccess: () => toast.success('Prices updated'), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
+      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Fetch live prices</Button>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
+      {list.length > 0 && !hasLive && !holdings.isLoading && (
+        <div role="status" className="glass-panel p-4 mb-6 flex flex-wrap items-center gap-3 border-accent/40">
+          <Tag className="w-4 h-4 text-accent shrink-0" />
+          <p className="text-sm flex-1 min-w-[14rem]">These prices were entered by hand, so they don't move on their own. Keeper will look for live prices by symbol; press <strong>Fetch live prices</strong> to try now.</p>
+        </div>
+      )}
       <StateView isLoading={holdings.isLoading} error={holdings.error} onRetry={() => void holdings.refetch()} isEmpty={list.length === 0} emptyTitle="No holdings yet" emptyHint="Track stocks, funds or crypto by entering quantity, cost and the current price." emptyAction={canEdit && <Button onClick={() => setEditing('new')}>Add holding</Button>}>
         {s && (
           <div className="grid lg:grid-cols-3 gap-4 mb-6">
@@ -102,7 +125,7 @@ export default function InvestmentsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary">{h.priceSource === 'LIVE' ? `live${h.priceUpdatedAt ? ` · ${new Date(h.priceUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : h.priceAsOf ?? 'manual'}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>Manual</Badge>}{h.priceSource === 'LIVE' ? (h.priceUpdatedAt ? new Date(h.priceUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') : h.priceAsOf ?? ''}</p></td>
                   <td className="px-3 py-3.5 text-right tabular-nums font-medium">{formatMoney(h.marketValueMinor, h.currency)}</td>
                   <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
