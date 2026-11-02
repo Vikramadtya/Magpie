@@ -49,7 +49,8 @@ public class InvestmentController {
       String exchange,
       String assetType,
       String priceSource,
-      java.time.Instant priceUpdatedAt) {}
+      java.time.Instant priceUpdatedAt,
+      LocalDate purchasedOn) {}
 
   @Serdeable
   public record Request(
@@ -63,7 +64,9 @@ public class InvestmentController {
       /** Exact instrument chosen from market search; makes the price live. */
       @Size(max = 40) String providerSymbol,
       @Size(max = 40) String exchange,
-      @Size(max = 20) String assetType) {}
+      @Size(max = 20) String assetType,
+      /** When the position was bought; optional. */
+      LocalDate purchasedOn) {}
 
   @Serdeable
   public record PriceRequest(@Min(0) @Max(1_000_000_000_000L) long priceMinor) {}
@@ -82,7 +85,7 @@ public class InvestmentController {
 
   private static final String SELECT =
       "SELECT id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of, "
-          + "ROUND(quantity * price_minor) AS value, provider_symbol, exchange, asset_type, price_source, price_updated_at "
+          + "ROUND(quantity * price_minor) AS value, provider_symbol, exchange, asset_type, price_source, price_updated_at, purchased_on "
           + "FROM holdings WHERE workspace_id = ? ";
 
   private final Db db;
@@ -125,7 +128,8 @@ public class InvestmentController {
         rs.getString("price_source"),
         rs.getObject("price_updated_at", java.time.OffsetDateTime.class) == null
             ? null
-            : rs.getObject("price_updated_at", java.time.OffsetDateTime.class).toInstant());
+            : rs.getObject("price_updated_at", java.time.OffsetDateTime.class).toInstant(),
+        rs.getObject("purchased_on", LocalDate.class));
   }
 
   @Get("/holdings")
@@ -163,8 +167,8 @@ public class InvestmentController {
     UUID id = UUID.randomUUID();
     db.update(
         "INSERT INTO holdings(id, workspace_id, account_id, symbol, name, quantity, cost_basis_minor, price_minor, currency, price_as_of, "
-            + "provider_symbol, exchange, asset_type, price_source, price_updated_at) "
-            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            + "provider_symbol, exchange, asset_type, price_source, price_updated_at, purchased_on) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         id,
         workspaceId,
         body.accountId(),
@@ -179,7 +183,8 @@ public class InvestmentController {
         blank(body.exchange()),
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",
-        r.fetched() ? java.time.Instant.now() : null);
+        r.fetched() ? java.time.Instant.now() : null,
+        body.purchasedOn());
     return get(workspaceId, id);
   }
 
@@ -200,12 +205,13 @@ public class InvestmentController {
             current.currency(),
             body.providerSymbol(),
             body.exchange(),
-            body.assetType());
+            body.assetType(),
+            body.purchasedOn());
     Resolved r = resolve(keep);
     long price = r.fetched() ? r.priceMinor() : body.priceMinor();
     db.update(
         "UPDATE holdings SET account_id = ?, symbol = ?, name = ?, quantity = ?, cost_basis_minor = ?, price_minor = ?, "
-            + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, "
+            + "provider_symbol = ?, exchange = ?, asset_type = ?, price_source = ?, purchased_on = ?, "
             + "price_updated_at = CASE WHEN ? THEN NOW() ELSE price_updated_at END WHERE workspace_id = ? AND id = ?",
         body.accountId(),
         body.symbol().toUpperCase().trim(),
@@ -217,6 +223,7 @@ public class InvestmentController {
         blank(body.exchange()),
         blank(body.assetType()),
         r.live() ? "LIVE" : "MANUAL",
+        body.purchasedOn(),
         r.fetched(),
         workspaceId,
         id);

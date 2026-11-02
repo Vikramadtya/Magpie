@@ -1,4 +1,4 @@
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { Download, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
@@ -120,7 +120,7 @@ export default function InvestmentsPage() {
         <div className="glass-panel overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs font-medium text-secondary border-b border-border">
-              <tr><th className="px-5 py-3.5">Holding</th><th className="px-3 py-3.5 text-right">Qty</th><th className="px-3 py-3.5 text-right">Price</th><th className="px-3 py-3.5 text-right">Value</th><th className="px-3 py-3.5 text-right">Gain</th><th className="px-3 py-3.5" /></tr>
+              <tr><th className="px-5 py-3.5">Holding</th><th className="px-3 py-3.5 text-right">Qty</th><th className="px-3 py-3.5 text-right">Buy price</th><th className="px-3 py-3.5 text-right">Current price</th><th className="px-3 py-3.5 text-right">Value</th><th className="px-3 py-3.5 text-right">Gain</th><th className="px-3 py-3.5" /></tr>
             </thead>
             <tbody>
               {list.map((h) => (
@@ -132,7 +132,8 @@ export default function InvestmentsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>Manual</Badge>}{h.priceSource === 'LIVE' ? (h.priceUpdatedAt ? new Date(h.priceUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') : h.priceAsOf ?? ''}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity > 0 ? formatMoney(Math.round(h.costBasisMinor / h.quantity), h.currency) : '—'}<p className="text-xs text-secondary mt-0.5">{h.purchasedOn ? `Bought ${format(parseISO(h.purchasedOn), 'd MMM yyyy')}` : 'Date not set'}</p></td>
+                  <td className="px-3 py-3.5 text-right tabular-nums">{formatMoney(h.priceMinor, h.currency)}<p className="text-xs text-secondary flex items-center justify-end gap-1.5 mt-0.5">{h.priceSource === 'LIVE' ? <Badge tone="good">Live</Badge> : <Badge>Manual</Badge>}{h.priceUpdatedAt ? `Updated ${format(new Date(h.priceUpdatedAt), 'd MMM, HH:mm')}` : h.priceAsOf ? `As of ${format(parseISO(h.priceAsOf), 'd MMM yyyy')}` : ''}</p></td>
                   <td className="px-3 py-3.5 text-right tabular-nums font-medium">{formatMoney(h.marketValueMinor, h.currency)}</td>
                   <td className="px-3 py-3.5 text-right"><Badge tone={h.gainMinor >= 0 ? 'good' : 'bad'} className="text-xs"><Amount minor={h.gainMinor} currency={h.currency} signed /></Badge></td>
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
@@ -172,6 +173,7 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
   const [price, setPrice] = useState(holding ? toInputValue(holding.priceMinor, cur) : '');
   const [currencyCode, setCurrencyCode] = useState(cur);
   const [accountId, setAccountId] = useState(holding?.accountId ?? '');
+  const [purchasedOn, setPurchasedOn] = useState(holding?.purchasedOn ?? '');
   const [error, setError] = useState('');
   // the exact instrument picked from market search; null = price entered by hand
   const [linked, setLinked] = useState<{ providerSymbol: string; exchange: string | null; assetType: string | null } | null>(
@@ -210,7 +212,7 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
     const priceMinor = parseMoney(price || '0', currencyCode);
     if (!symbol.trim() || !name.trim()) return setError('Symbol and name are required');
     if (!(q >= 0) || costMinor === null || priceMinor === null) return setError('Check quantity, cost and price');
-    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: costMinor, priceMinor, currency: currencyCode, providerSymbol: linked?.providerSymbol ?? null, exchange: linked?.exchange ?? null, assetType: linked?.assetType ?? null } }, { onSuccess: onClose });
+    save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: costMinor, priceMinor, currency: currencyCode, providerSymbol: linked?.providerSymbol ?? null, exchange: linked?.exchange ?? null, assetType: linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
   };
 
   return (
@@ -255,6 +257,7 @@ function HoldingModal({ holding, currency, onClose }: { holding: Holding | null;
           <Field label="Total cost"><MoneyInput value={cost} currency={currencyCode} onChange={setCost} /></Field>
           <Field label="Price / unit"><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
         </div>
+        <Field label="Date bought (optional)"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
         {accounts.length > 0 && <Field label="Account (optional)"><Select value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">None</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>}
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></div>
       </form>

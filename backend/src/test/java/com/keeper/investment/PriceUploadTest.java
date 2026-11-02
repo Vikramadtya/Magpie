@@ -68,4 +68,30 @@ class PriceUploadTest extends ApiTestBase {
             .get("priceMinor")
             .equals(100));
   }
+
+  @Test
+  void theBuyDateIsKept() {
+    Session s = register("bought");
+    Map<?, ?> created =
+        post(
+            s.token(),
+            "/api/v1/workspaces/" + s.workspaceId() + "/holdings",
+            Map.of(
+                "symbol",
+                "ZZDATE",
+                "name",
+                "Dated",
+                "quantity",
+                2,
+                "costBasisMinor",
+                5000,
+                "priceMinor",
+                3000,
+                "currency",
+                "USD",
+                "purchasedOn",
+                "2025-03-14"),
+            Map.class);
+    assertEquals("2025-03-14", created.get("purchasedOn"));
+  }
 }
