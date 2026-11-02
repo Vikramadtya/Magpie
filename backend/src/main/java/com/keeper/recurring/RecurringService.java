@@ -57,13 +57,16 @@ public class RecurringService {
 
   public RecurringRule create(UUID ws, UUID actor, RecurringController.Request r) {
     validate(ws, r);
-    return rules.find(ws, rules.insert(ws, actor, withAccountCurrency(ws, r))).orElseThrow();
+    UUID id = rules.insert(ws, actor, withAccountCurrency(ws, r));
+    postDue(LocalDate.now(), ws);
+    return get(ws, id);
   }
 
   public RecurringRule update(UUID ws, UUID id, RecurringController.Request r) {
     get(ws, id);
     validate(ws, r);
     rules.update(ws, id, withAccountCurrency(ws, r));
+    postDue(LocalDate.now(), ws);
     return get(ws, id);
   }
 
@@ -76,6 +79,7 @@ public class RecurringService {
   public void setStatus(UUID ws, UUID id, String status) {
     get(ws, id);
     rules.setStatus(ws, id, status);
+    if ("ACTIVE".equals(status)) postDue(LocalDate.now(), ws);
   }
 
   public void delete(UUID ws, UUID id) {
@@ -118,8 +122,13 @@ public class RecurringService {
 
   /** Daily job body: catches up every missed occurrence of each due rule. Returns postings made. */
   public int postDue(LocalDate today) {
+    return postDue(today, null);
+  }
+
+  /** Same, for one workspace only (used right after a rule is saved, so it shows up at once). */
+  public int postDue(LocalDate today, UUID onlyWorkspace) {
     int posted = 0;
-    List<RecurringRule> due = db.tx(() -> rules.lockDue(today));
+    List<RecurringRule> due = db.tx(() -> rules.lockDue(today, onlyWorkspace));
     for (RecurringRule rule : due) {
       posted +=
           db.tx(

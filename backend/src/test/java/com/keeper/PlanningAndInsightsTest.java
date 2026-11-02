@@ -133,9 +133,10 @@ class PlanningAndInsightsTest extends ApiTestBase {
             "autoPost",
             true),
         Map.class);
+    // a rule that is already due posts as soon as it is saved, so the job has nothing left to do
     int first = recurring.postDue(LocalDate.now());
     int second = recurring.postDue(LocalDate.now());
-    assertTrue(first >= 1, "the due rule should have been posted");
+    assertEquals(0, first, "saving the rule already posted it");
     assertEquals(0, second, "a second run must not post again");
     Map<?, ?> txs = get(s.token(), ws(s) + "/transactions", Map.class);
     assertEquals(1, ((List<?>) txs.get("items")).size());

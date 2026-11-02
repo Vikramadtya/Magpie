@@ -16,7 +16,9 @@ public class RecurringJob {
     this.service = service;
   }
 
-  @Scheduled(cron = "0 5 0 * * *", initialDelay = "30s")
+  // Hourly (and once shortly after start) rather than once a night: the server may be asleep at
+  // midnight, and postings are idempotent per date.
+  @Scheduled(fixedDelay = "1h", initialDelay = "30s")
   public void run() {
     try {
       int n = service.postDue(LocalDate.now());

@@ -54,14 +54,15 @@ public class RecurringRepository {
   }
 
   /** Due rules for every workspace; SKIP LOCKED lets several instances share the work safely. */
-  public List<RecurringRule> lockDue(LocalDate today) {
+  public List<RecurringRule> lockDue(LocalDate today, UUID onlyWorkspace) {
     return db.list(
         "SELECT "
             + COLS
             + " FROM recurring_rules WHERE status = 'ACTIVE' AND auto_post AND next_run_on <= ? "
+            + (onlyWorkspace == null ? "" : "AND workspace_id = ? ")
             + "ORDER BY next_run_on FOR UPDATE SKIP LOCKED LIMIT 200",
         MAPPER,
-        today);
+        onlyWorkspace == null ? new Object[] {today} : new Object[] {today, onlyWorkspace});
   }
 
   public UUID workspaceOf(UUID ruleId) {
