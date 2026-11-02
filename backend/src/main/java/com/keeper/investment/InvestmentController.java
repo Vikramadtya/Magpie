@@ -230,6 +230,28 @@ public class InvestmentController {
     return list(workspaceId);
   }
 
+  @Serdeable
+  public record UploadedPrice(
+      @NotBlank @Size(max = 40) String symbol,
+      @DecimalMin(value = "0", inclusive = false)
+          @jakarta.validation.constraints.DecimalMax("1000000000")
+          BigDecimal price,
+      @Pattern(regexp = "^[A-Za-z]{3}$") String currency) {}
+
+  @Serdeable
+  public record UploadRequest(@Size(min = 1, max = 500) List<@Valid UploadedPrice> prices) {}
+
+  /** Applies prices gathered by the downloadable script (see the Investments page). */
+  @Post("/holdings/prices")
+  public HoldingRefresher.UploadResult uploadPrices(
+      @PathVariable UUID workspaceId, @Valid @Body UploadRequest body) {
+    return refresher.applyUploaded(
+        workspaceId,
+        body.prices().stream()
+            .map(p -> new HoldingRefresher.Uploaded(p.symbol(), p.price(), p.currency()))
+            .toList());
+  }
+
   /** Re-fetches the live price of a single holding right now. */
   @Post("/holdings/{id}/refresh")
   public Holding refreshOne(@PathVariable UUID workspaceId, @PathVariable UUID id) {

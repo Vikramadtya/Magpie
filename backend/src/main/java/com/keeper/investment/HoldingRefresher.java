@@ -125,6 +125,53 @@ public class HoldingRefresher {
                 : rows("workspace_id = ? AND id = ?", ws, onlyId));
   }
 
+  /** One price from an uploaded file; the currency is optional and defaults to the holding's. */
+  public record Uploaded(String symbol, java.math.BigDecimal price, String currency) {}
+
+  @io.micronaut.serde.annotation.Serdeable
+  public record UploadResult(int updated, List<String> unmatched) {}
+
+  /**
+   * Applies prices collected elsewhere (e.g. by the downloadable script run on the user's own
+   * computer). A row matches a holding by its symbol or its live-linked symbol; the price is
+   * converted into the holding's currency.
+   */
+  public UploadResult applyUploaded(UUID ws, List<Uploaded> prices) {
+    int updated = 0;
+    List<String> unmatched = new java.util.ArrayList<>();
+    for (Uploaded u : prices) {
+      String key = u.symbol().trim().toUpperCase();
+      var holdings =
+          db.list(
+              "SELECT id, symbol, currency FROM holdings WHERE workspace_id = ? "
+                  + "AND (UPPER(symbol) = ? OR UPPER(provider_symbol) = ?)",
+              rs -> new Row(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
+              ws,
+              key,
+              key);
+      if (holdings.isEmpty()) {
+        unmatched.add(key);
+        continue;
+      }
+      for (Row row : holdings) {
+        String quoted = u.currency() == null ? row.currency() : u.currency().toUpperCase();
+        Quote q = new Quote(key, key, u.price(), quoted, null, java.time.Instant.now(), "upload");
+        OptionalLong minor = priceIn(q, row.currency());
+        if (minor.isEmpty()) {
+          unmatched.add(key);
+          continue;
+        }
+        db.update(
+            "UPDATE holdings SET price_minor = ?, price_as_of = CURRENT_DATE, price_updated_at = NOW() "
+                + "WHERE id = ?",
+            minor.getAsLong(),
+            row.id());
+        updated++;
+      }
+    }
+    return new UploadResult(updated, unmatched);
+  }
+
   /** Fire-and-forget refresh if any live holding's price is older than 30 minutes. */
   public void refreshInBackgroundIfStale(UUID ws) {
     if (!market.isEnabled()) return;

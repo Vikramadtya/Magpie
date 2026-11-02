@@ -108,3 +108,7 @@ To keep prices flowing in that case, add an official key as a fallback:
 Keeper then tries Yahoo first and Alpha Vantage second. The free key allows roughly 25 lookups a day, enough
 for a personal portfolio because prices are cached for 5 minutes and refreshed hourly. Indian shares are
 looked up as `SYMBOL.BSE` automatically. Holdings that no source can price stay on the price you entered.
+
+### Prices from your own computer
+
+If the server cannot reach any market data source, open **Investments → From my computer**. Download `keeper_prices.py`, run `python3 keeper_prices.py` (Python 3, no packages needed), and upload the `prices.csv` it writes. Keeper matches each row to a holding by symbol and converts the price into the holding's currency. The endpoint is `POST /api/v1/workspaces/{id}/holdings/prices`.

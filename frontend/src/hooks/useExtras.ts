@@ -70,3 +70,15 @@ export function useRefreshHoldings() {
     },
   });
 }
+
+export function useUploadPrices() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (prices: { symbol: string; price: number; currency?: string }[]) => holdingsApi.uploadPrices(id, prices),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.holdings(id) });
+      void qc.invalidateQueries({ queryKey: qk.investments(id) });
+    },
+  });
+}

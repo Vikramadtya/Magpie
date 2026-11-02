@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from 'date-fns';
-import { Pencil, Plus, RefreshCw, Search, Tag, Trash2 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { Download, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
 import { marketApi } from '../api/endpoints';
@@ -25,7 +25,8 @@ import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
-import { useMarketSearch, useRefreshHolding, useRefreshHoldings } from '../hooks/useExtras';
+import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices } from '../hooks/useExtras';
+import { buildPriceScript, parsePriceCsv } from '../lib/priceScript';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../lib/money';
 
 
@@ -36,6 +37,7 @@ export default function InvestmentsPage() {
   const [editing, setEditing] = useState<Holding | 'new' | null>(null);
   const [pricing, setPricing] = useState<Holding | null>(null);
   const [deleting, setDeleting] = useState<Holding | null>(null);
+  const [offline, setOffline] = useState(false);
   const del = useDeleteHolding();
   const refresh = useRefreshHoldings();
   const refreshOne = useRefreshHolding();
@@ -72,7 +74,7 @@ export default function InvestmentsPage() {
 
   return (
     <>
-      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <div className="flex items-center gap-3">{updatedAt && <span className="text-xs text-secondary hidden sm:inline">Updated {formatDistanceToNow(updatedAt, { addSuffix: true })}</span>}<Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button></div>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
+      <PageHeader title="Investments" subtitle="Holdings with prices you update" actions={<>{list.length > 0 && <div className="flex items-center gap-3">{updatedAt && <span className="text-xs text-secondary hidden sm:inline">Updated {formatDistanceToNow(updatedAt, { addSuffix: true })}</span>}<Button variant="outline" disabled={refresh.isPending} onClick={fetchLive}><RefreshCw className={`w-4 h-4 mr-2 ${refresh.isPending ? 'animate-spin' : ''}`} />Refresh prices</Button>{canEdit && <Button variant="outline" onClick={() => setOffline(true)}><Upload className="w-4 h-4 mr-2" />From my computer</Button>}</div>}{canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />Add holding</Button>}</>} />
       {list.length > 0 && !hasLive && !holdings.isLoading && (
         <div role="status" className="glass-panel p-4 mb-6 flex flex-wrap items-center gap-3 border-accent/40">
           <Tag className="w-4 h-4 text-accent shrink-0" />
@@ -152,6 +154,7 @@ export default function InvestmentsPage() {
         </div>
       </StateView>
       {editing && <HoldingModal holding={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
+      {offline && <OfflinePricesModal holdings={list} onClose={() => setOffline(false)} />}
       {pricing && <PriceModal holding={pricing} onClose={() => setPricing(null)} />}
       <ConfirmDialog open={!!deleting} title={`Remove ${deleting?.symbol}?`} message="This only removes the holding record." confirmLabel="Remove" onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />
     </>
@@ -274,6 +277,46 @@ function PriceModal({ holding, onClose }: { holding: Holding; onClose: () => voi
         <Field label={`Price per unit (${holding.currency})`}><MoneyInput value={price} currency={holding.currency} onChange={setPriceText} autoFocus /></Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={setPrice.isPending}>Update</Button></div>
       </form>
+    </Modal>
+  );
+}
+
+/** Prices without the server: run a downloaded script on your own computer, then upload its CSV. */
+function OfflinePricesModal({ holdings, onClose }: { holdings: Holding[]; onClose: () => void }) {
+  const upload = useUploadPrices();
+  const input = useRef<HTMLInputElement>(null);
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([buildPriceScript(holdings)], { type: 'text/x-python' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'keeper_prices.py' });
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const send = async (file: File | undefined) => {
+    if (!file) return;
+    const prices = parsePriceCsv(await file.text());
+    if (prices.length === 0) return toast.error('No prices found. Upload the prices.csv the script wrote.');
+    upload.mutate(prices, {
+      onSuccess: (r) => {
+        toast.success(`${r.updated} price${r.updated === 1 ? '' : 's'} updated`);
+        if (r.unmatched.length) toast.error(`Not matched to a holding: ${r.unmatched.join(', ')}`, { duration: 8000 });
+        onClose();
+      },
+      onError: (e) => toast.error(errorMessage(e)),
+    });
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title="Prices from my computer">
+      <div className="p-5 space-y-5 text-sm">
+        <p className="text-secondary">When the server can't reach the market, your own computer usually can. Nothing leaves your computer except the prices you upload.</p>
+        <ol className="space-y-4">
+          <li className="flex items-start gap-3"><Badge>1</Badge><div className="flex-1"><p className="mb-2">Download the script. It already lists your {holdings.length} holding{holdings.length === 1 ? '' : 's'}.</p><Button variant="outline" onClick={download}><Download className="w-4 h-4 mr-2" />Download keeper_prices.py</Button></div></li>
+          <li className="flex items-start gap-3"><Badge>2</Badge><div className="flex-1"><p className="mb-2">Run it. It needs Python 3 and writes <code>prices.csv</code> next to it.</p><code className="block rounded-lg bg-primary/[0.06] px-3 py-2 text-xs">python3 keeper_prices.py</code></div></li>
+          <li className="flex items-start gap-3"><Badge>3</Badge><div className="flex-1"><p className="mb-2">Upload the CSV to update your prices.</p><input ref={input} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => { void send(e.target.files?.[0]); e.target.value = ''; }} /><Button disabled={upload.isPending} onClick={() => input.current?.click()}><Upload className="w-4 h-4 mr-2" />{upload.isPending ? 'Updating…' : 'Upload prices.csv'}</Button></div></li>
+        </ol>
+      </div>
     </Modal>
   );
 }

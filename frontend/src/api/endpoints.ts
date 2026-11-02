@@ -151,6 +151,8 @@ export const holdingsApi = {
   refresh: (ws: string) => api.post<T.Holding[]>(ws, '/holdings/refresh'),
   refreshOne: (ws: string, id: string) => api.post<T.Holding>(ws, `/holdings/${id}/refresh`),
   setPrice: (ws: string, id: string, priceMinor: number) => api.put<T.Holding>(ws, `/holdings/${id}/price`, { priceMinor }),
+  uploadPrices: (ws: string, prices: { symbol: string; price: number; currency?: string }[]) =>
+    api.post<{ updated: number; unmatched: string[] }>(ws, '/holdings/prices', { prices }),
   remove: (ws: string, id: string) => api.del(ws, `/holdings/${id}`),
 };
 
