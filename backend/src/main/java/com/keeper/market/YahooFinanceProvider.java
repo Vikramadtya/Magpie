@@ -29,6 +29,21 @@ public class YahooFinanceProvider implements MarketDataProvider, Ordered {
   // or the user's manual price; we do not try to disguise the client.
   private static final String UA = "Keeper/1.0 (personal finance app)";
 
+  private final java.util.concurrent.atomic.AtomicReference<String> lastError =
+      new java.util.concurrent.atomic.AtomicReference<>();
+
+  @Override
+  public String lastError() {
+    return lastError.get();
+  }
+
+  private static String describe(RuntimeException e) {
+    if (e instanceof io.micronaut.http.client.exceptions.HttpClientResponseException h) {
+      return "HTTP " + h.getStatus().getCode() + " " + h.getStatus().getReason();
+    }
+    return e.getClass().getSimpleName() + ": " + e.getMessage();
+  }
+
   private final HttpClient searchClient;
   private final HttpClient chartClient;
 
@@ -77,8 +92,11 @@ public class YahooFinanceProvider implements MarketDataProvider, Ordered {
           chartClient
               .toBlocking()
               .retrieve(HttpRequest.GET(uri).header("User-Agent", UA), Map.class);
-      return parseChart(body);
+      var parsed = parseChart(body);
+      lastError.set(parsed.isPresent() ? null : "No price in the response for " + symbol);
+      return parsed;
     } catch (RuntimeException e) {
+      lastError.set(describe(e));
       LOG.warn("Yahoo quote failed for {}: {}", symbol, e.getMessage());
       return Optional.empty();
     }

@@ -91,3 +91,20 @@ make dev-fe         # Vite on :5173, proxies /api, /oauth and /health to :8080
 ```
 
 **Done!** Your full-stack application is now live on the internet, secure, and auto-deploying whenever you push to `main`.
+
+
+## Live investment prices
+
+Keeper asks Yahoo Finance for prices by default (no key, US and Indian listings). Yahoo sometimes refuses
+requests that come from cloud hosts such as Render. When that happens the **Refresh prices** message on the
+Investments page says what Yahoo answered, for example `yahoo: HTTP 429 Too Many Requests`, and
+`GET /api/v1/market/status` shows the same.
+
+To keep prices flowing in that case, add an official key as a fallback:
+
+1. Get a free key at <https://www.alphavantage.co/support/#api-key>.
+2. On Render, set `ALPHA_VANTAGE_API_KEY` to it and redeploy.
+
+Keeper then tries Yahoo first and Alpha Vantage second. The free key allows roughly 25 lookups a day, enough
+for a personal portfolio because prices are cached for 5 minutes and refreshed hourly. Indian shares are
+looked up as `SYMBOL.BSE` automatically. Holdings that no source can price stay on the price you entered.

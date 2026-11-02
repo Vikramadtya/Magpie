@@ -41,12 +41,16 @@ public class MarketDataService {
 
   /** What each provider says right now, so an operator can see why prices are not arriving. */
   @io.micronaut.serde.annotation.Serdeable
-  public record ProviderStatus(String provider, boolean ok) {}
+  public record ProviderStatus(String provider, boolean ok, String error) {}
 
   public List<ProviderStatus> diagnose() {
     if (!enabled) return List.of();
     return providers.stream()
-        .map(p -> new ProviderStatus(p.name(), p.quote("AAPL").isPresent()))
+        .map(
+            p -> {
+              boolean ok = p.quote("AAPL").isPresent();
+              return new ProviderStatus(p.name(), ok, ok ? null : p.lastError());
+            })
         .toList();
   }
 

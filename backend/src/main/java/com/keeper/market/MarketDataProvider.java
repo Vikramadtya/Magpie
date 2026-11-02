@@ -13,4 +13,9 @@ public interface MarketDataProvider {
   List<SecurityHit> search(String query);
 
   Optional<Quote> quote(String symbol);
+
+  /** Why the most recent call failed, or null when it worked; for the status page. */
+  default String lastError() {
+    return null;
+  }
 }

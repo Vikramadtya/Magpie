@@ -63,6 +63,7 @@ public class HoldingRefresher {
     if ("INR".equals(currency) && !base.contains(".")) {
       candidates.add(base + ".NS");
       candidates.add(base + ".BO");
+      candidates.add(base + ".BSE");
     }
     for (String candidate : candidates) {
       Optional<Quote> q = market.quote(candidate);

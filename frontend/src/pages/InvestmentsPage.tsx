@@ -59,9 +59,10 @@ export default function InvestmentsPage() {
         if (live > 0) return toast.success(`${live} of ${after.length} holdings now have live prices`);
         try {
           const status = await marketApi.status();
+          const why = status.providers.filter((p) => !p.ok && p.error).map((p) => `${p.provider}: ${p.error}`).join('; ');
           toast.error(status.live
             ? "None of these symbols was found on the market. Edit a holding and pick the exact instrument from search."
-            : "Live prices can't be reached from the server right now. Your last prices are kept; try again in a few minutes.");
+            : `Live prices can't be reached from the server right now${why ? ` (${why})` : ''}. Your last prices are kept. If this keeps happening, add a market data key in the server settings.`, { duration: 10000 });
         } catch {
           toast.error('Could not check the market data service.');
         }

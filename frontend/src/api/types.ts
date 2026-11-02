@@ -199,7 +199,7 @@ export interface ApiToken {
   /** The split-app person this connection is bound to, once it has introduced itself. */
   externalName: string | null; externalEmail: string | null; emailMatched: boolean;
 }
-export interface MarketStatus { enabled: boolean; live: boolean; providers: { provider: string; ok: boolean }[] }
+export interface MarketStatus { enabled: boolean; live: boolean; providers: { provider: string; ok: boolean; error: string | null }[] }
 export interface SplitPerson { id: string; externalId: string; name: string; email: string | null; label: string; labelEdited: boolean }
 
 export interface HouseholdMember {

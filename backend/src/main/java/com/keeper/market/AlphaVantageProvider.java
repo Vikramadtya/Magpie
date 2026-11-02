@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory;
 public class AlphaVantageProvider implements MarketDataProvider, Ordered {
   private static final Logger LOG = LoggerFactory.getLogger(AlphaVantageProvider.class);
 
+  private final java.util.concurrent.atomic.AtomicReference<String> lastError =
+      new java.util.concurrent.atomic.AtomicReference<>();
   private final HttpClient client;
   private final String key;
   private final ConcurrentHashMap<String, SecurityHit> seen = new ConcurrentHashMap<>();
@@ -44,6 +46,32 @@ public class AlphaVantageProvider implements MarketDataProvider, Ordered {
   @Override
   public int getOrder() {
     return 10;
+  }
+
+  @Override
+  public String lastError() {
+    return lastError.get();
+  }
+
+  /** Alpha Vantage lists Indian shares as SYMBOL.BSE; the usual Yahoo suffixes are translated. */
+  static String providerSymbol(String symbol) {
+    String s = symbol.toUpperCase();
+    if (s.endsWith(".NS") || s.endsWith(".BO")) return s.substring(0, s.length() - 3) + ".BSE";
+    return s;
+  }
+
+  /** The currency a symbol trades in, when a search has not told us. */
+  static String currencyOf(String symbol) {
+    int dot = symbol.lastIndexOf('.');
+    String suffix = dot < 0 ? "" : symbol.substring(dot + 1).toUpperCase();
+    return switch (suffix) {
+      case "BSE" -> "INR";
+      case "LON" -> "GBP";
+      case "DEX", "FRK", "PAR", "AMS" -> "EUR";
+      case "TRT" -> "CAD";
+      case "SHH", "SHZ" -> "CNY";
+      default -> "USD";
+    };
   }
 
   @Override
@@ -92,22 +120,30 @@ public class AlphaVantageProvider implements MarketDataProvider, Ordered {
                       "/query?function=GLOBAL_QUOTE&apikey="
                           + key
                           + "&symbol="
-                          + URLEncoder.encode(symbol, StandardCharsets.UTF_8)),
+                          + URLEncoder.encode(providerSymbol(symbol), StandardCharsets.UTF_8)),
                   Map.class);
       if (!(body.get("Global Quote") instanceof Map<?, ?> q) || q.get("05. price") == null) {
+        lastError.set(
+            body.get("Note") != null || body.get("Information") != null
+                ? "Alpha Vantage limit reached (free keys allow about 25 lookups a day)"
+                : "Alpha Vantage has no price for " + symbol);
         return Optional.empty();
       }
+      lastError.set(null);
       SecurityHit hit = seen.get(symbol);
       return Optional.of(
           new Quote(
               symbol,
               hit == null ? symbol : hit.name(),
               new BigDecimal(String.valueOf(q.get("05. price"))),
-              hit == null ? null : hit.currency(),
+              hit == null || hit.currency() == null
+                  ? currencyOf(providerSymbol(symbol))
+                  : hit.currency(),
               hit == null ? null : hit.exchange(),
               Instant.now(),
               "alphavantage"));
     } catch (RuntimeException e) {
+      lastError.set(e.getClass().getSimpleName() + ": " + e.getMessage());
       LOG.warn("Alpha Vantage quote failed for {}: {}", symbol, e.getMessage());
       return Optional.empty();
     }
