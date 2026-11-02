@@ -142,6 +142,17 @@ function takeSignInProblem(): string | undefined {
   return SIGN_IN_PROBLEMS[code] ?? SIGN_IN_PROBLEMS.failed;
 }
 
+/** Drops this site's service worker and caches, then reloads, so the newest page is fetched. */
+async function freshStart() {
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations();
+    await Promise.all((registrations ?? []).map((r) => r.unregister()));
+    await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
+  } finally {
+    window.location.reload();
+  }
+}
+
 function SignIn({ clientId, message }: { clientId: string | null; message?: string }) {
   const [problem] = useState(takeSignInProblem);
   const slot = useRef<HTMLDivElement>(null);
@@ -172,7 +183,12 @@ function SignIn({ clientId, message }: { clientId: string | null; message?: stri
         <p className="text-sm text-secondary mt-1.5">Sign in with the Google account you use for Keeper. You only do this once on this phone.</p>
       </div>
       {clientId ? <div ref={slot} className="flex justify-center min-h-[44px]" /> : null}
-      {failed && <p role="alert" className="text-sm text-red-500">Google sign-in could not load. Check your connection and reload.</p>}
+      {failed && (
+        <div role="alert" className="space-y-3">
+          <p className="text-sm text-red-500">Google sign-in could not load. This is usually an old saved copy of the page or a content blocker.</p>
+          <button type="button" onClick={() => void freshStart()} className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium shadow-card">Clear saved copy and reload</button>
+        </div>
+      )}
       {(problem ?? message) && <p role="alert" className="text-sm text-red-500">{problem ?? message}</p>}
     </section>
   );
