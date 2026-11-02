@@ -1,4 +1,4 @@
-# Keeper ↔ expense-split interface (v1)
+# Keeper ↔ expense-split interface (v1.1)
 
 Group expenses are entered in the split app. It sends them to Keeper, where the owner reviews and records
 them in **To review**. Keeper never writes back to the split app.
@@ -96,3 +96,48 @@ Send the item's `type`, `externalId`, `occurredOn`, `currency` and `"deleted": t
 
 If an accepted item is later changed or deleted in the split app, it returns to **To review** and nothing is
 changed in Keeper until the owner chooses to apply it.
+
+
+## Version 1.1 (additions; v1 items keep working)
+
+### Same ids on both sides
+Every person is identified by the split app's own stable `personId` (never by name). The connection is
+bound to one person: the first request carries `"me": {"personId": "...", "name": "..."}` and Keeper stores
+it on the connection. Names are only labels; renaming someone never merges or splits their loans.
+
+### Several payers
+An expense lists what each person **paid** and what each person **owes**, in the currency's minor unit:
+
+```json
+{
+  "type": "EXPENSE", "externalId": "exp_8f3a", "version": "7",
+  "groupId": "grp_lisbon", "groupName": "Lisbon", "ledger": "GROUP",
+  "occurredOn": "2026-03-04", "currency": "EUR", "currencyExponent": 2, "totalMinor": 30000,
+  "title": "Dinner", "category": "Food", "tags": ["trip"], "note": "Cash and card",
+  "splitType": "EQUAL",
+  "payers": [ { "personId": "u_me", "name": "Asha", "paidMinor": 20000 },
+              { "personId": "u_ravi", "name": "Ravi", "paidMinor": 10000 } ],
+  "shares": [ { "personId": "u_me", "name": "Asha", "shareMinor": 10000 },
+              { "personId": "u_ravi", "name": "Ravi", "shareMinor": 10000 },
+              { "personId": "u_sam", "name": "Sam", "shareMinor": 10000 } ]
+}
+```
+
+`payers` sum to `totalMinor`, and so do `shares`. The split app sends the item to **each** connected payer
+or participant, from their own point of view (`me` differs per connection), so every payer is told their part.
+Keeper works out the rest: money you paid beyond your share becomes loans to the people who are short;
+your share of what others paid goes to "Owed to friends".
+
+### Currency
+`currency` is an ISO 4217 code and `totalMinor`, `paidMinor`, `shareMinor` use **that currency's real minor
+unit** (JPY 0 decimals, USD 2, KWD 3). `currencyExponent` must match; Keeper rejects the item otherwise.
+
+### Friend-to-friend ledgers
+`"ledger": "DIRECT"` marks the private ledger between two friends. Keeper creates no trip for it. Payments
+between you and a friend there are ordinary settlements. Items in which you are neither payer nor participant
+are never sent.
+
+### Information for review
+`category`, `tags`, `note` and `splitType` are hints. In **To review** the owner can **add** the item as it is,
+**edit** (category, account, trip, amounts charged) before adding, or **ignore** it. Nothing is recorded
+until they choose.
