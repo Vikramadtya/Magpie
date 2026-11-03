@@ -138,6 +138,55 @@ public class TransactionRepository {
         where.argsWith(limit + 1));
   }
 
+  /** A page in any sort order, by position (the keyset page above only fits newest-first). */
+  public List<TransactionView> offsetPage(
+      UUID ws, TransactionFilter filter, int offset, int limit) {
+    SqlWhere where = filter.toWhere(ws);
+    return db.list(
+        SELECT + "WHERE " + where.sql() + " ORDER BY " + filter.orderBy() + " LIMIT ? OFFSET ?",
+        this::toView,
+        where.argsWith(limit + 1, offset));
+  }
+
+  /** Up to {@code cap} matching rows in the chosen order, for matching free text in the app. */
+  public List<TransactionView> candidates(UUID ws, TransactionFilter filter, int cap) {
+    SqlWhere where = filter.toWhere(ws);
+    return db.list(
+        SELECT + "WHERE " + where.sql() + " ORDER BY " + filter.orderBy() + " LIMIT ?",
+        this::toView,
+        where.argsWith(cap));
+  }
+
+  public record Totals(long count, long incomeMinor, long expenseMinor) {}
+
+  /** How many rows match and what they add up to, in the ledger's main currency. */
+  public Totals totals(UUID ws, TransactionFilter filter) {
+    SqlWhere where = filter.toWhere(ws);
+    String amount = "COALESCE(t.base_amount_minor, t.amount_minor)";
+    return db.one(
+            "SELECT count(*), COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN "
+                + amount
+                + " END), 0), COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN "
+                + amount
+                + " END), 0)"
+                + FROM
+                + "WHERE "
+                + where.sql(),
+            rs -> new Totals(rs.getLong(1), rs.getLong(2), rs.getLong(3)),
+            where.args().toArray())
+        .orElse(new Totals(0, 0, 0));
+  }
+
+  /** Ids of tags whose name contains the text. */
+  public java.util.Set<UUID> tagIdsMatching(UUID ws, String term) {
+    return new java.util.HashSet<>(
+        db.list(
+            "SELECT id FROM tags WHERE workspace_id = ? AND name ILIKE ?",
+            rs -> rs.getObject(1, UUID.class),
+            ws,
+            "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"));
+  }
+
   public Optional<TransactionView> find(UUID ws, UUID id) {
     return db.one(
         SELECT + "WHERE t.workspace_id = ? AND t.id = ? AND t.deleted_at IS NULL",

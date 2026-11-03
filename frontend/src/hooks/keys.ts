@@ -11,6 +11,8 @@ export const qk = {
   tags: (ws: string) => ['ws', ws, 'tags'] as const,
   transactions: (ws: string) => ['ws', ws, 'transactions'] as const,
   transactionList: (ws: string, f: TransactionFilters) => ['ws', ws, 'transactions', f] as const,
+  // its own root: the cache code treats everything under 'transactions' as a list of rows
+  transactionSummary: (ws: string, f: TransactionFilters) => ['ws', ws, 'tx-summary', f] as const,
   comments: (ws: string, id: string) => ['ws', ws, 'comments', id] as const,
   budgets: (ws: string, month: string) => ['ws', ws, 'budgets', month] as const,
   goals: (ws: string) => ['ws', ws, 'goals'] as const,
@@ -34,7 +36,7 @@ export const qk = {
   connections: (ws: string) => ['ws', ws, 'connections'] as const,
 };
 
-const MONEY_KEYS = new Set(['accounts', 'transactions', 'budgets', 'goals', 'recurring', 'upcoming', 'dashboard', 'analytics', 'investments', 'activity', 'deleted', 'loans', 'forecast', 'insights', 'trips', 'inbox']);
+const MONEY_KEYS = new Set(['accounts', 'transactions', 'tx-summary', 'budgets', 'goals', 'recurring', 'upcoming', 'dashboard', 'analytics', 'investments', 'activity', 'deleted', 'loans', 'forecast', 'insights', 'trips', 'inbox']);
 
 /** Anything derived from transactions: refetch after a money change. */
 export function invalidateMoney(qc: QueryClient, ws: string) {

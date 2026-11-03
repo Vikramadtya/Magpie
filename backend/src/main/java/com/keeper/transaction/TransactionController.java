@@ -16,6 +16,7 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -110,6 +111,61 @@ public class TransactionController {
     this.service = service;
   }
 
+  /** Every filter the list and the summary share. Several ids are comma-separated. */
+  private static TransactionFilter filter(
+      LocalDate from,
+      LocalDate to,
+      String accountIds,
+      String categoryIds,
+      String payeeIds,
+      String tagIds,
+      boolean uncategorised,
+      Long minAmount,
+      Long maxAmount,
+      String type,
+      String q,
+      UUID tripId,
+      String spentBy,
+      String sort,
+      UUID accountId,
+      UUID categoryId,
+      UUID payeeId,
+      UUID tagId) {
+    return new TransactionFilter(
+        from,
+        to,
+        ids(accountIds, accountId),
+        ids(categoryIds, categoryId),
+        ids(payeeIds, payeeId),
+        ids(tagIds, tagId),
+        uncategorised,
+        minAmount,
+        maxAmount,
+        type,
+        q == null ? null : q.trim(),
+        tripId,
+        spentBy,
+        sort);
+  }
+
+  private static List<UUID> ids(String commaSeparated, UUID single) {
+    java.util.List<UUID> out = new java.util.ArrayList<>();
+    if (single != null) out.add(single);
+    if (commaSeparated != null && !commaSeparated.isBlank()) {
+      for (String part : commaSeparated.split(",")) {
+        if (part.isBlank()) continue;
+        try {
+          out.add(UUID.fromString(part.trim()));
+        } catch (IllegalArgumentException e) {
+          throw new com.keeper.common.exception.BadRequestException("Invalid id in filter");
+        }
+        if (out.size() > 50)
+          throw new com.keeper.common.exception.BadRequestException("Too many values in a filter");
+      }
+    }
+    return out;
+  }
+
   @Get("/transactions")
   public CursorPage<TransactionView> list(
       @PathVariable UUID workspaceId,
@@ -121,16 +177,82 @@ public class TransactionController {
       @Nullable @QueryValue UUID categoryId,
       @Nullable @QueryValue UUID payeeId,
       @Nullable @QueryValue UUID tagId,
+      @Nullable @QueryValue @Size(max = 2000) String accountIds,
+      @Nullable @QueryValue @Size(max = 2000) String categoryIds,
+      @Nullable @QueryValue @Size(max = 2000) String payeeIds,
+      @Nullable @QueryValue @Size(max = 2000) String tagIds,
+      @QueryValue(defaultValue = "false") boolean uncategorised,
+      @Nullable @QueryValue @Min(0) @Max(MAX_MINOR) Long minAmount,
+      @Nullable @QueryValue @Min(0) @Max(MAX_MINOR) Long maxAmount,
+      @Nullable @QueryValue @Pattern(regexp = "^(INCOME|EXPENSE|TRANSFER)$") String type,
+      @Nullable @QueryValue @Size(max = 100) String q,
+      @Nullable @QueryValue UUID tripId,
+      @Nullable @QueryValue @Pattern(regexp = "^(me|[0-9a-fA-F-]{36})$") String spentBy,
+      @Nullable @QueryValue @Pattern(regexp = "^(date_desc|date_asc|amount_desc|amount_asc)$")
+          String sort) {
+    return service.list(
+        workspaceId,
+        filter(
+            from,
+            to,
+            accountIds,
+            categoryIds,
+            payeeIds,
+            tagIds,
+            uncategorised,
+            minAmount,
+            maxAmount,
+            type,
+            q,
+            tripId,
+            spentBy,
+            sort,
+            accountId,
+            categoryId,
+            payeeId,
+            tagId),
+        cursor,
+        limit);
+  }
+
+  /** How many transactions match the filters, and what they add up to. */
+  @Get("/transactions/summary")
+  public TransactionSearch.Summary summary(
+      @PathVariable UUID workspaceId,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to,
+      @Nullable @QueryValue @Size(max = 2000) String accountIds,
+      @Nullable @QueryValue @Size(max = 2000) String categoryIds,
+      @Nullable @QueryValue @Size(max = 2000) String payeeIds,
+      @Nullable @QueryValue @Size(max = 2000) String tagIds,
+      @QueryValue(defaultValue = "false") boolean uncategorised,
+      @Nullable @QueryValue @Min(0) @Max(MAX_MINOR) Long minAmount,
+      @Nullable @QueryValue @Min(0) @Max(MAX_MINOR) Long maxAmount,
       @Nullable @QueryValue @Pattern(regexp = "^(INCOME|EXPENSE|TRANSFER)$") String type,
       @Nullable @QueryValue @Size(max = 100) String q,
       @Nullable @QueryValue UUID tripId,
       @Nullable @QueryValue @Pattern(regexp = "^(me|[0-9a-fA-F-]{36})$") String spentBy) {
-    return service.list(
+    return service.summary(
         workspaceId,
-        new TransactionFilter(
-            from, to, accountId, categoryId, payeeId, tagId, type, q, tripId, spentBy),
-        cursor,
-        limit);
+        filter(
+            from,
+            to,
+            accountIds,
+            categoryIds,
+            payeeIds,
+            tagIds,
+            uncategorised,
+            minAmount,
+            maxAmount,
+            type,
+            q,
+            tripId,
+            spentBy,
+            null,
+            null,
+            null,
+            null,
+            null));
   }
 
   @Get("/transactions/{id}")

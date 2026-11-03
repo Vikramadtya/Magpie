@@ -1,10 +1,9 @@
-import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, User, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, User } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSearchParams } from 'react-router-dom';
-import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
-import type { Transaction, TransactionFilters, TxType } from '../api/types';
+import type { Transaction, TransactionFilters } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
 import { Avatar } from '../components/ui/Avatar';
@@ -16,47 +15,28 @@ import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
+import { FilterBar } from '../features/transactions/FilterBar';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
-import { useAccounts, useCategories, usePeople } from '../hooks/useReference';
-import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList } from '../hooks/useTransactions';
+import { countActive, parseFilters, toParams } from '../lib/txFilters';
+import { useCategories, usePeople } from '../hooks/useReference';
+import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList, useTransactionSummary } from '../hooks/useTransactions';
 import { useAssignToTrip, useTrips } from '../hooks/useTrips';
 import { prettyDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { cn } from '../lib/cn';
 
 export default function TransactionsPage() {
-  const { canEdit } = useWorkspace();
+  const ws = useWorkspace();
+  const { canEdit } = ws;
   const trips = useTrips().data ?? [];
   const people = usePeople().data ?? [];
   const dialog = useTransactionDialog();
   const [params, setParams] = useSearchParams();
-  const accounts = useAccounts().data ?? [];
   const categories = useCategories().data ?? [];
 
-  const [search, setSearch] = useState(params.get('q') ?? '');
-  const [debounced] = useDebounce(search, 250);
-
-  const filters: TransactionFilters = useMemo(
-    () => ({
-      q: debounced.trim() || undefined,
-      accountId: params.get('account') || undefined,
-      categoryId: params.get('category') || undefined,
-      type: (params.get('type') as TxType) || undefined,
-      from: params.get('from') || undefined,
-      to: params.get('to') || undefined,
-      tripId: params.get('trip') || undefined,
-      spentBy: params.get('by') || undefined,
-    }),
-    [debounced, params],
-  );
-
-  const setParam = (key: string, value: string) =>
-    setParams((p) => {
-      const next = new URLSearchParams(p);
-      if (value) next.set(key, value);
-      else next.delete(key);
-      return next;
-    }, { replace: true });
+  const filters: TransactionFilters = useMemo(() => parseFilters(params), [params]);
+  const setFilters = (next: TransactionFilters) => setParams(toParams(next), { replace: true });
+  const summary = useTransactionSummary(filters);
 
   const list = useTransactionList(filters);
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
@@ -88,7 +68,7 @@ export default function TransactionsPage() {
       return next;
     });
 
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters = countActive(filters) > 0;
   const expenseGroups = groupCategories(categories, 'EXPENSE');
   const incomeGroups = groupCategories(categories, 'INCOME');
 
@@ -105,56 +85,13 @@ export default function TransactionsPage() {
               <Button variant={selecting ? 'secondary' : 'outline'} size="sm" onClick={() => setSelecting(!selecting)}>
                 <CheckSquare className="w-4 h-4 mr-2" />{selecting ? 'Done' : 'Select'}
               </Button>
-              <Button size="sm" onClick={() => dialog.open(null, filters.accountId ? { accountId: filters.accountId } : undefined)}>Add</Button>
+              <Button size="sm" onClick={() => dialog.open(null, filters.accountIds?.length === 1 ? { accountId: filters.accountIds[0] } : undefined)}>Add</Button>
             </>
           )
         }
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 mb-5 [&>*]:min-w-0">
-        <Input className="col-span-2" placeholder="Search payees…" value={search} onChange={(e) => { setSearch(e.target.value); setParam('q', e.target.value); }} aria-label="Search" />
-        <Select value={filters.accountId ?? ''} onChange={(e) => setParam('account', e.target.value)} aria-label="Account">
-          <option value="">All accounts</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </Select>
-        <Select value={filters.categoryId ?? ''} onChange={(e) => setParam('category', e.target.value)} aria-label="Category">
-          <option value="">All categories</option>
-          {[...expenseGroups, ...incomeGroups].map((g) => (
-            <optgroup key={g.parent.id} label={g.parent.name}>
-              <option value={g.parent.id}>{g.parent.name}</option>
-              {g.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </optgroup>
-          ))}
-        </Select>
-        {people.length > 0 && (
-          <Select value={filters.spentBy ?? ''} onChange={(e) => setParam('by', e.target.value)} aria-label="Spent by">
-            <option value="">Everyone</option>
-            <option value="me">Me</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        )}
-        {trips.length > 0 && (
-          <Select value={filters.tripId ?? ''} onChange={(e) => setParam('trip', e.target.value)} aria-label="Trip">
-            <option value="">All trips</option>
-            {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Select>
-        )}
-        <Select value={filters.type ?? ''} onChange={(e) => setParam('type', e.target.value)} aria-label="Type">
-          <option value="">All types</option>
-          <option value="EXPENSE">Expenses</option>
-          <option value="INCOME">Income</option>
-          <option value="TRANSFER">Transfers</option>
-        </Select>
-        <div className="flex gap-2">
-          <Input type="date" value={filters.from ?? ''} onChange={(e) => setParam('from', e.target.value)} aria-label="From date" />
-          <Input type="date" value={filters.to ?? ''} onChange={(e) => setParam('to', e.target.value)} aria-label="To date" />
-        </div>
-      </div>
-      {hasFilters && (
-        <button className="text-sm text-accent mb-3 inline-flex items-center gap-1" onClick={() => { setSearch(''); setParams({}, { replace: true }); }}>
-          <X className="w-3.5 h-3.5" /> Clear filters
-        </button>
-      )}
+      <FilterBar filters={filters} onChange={setFilters} summary={summary.data} workspaceId={ws.id} baseCurrency={ws.baseCurrency} />
 
       {selecting && selected.size > 0 && (
         <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-2 shadow">

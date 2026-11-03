@@ -1,5 +1,6 @@
 import { api } from './client';
 import { http } from '../lib/http';
+import { toQuery } from '../lib/txFilters';
 import type * as T from './types';
 
 export const authApi = {
@@ -69,8 +70,13 @@ export const tagsApi = {
 };
 
 export const transactionsApi = {
-  page: (ws: string, filters: T.TransactionFilters, cursor?: string) =>
-    api.get<T.CursorPage<T.Transaction>>(ws, '/transactions', { ...filters, cursor, limit: 50 }),
+  page: (ws: string, filters: T.TransactionFilters, baseCurrency: string, cursor?: string) =>
+    api.get<T.CursorPage<T.Transaction>>(ws, '/transactions', { ...toQuery(filters, baseCurrency), cursor, limit: 50 }),
+  summary: (ws: string, filters: T.TransactionFilters, baseCurrency: string) => {
+    const { sort: _sort, ...rest } = toQuery(filters, baseCurrency);
+    return api.get<T.TransactionSummary>(ws, '/transactions/summary', rest);
+  },
+  search: (ws: string, q: string) => api.get<T.SearchHit[]>(ws, '/search', { q }),
   create: (ws: string, b: T.TransactionInput, key: string) => api.post<T.Transaction>(ws, '/transactions', b, { 'Idempotency-Key': key }),
   update: (ws: string, id: string, b: Omit<T.TransactionInput, 'type'> & { type: T.TxType; expectedVersion: number }) =>
     api.put<T.Transaction>(ws, `/transactions/${id}`, b),

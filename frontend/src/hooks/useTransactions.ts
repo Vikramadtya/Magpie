@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { transactionsApi } from '../api/endpoints';
 import { errorMessage } from '../lib/http';
@@ -34,28 +34,43 @@ async function runRemove(qc: QueryClient, ws: string, id: string) {
 const withUndo = (message: string, undo: () => void) => toast(message, { action: { label: 'Undo', onClick: undo }, duration: 8000 });
 
 export function useTransactionList(filters: TransactionFilters) {
-  const { id } = useWorkspace();
+  const { id, baseCurrency } = useWorkspace();
   return useInfiniteQuery({
     queryKey: qk.transactionList(id, filters),
-    queryFn: ({ pageParam }) => transactionsApi.page(id, filters, pageParam),
+    queryFn: ({ pageParam }) => transactionsApi.page(id, filters, baseCurrency, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
 }
 
-/** Client-side mirror of the server filter, so optimistic rows only appear in lists they belong to. */
+/** How much is matching, and what it adds up to; refreshed whenever the money data changes. */
+export function useTransactionSummary(filters: TransactionFilters) {
+  const { id, baseCurrency } = useWorkspace();
+  return useQuery({
+    queryKey: qk.transactionSummary(id, filters),
+    queryFn: () => transactionsApi.summary(id, filters, baseCurrency),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Client-side mirror of the server filter, so optimistic rows only appear in lists they belong to.
+ * Filters that are awkward to mirror (amount range, free text, another sort order) leave the row
+ * out; the list refreshes from the server right after anyway.
+ */
 function matches(f: TransactionFilters, t: Transaction): boolean {
-  if (f.accountId && f.accountId !== t.accountId) return false;
-  if (f.categoryId && f.categoryId !== t.categoryId) return false;
-  if (f.payeeId && f.payeeId !== t.payeeId) return false;
+  if (f.q || f.minAmount || f.maxAmount || (f.sort && f.sort !== 'date_desc')) return false;
+  if (f.accountIds?.length && !f.accountIds.includes(t.accountId)) return false;
+  if (f.categoryIds?.length || f.uncategorised) {
+    const inCategory = !!f.categoryIds?.length && !!t.categoryId && f.categoryIds.includes(t.categoryId);
+    const none = !!f.uncategorised && !t.categoryId && t.type !== 'TRANSFER';
+    if (!inCategory && !none) return false;
+  }
+  if (f.payeeIds?.length && !(t.payeeId && f.payeeIds.includes(t.payeeId))) return false;
   if (f.type && f.type !== t.type) return false;
   if (f.from && t.occurredOn < f.from) return false;
   if (f.to && t.occurredOn > f.to) return false;
-  if (f.tagId && !t.tagIds.includes(f.tagId)) return false;
-  if (f.q) {
-    const q = f.q.toLowerCase();
-    if (!`${t.note ?? ''} ${t.payeeName ?? ''}`.toLowerCase().includes(q)) return false;
-  }
+  if (f.tagIds?.length && !f.tagIds.some((id) => t.tagIds.includes(id))) return false;
   return true;
 }
 

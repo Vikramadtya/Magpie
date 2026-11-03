@@ -122,12 +122,7 @@ public class DashboardService {
             month.atDay(1),
             month.atEndOfMonth());
 
-    CursorPage<TransactionView> recent =
-        transactions.list(
-            ws,
-            new TransactionFilter(null, null, null, null, null, null, null, null, null, null),
-            null,
-            8);
+    CursorPage<TransactionView> recent = transactions.list(ws, TransactionFilter.none(), null, 8);
     int savings =
         income.get() > 0 ? (int) ((income.get() - expense.get()) * 100 / income.get()) : 0;
 

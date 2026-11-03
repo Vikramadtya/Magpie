@@ -37,6 +37,7 @@ public class TransactionService {
   private final Audit audit;
   private final Db db;
   private final List<EntryListener> listeners;
+  private final TransactionSearch search;
 
   public TransactionService(
       TransactionRepository transactions,
@@ -50,7 +51,9 @@ public class TransactionService {
       RefChecks refs,
       Audit audit,
       Db db,
-      List<EntryListener> listeners) {
+      List<EntryListener> listeners,
+      TransactionSearch search) {
+    this.search = search;
     this.transactions = transactions;
     this.accounts = accounts;
     this.categories = categories;
@@ -70,6 +73,14 @@ public class TransactionService {
   public CursorPage<TransactionView> list(
       UUID ws, TransactionFilter filter, String cursor, int limit) {
     int size = Math.min(Math.max(limit, 1), 200);
+    if (filter.hasQuery()) return search.page(ws, filter, cursor, size);
+    // Any order other than newest-first pages by position rather than by a key.
+    if (!filter.defaultOrder()) {
+      int offset = offsetOf(cursor);
+      List<TransactionView> rows = transactions.offsetPage(ws, filter, offset, size);
+      if (rows.size() <= size) return new CursorPage<>(rows, null);
+      return new CursorPage<>(rows.subList(0, size), TransactionSearch.offsetCursor(offset + size));
+    }
     LocalDate cursorDate = null;
     UUID cursorId = null;
     if (cursor != null && !cursor.isBlank()) {
@@ -93,6 +104,22 @@ public class TransactionService {
             .withoutPadding()
             .encodeToString((last.occurredOn() + "|" + last.id()).getBytes(StandardCharsets.UTF_8));
     return new CursorPage<>(items, next);
+  }
+
+  private static int offsetOf(String cursor) {
+    if (cursor == null || cursor.isBlank()) return 0;
+    try {
+      String[] parts =
+          new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8).split("\\|");
+      if (!"o".equals(parts[0])) throw new IllegalArgumentException();
+      return Math.max(0, Integer.parseInt(parts[1]));
+    } catch (RuntimeException e) {
+      throw new BadRequestException("Invalid cursor");
+    }
+  }
+
+  public TransactionSearch.Summary summary(UUID ws, TransactionFilter filter) {
+    return search.summary(ws, filter);
   }
 
   public TransactionView get(UUID ws, UUID id) {

@@ -85,11 +85,7 @@ public class ImportController {
     int rows = 0;
     do {
       CursorPage<TransactionView> page =
-          transactions.list(
-              workspaceId,
-              new TransactionFilter(from, to, null, null, null, null, null, null, null, null),
-              cursor,
-              200);
+          transactions.list(workspaceId, TransactionFilter.between(from, to), cursor, 200);
       for (TransactionView t : page.items()) {
         long signed = t.direction() * t.amountMinor();
         out.append(t.occurredOn())

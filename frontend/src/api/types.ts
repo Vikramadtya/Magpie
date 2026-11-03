@@ -42,12 +42,21 @@ export interface Transaction {
   spentById: string | null; spentByName: string | null;
 }
 export interface CursorPage<T> { items: T[]; nextCursor: string | null }
+export type TxSort = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc';
 export interface TransactionFilters {
-  from?: string; to?: string; accountId?: string; categoryId?: string; payeeId?: string; tagId?: string;
-  type?: TxType; q?: string; tripId?: string;
+  from?: string; to?: string; type?: TxType; q?: string; tripId?: string;
+  /** Several values at once; a parent category includes its sub-categories. */
+  accountIds?: string[]; categoryIds?: string[]; payeeIds?: string[]; tagIds?: string[];
+  /** Only transactions without a category. */
+  uncategorised?: boolean;
+  /** Amount range in the main currency, as typed (for example "500" or "12.50"). */
+  minAmount?: string; maxAmount?: string;
+  sort?: TxSort;
   /** 'me' for your own spending, or a person's id. */
   spentBy?: string;
 }
+export interface TransactionSummary { count: number; incomeMinor: number; expenseMinor: number; currency: string; capped: boolean }
+export interface SearchHit { kind: 'transaction' | 'account' | 'payee' | 'category' | 'tag' | 'trip' | 'loan' | 'goal' | 'holding'; id: string; title: string; subtitle: string | null }
 export interface TransactionInput {
   accountId: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; occurredOn: string;
   categoryId?: string | null; payeeId?: string | null; note?: string | null; tagIds?: string[];
