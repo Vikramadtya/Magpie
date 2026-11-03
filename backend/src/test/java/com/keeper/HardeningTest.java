@@ -105,4 +105,31 @@ class HardeningTest extends ApiTestBase {
         404,
         statusOf(HttpRequest.POST(base, Map.of("label", "x")).bearerAuth(other.token())).getCode());
   }
+
+  @Test
+  void aDiscordAccountLinksToOneActiveKeyOnly() {
+    Session s = register("discord-key");
+    String base = "/api/v1/workspaces/" + s.workspaceId() + "/quick-keys";
+    String discordId = "9" + Math.abs(UUID.randomUUID().getMostSignificantBits() % 1_000_000_000L);
+
+    Map<?, ?> created =
+        post(s.token(), base, Map.of("label", "Discord", "discordUserId", discordId), Map.class);
+    assertEquals(discordId, ((Map<?, ?>) created.get("key")).get("discordUserId"));
+    assertEquals(discordId, getList(s.token(), base).get(0).get("discordUserId"));
+
+    // the same Discord account cannot be linked to a second active key
+    assertEquals(
+        409,
+        statusOf(
+                HttpRequest.POST(base, Map.of("label", "Again", "discordUserId", discordId))
+                    .bearerAuth(s.token()))
+            .getCode());
+    // and the id must be a Discord id
+    assertEquals(
+        400,
+        statusOf(
+                HttpRequest.POST(base, Map.of("label", "Bad", "discordUserId", "not-an-id"))
+                    .bearerAuth(s.token()))
+            .getCode());
+  }
 }

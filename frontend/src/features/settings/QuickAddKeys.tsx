@@ -1,4 +1,5 @@
 import { Copy, KeyRound, Smartphone } from 'lucide-react';
+import { Badge } from '../../components/ui/Badge';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/Button';
@@ -16,6 +17,7 @@ export function QuickAddKeys({ canEdit }: { canEdit: boolean }) {
   const create = useCreateQuickKey();
   const revoke = useRevokeQuickKey();
   const [label, setLabel] = useState('My phone');
+  const [discordId, setDiscordId] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
 
   return (
@@ -32,7 +34,7 @@ export function QuickAddKeys({ canEdit }: { canEdit: boolean }) {
             <li key={k.id} className="py-3 flex items-center gap-3">
               <span className="w-9 h-9 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0"><KeyRound className="w-4 h-4" /></span>
               <div className="flex-1 min-w-0">
-                <p className="font-medium">{k.label} <span className="text-xs text-secondary font-normal">· {k.prefix}…</span></p>
+                <p className="font-medium flex items-center gap-2 flex-wrap">{k.label} <span className="text-xs text-secondary font-normal">· {k.prefix}…</span>{k.discordUserId && <Badge tone="accent">Discord</Badge>}</p>
                 <p className="text-xs text-secondary">{k.lastUsedAt ? `Last used ${new Date(k.lastUsedAt).toLocaleString()}` : 'Not used yet'}</p>
               </div>
               {canEdit && <Button size="sm" variant="outline" disabled={revoke.isPending} onClick={() => revoke.mutate(k.id, { onSuccess: () => toast.success('Key revoked') })}>Revoke</Button>}
@@ -42,14 +44,19 @@ export function QuickAddKeys({ canEdit }: { canEdit: boolean }) {
       )}
       {canEdit && (
         <form
-          className="flex gap-2"
+          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            create.mutate(label.trim() || 'My phone', { onSuccess: (r) => setSecret(r.secret), onError: (err) => toast.error(errorMessage(err)) });
+            const id = discordId.trim();
+            if (id && !/^\d{5,25}$/.test(id)) return toast.error('A Discord user ID is only digits');
+            create.mutate({ label: label.trim() || 'My phone', discordUserId: id || undefined }, { onSuccess: (r) => { setSecret(r.secret); setDiscordId(''); }, onError: (err) => toast.error(errorMessage(err)) });
           }}
         >
-          <Input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} aria-label="Key name" />
-          <Button type="submit" disabled={create.isPending}>Create key</Button>
+          <div className="flex gap-2">
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} aria-label="Key name" />
+            <Button type="submit" disabled={create.isPending}>Create key</Button>
+          </div>
+          <Input value={discordId} onChange={(e) => setDiscordId(e.target.value)} inputMode="numeric" placeholder="Discord user ID (optional, to use /spend in Discord)" aria-label="Discord user ID" />
         </form>
       )}
       {secret && <NewKey secret={secret} onClose={() => setSecret(null)} />}

@@ -13,6 +13,7 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -32,13 +33,21 @@ public class QuickKeyController {
 
   @Serdeable
   public record KeyView(
-      UUID id, String label, String prefix, Instant createdAt, Instant lastUsedAt) {}
+      UUID id,
+      String label,
+      String prefix,
+      Instant createdAt,
+      Instant lastUsedAt,
+      String discordUserId) {}
 
   @Serdeable
   public record Created(KeyView key, String secret) {}
 
   @Serdeable
-  public record Request(@NotBlank @Size(max = 60) String label) {}
+  public record Request(
+      @NotBlank @Size(max = 60) String label,
+      /** Optional: the owner's Discord user id, so /spend and /income in Discord use this key. */
+      @Pattern(regexp = "^\\d{5,25}$") String discordUserId) {}
 
   private final Db db;
   private final SecureRandom random = new SecureRandom();
@@ -54,13 +63,14 @@ public class QuickKeyController {
         rs.getString("label"),
         rs.getString("key_prefix"),
         rs.getObject("created_at", OffsetDateTime.class).toInstant(),
-        used == null ? null : used.toInstant());
+        used == null ? null : used.toInstant(),
+        rs.getString("discord_user_id"));
   }
 
   @Get
   public List<KeyView> list(@PathVariable UUID workspaceId) {
     return db.list(
-        "SELECT id, label, key_prefix, created_at, last_used_at FROM quick_api_keys "
+        "SELECT id, label, key_prefix, created_at, last_used_at, discord_user_id FROM quick_api_keys "
             + "WHERE workspace_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
         QuickKeyController::map,
         workspaceId);
@@ -74,16 +84,19 @@ public class QuickKeyController {
     String secret = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
     UUID id = UUID.randomUUID();
     db.update(
-        "INSERT INTO quick_api_keys(id, workspace_id, user_id, label, key_prefix, key_hash) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO quick_api_keys(id, workspace_id, user_id, label, key_prefix, key_hash, discord_user_id) VALUES (?,?,?,?,?,?,?)",
         id,
         workspaceId,
         Actor.id(auth),
         body.label().trim(),
         secret.substring(0, 8),
-        TokenService.hash(secret));
+        TokenService.hash(secret),
+        body.discordUserId() == null || body.discordUserId().isBlank()
+            ? null
+            : body.discordUserId());
     KeyView view =
         db.one(
-                "SELECT id, label, key_prefix, created_at, last_used_at FROM quick_api_keys WHERE id = ?",
+                "SELECT id, label, key_prefix, created_at, last_used_at, discord_user_id FROM quick_api_keys WHERE id = ?",
                 QuickKeyController::map,
                 id)
             .orElseThrow();

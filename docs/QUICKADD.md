@@ -5,8 +5,8 @@ small always-on function on Vercel instead. Entries wait in Keeper's **To review
 recorded in your ledger until you press **Record** there.
 
 ```
-phone page / iPhone Shortcut / Google Form  ->  Vercel function  ->  quick_captures (Neon)
-        (carry a revocable key)                                              |
+Discord / phone page / iPhone Shortcut / Google Form  ->  Vercel function  ->  quick_captures (Neon)
+        (a revocable key, or Discord's signed request)                                  |
                                   Keeper (Render, when awake)  <-------------+  shown in "To review"
 ```
 
@@ -39,6 +39,8 @@ phone page / iPhone Shortcut / Google Form  ->  Vercel function  ->  quick_captu
    GRANT SELECT (id, user_id, status, created_at, idempotency_key) ON quick_captures TO quickadd;
    GRANT SELECT (id, user_id, workspace_id, key_hash, revoked_at) ON quick_api_keys TO quickadd;
    GRANT UPDATE (last_used_at) ON quick_api_keys TO quickadd;
+   GRANT SELECT (discord_user_id) ON quick_api_keys TO quickadd;
+   GRANT SELECT (account_id) ON quick_captures TO quickadd;
    ```
 
 2. **Vercel environment variable** (then redeploy): `QUICKADD_DATABASE_URL`, the Neon connection string
@@ -48,14 +50,44 @@ phone page / iPhone Shortcut / Google Form  ->  Vercel function  ->  quick_captu
 
 ## Ways to send an entry
 
-### A. The phone page
+### A. Discord (a pop-up form in a chat app you already have)
+
+Type `/spend` (or `/income`) in any Discord chat. A form opens with Amount, Account, Category, Paid to and
+Note. The account starts as the one you used last. Submit, and the entry is in To review. Discord calls a
+function on Vercel directly, so this works while Keeper's server is asleep. Only you see the replies.
+
+Setup, once:
+
+1. Go to <https://discord.com/developers/applications>, **New Application**, name it "Keeper".
+2. **General Information**: copy the **Application ID** and the **Public Key**.
+3. **Bot**: **Reset Token** and copy it. It is only used once, in step 6, to register the commands.
+4. **Installation**: turn on **User Install**, then open the install link and add the app to your own
+   account (this lets the commands work in any chat or DM without a server).
+5. In Vercel add the variable `DISCORD_PUBLIC_KEY` (the Public Key from step 2) and redeploy. Then, in
+   Discord's **General Information**, set **Interactions Endpoint URL** to
+   `https://magpie-red.vercel.app/api/quickadd/discord` and Save (Discord tests it first).
+6. On your computer, register the commands:
+
+   ```bash
+   cd frontend
+   DISCORD_APP_ID=... DISCORD_BOT_TOKEN=... node scripts/discord-register.mjs
+   ```
+
+7. In Discord, **Settings, Advanced, Developer Mode** on; right-click your own name and **Copy User ID**.
+   In Keeper, **Settings, Quick add**, create a key with that number in "Discord user ID".
+
+Every request is signed by Discord and checked on Vercel, and only your linked Discord user can file
+entries. Revoking the key in Keeper switches Discord off immediately. Discord can read what you type, so
+keep notes short.
+
+### B. The phone page
 
 Open the setup link from the key dialog on your phone (`https://magpie-red.vercel.app/quickadd#key=…`;
 the part after `#` is never sent to any server), or open `/quickadd` and paste the key. Then use Safari's
 Share button, **Add to Home Screen**. Entries are saved on the phone first and sent in the background, so
 nothing is lost offline.
 
-### B. iPhone Shortcut (no browser)
+### C. iPhone Shortcut (no browser)
 
 1. Shortcuts app, **+**, add these actions:
    * **Ask for Input** (Number), prompt "Amount?"
@@ -65,7 +97,7 @@ nothing is lost offline.
      first input, `payee` = the second input, `account` = `Card` (the exact account name).
 2. Name it, then add it to the Home Screen, the Action Button or Siri ("Hey Siri, add expense").
 
-### C. Google Form
+### D. Google Form
 
 A form can't call a web address itself, but a short script attached to it can.
 
@@ -105,7 +137,7 @@ A form can't call a web address itself, but a short script attached to it can.
 
 Google keeps a copy of every submission in the form's responses, so use short, non-sensitive notes.
 
-### D. Anything else
+### E. Anything else
 
 ```bash
 curl -X POST https://magpie-red.vercel.app/api/quickadd/submit \
@@ -128,13 +160,13 @@ returns the list of valid ones.
 
 ## Undoing it
 
-Revert the quick-add commits. Because the backend already applied migrations `V17` and `V18`, also run
+Revert the quick-add commits. Because the backend already applied migrations `V17` to `V19`, also run
 this once on Neon **before the backend restarts on the reverted code**, or Flyway will refuse to start:
 
 ```sql
 DROP TABLE IF EXISTS quick_api_keys;
 DROP TABLE IF EXISTS quick_captures;
 ALTER TABLE users DROP COLUMN IF EXISTS email_verified;
-DELETE FROM flyway_schema_history WHERE version IN ('17', '18');
+DELETE FROM flyway_schema_history WHERE version IN ('17', '18', '19');
 DROP ROLE IF EXISTS quickadd;  -- optional
 ```

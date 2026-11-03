@@ -100,16 +100,13 @@ async function findCategory(sql, ws, body, type) {
   return best ? { id: best.id } : { unknownName: name };
 }
 
-export async function handleSubmit(req, res, { sql, now = () => new Date() }) {
-  res.setHeader('Cache-Control', 'no-store');
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return json(res, 405, { error: 'method_not_allowed' });
-  }
-  const who = await authenticate(sql, req);
-  if (!who) return json(res, 401, { error: 'bad_key' });
-
-  const b = req.body && typeof req.body === 'object' ? req.body : {};
+/**
+ * Validates one entry and puts it in the review list for the key's owner. Used by every way in
+ * (the JSON endpoint, Discord, ...). Returns { status, body } so each caller can answer in its own way.
+ */
+export async function recordEntry(sql, who, input, now = () => new Date()) {
+  const b = input && typeof input === 'object' ? input : {};
+  const fail = (status, payload) => ({ status, body: payload });
   const type = b.type === undefined || b.type === 'EXPENSE' || b.type === 'expense' ? 'EXPENSE' : b.type === 'INCOME' || b.type === 'income' ? 'INCOME' : null;
   const payee = text(b.payee, 160);
   let note = text(b.note, 1000);
@@ -117,23 +114,23 @@ export async function handleSubmit(req, res, { sql, now = () => new Date() }) {
   const occurredOn = typeof b.occurredOn === 'string' && validDate(b.occurredOn) ? b.occurredOn : today;
   const badId = (v) => v !== undefined && v !== null && v !== '' && !UUID.test(String(v));
   if (!type || badId(b.accountId) || (b.key !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(String(b.key)))) {
-    return json(res, 400, { error: 'invalid' });
+    return fail(400, { error: 'invalid' });
   }
   if (occurredOn > new Date(Date.parse(today) + 2 * 86400000).toISOString().slice(0, 10) || occurredOn < '2000-01-01') {
-    return json(res, 400, { error: 'invalid_date' });
+    return fail(400, { error: 'invalid_date' });
   }
 
   const { matches, names } = await findAccount(sql, who.ws, b);
   if (matches.length !== 1) {
-    return json(res, 400, { error: matches.length > 1 ? 'ambiguous_account' : b.account || b.accountId ? 'unknown_account' : 'account_required', accounts: names });
+    return fail(400, { error: matches.length > 1 ? 'ambiguous_account' : b.account || b.accountId ? 'unknown_account' : 'account_required', accounts: names });
   }
   const account = matches[0];
   const currency = String(account.currency).trim();
   const minor = parseAmount(b.amount, currency);
-  if (minor === null) return json(res, 400, { error: 'invalid_amount' });
+  if (minor === null) return fail(400, { error: 'invalid_amount' });
 
   const category = await findCategory(sql, who.ws, b, type);
-  if (category.bad) return json(res, 400, { error: 'unknown_category' });
+  if (category.bad) return fail(400, { error: 'unknown_category' });
   // Don't lose an entry over a misspelt category: keep it and say what was meant.
   if (category.unknownName) note = [note, `Category: ${category.unknownName}`].filter(Boolean).join(' · ');
 
@@ -142,7 +139,7 @@ export async function handleSubmit(req, res, { sql, now = () => new Date() }) {
     SELECT count(*) FILTER (WHERE status = 'PENDING')::int AS pending,
            count(*) FILTER (WHERE created_at > now() - interval '1 minute')::int AS recent
     FROM quick_captures WHERE user_id = ${who.uid}`;
-  if (load.recent >= MAX_PER_MINUTE || load.pending >= MAX_PENDING) return json(res, 429, { error: 'too_many' });
+  if (load.recent >= MAX_PER_MINUTE || load.pending >= MAX_PENDING) return fail(429, { error: 'too_many' });
 
   // A retry or a double tap is stored once. Callers without their own key get one from the content
   // and the current minute.
@@ -156,5 +153,17 @@ export async function handleSubmit(req, res, { sql, now = () => new Date() }) {
     VALUES (${who.ws}, ${who.uid}, ${type}, ${minor}, ${currency}, ${occurredOn},
             ${account.id}, ${category.id ?? null}, ${payee || null}, ${note || null}, ${key})
     ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`;
-  return json(res, 200, { saved: true });
+  return { status: 200, body: { saved: true, amountMinor: minor, currency, account: account.name, categoryFound: Boolean(category.id), unknownCategory: category.unknownName ?? null } };
+}
+
+export async function handleSubmit(req, res, { sql, now = () => new Date() }) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return json(res, 405, { error: 'method_not_allowed' });
+  }
+  const who = await authenticate(sql, req);
+  if (!who) return json(res, 401, { error: 'bad_key' });
+  const result = await recordEntry(sql, who, req.body, now);
+  return json(res, result.status, result.body);
 }

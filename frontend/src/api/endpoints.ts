@@ -194,7 +194,7 @@ export const tripsApi = {
 
 export const quickKeysApi = {
   list: (ws: string) => api.get<T.QuickKey[]>(ws, '/quick-keys'),
-  create: (ws: string, label: string) => api.post<T.QuickKeyCreated>(ws, '/quick-keys', { label }),
+  create: (ws: string, label: string, discordUserId?: string) => api.post<T.QuickKeyCreated>(ws, '/quick-keys', { label, discordUserId: discordUserId || undefined }),
   revoke: (ws: string, id: string) => api.del(ws, `/quick-keys/${id}`),
 };
 

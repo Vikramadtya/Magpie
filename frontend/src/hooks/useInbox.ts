@@ -89,7 +89,7 @@ export function useCreateQuickKey() {
   const { id } = useWorkspace();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (label: string) => quickKeysApi.create(id, label),
+    mutationFn: (a: { label: string; discordUserId?: string }) => quickKeysApi.create(id, a.label, a.discordUserId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.quickKeys(id) }),
   });
 }
