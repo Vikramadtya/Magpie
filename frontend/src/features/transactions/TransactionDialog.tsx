@@ -16,7 +16,7 @@ import { errorMessage } from '../../lib/http';
 import { CURRENCIES, formatMoney, parseMoney, toInputValue } from '../../lib/money';
 import { cn } from '../../lib/cn';
 import { qk } from '../../hooks/keys';
-import { useAccounts, useCategories, usePayees, usePeople, useTags } from '../../hooks/useReference';
+import { useAccounts, useCategories, useCreateCategory, usePayees, usePeople, useTags } from '../../hooks/useReference';
 import { useCreateTransaction, useSetNormalised, useTransfer, useUpdateTransaction } from '../../hooks/useTransactions';
 import { useFxQuote } from '../../hooks/useInsights';
 import { useQueryClient } from '@tanstack/react-query';
@@ -97,6 +97,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
   const [destTouched, setDestTouched] = useState(false);
   const [date, setDate] = useState(tx?.occurredOn ?? today());
   const [categoryId, setCategoryId] = useState(tx?.categoryId ?? '');
+  const [addingCategory, setAddingCategory] = useState(false);
   const [payeeName, setPayeeName] = useState(tx?.payeeName ?? '');
   // '' = you, a person's id, or NEW_PERSON with a typed name.
   const [spentBy, setSpentBy] = useState(tx?.spentById ?? '');
@@ -331,7 +332,10 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
               </datalist>
             </Field>
             <Field label="Category">
-              <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <Select
+                value={addingCategory ? NEW_CATEGORY : categoryId}
+                onChange={(e) => (e.target.value === NEW_CATEGORY ? setAddingCategory(true) : (setAddingCategory(false), setCategoryId(e.target.value)))}
+              >
                 <option value="">Uncategorized</option>
                 {categoryOptions.map((g) => (
                   <optgroup key={g.parent.id} label={`${g.parent.icon ?? ''} ${g.parent.name}`.trim()}>
@@ -339,7 +343,17 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
                     {g.children.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </optgroup>
                 ))}
+                <option value={NEW_CATEGORY}>＋ New category or sub-category…</option>
               </Select>
+              {addingCategory && (
+                <NewCategory
+                  kind={kind}
+                  groups={categoryOptions}
+                  parentId={categories.find((c) => c.id === categoryId)?.parentId ?? categoryId}
+                  onCancel={() => setAddingCategory(false)}
+                  onCreated={(c) => { setCategoryId(c.id); setAddingCategory(false); }}
+                />
+              )}
             </Field>
             {showMore && tags.length > 0 && (
               <Field label="Tags">
@@ -402,6 +416,55 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
 }
 
 const NEW_PERSON = '__new__';
+const NEW_CATEGORY = '__new_category__';
+
+/** Makes a category (or a sub-category under a chosen parent) without leaving the expense form. */
+function NewCategory({ kind, groups, parentId, onCreated, onCancel }: {
+  kind: 'INCOME' | 'EXPENSE';
+  groups: ReturnType<typeof groupCategories>;
+  parentId: string;
+  onCreated: (c: Category) => void;
+  onCancel: () => void;
+}) {
+  const create = useCreateCategory();
+  const [name, setName] = useState('');
+  const [parent, setParent] = useState(groups.some((g) => g.parent.id === parentId) ? parentId : '');
+
+  const add = async () => {
+    if (!name.trim() || create.isPending) return;
+    try {
+      const made = await create.mutateAsync({ name: name.trim(), kind, parentId: parent || null, color: groups.find((g) => g.parent.id === parent)?.parent.color ?? '#0A84FF' });
+      toast.success(`Added ${made.name}`);
+      onCreated(made);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2 rounded-xl border border-border bg-background p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void add(); } }}
+          placeholder="Name"
+          maxLength={120}
+          autoFocus
+          aria-label="New category name"
+        />
+        <Select value={parent} onChange={(e) => setParent(e.target.value)} aria-label="Under which category">
+          <option value="">Top-level category</option>
+          {groups.map((g) => <option key={g.parent.id} value={g.parent.id}>Under {g.parent.name}</option>)}
+        </Select>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button type="button" size="sm" disabled={!name.trim() || create.isPending} onClick={() => void add()}>Add and use</Button>
+      </div>
+    </div>
+  );
+}
 
 /** Parents with their children, for one kind (income/expense). */
 export function groupCategories(all: Category[], kind: 'INCOME' | 'EXPENSE') {
