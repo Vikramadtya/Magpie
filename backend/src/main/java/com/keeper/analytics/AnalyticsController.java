@@ -17,10 +17,126 @@ public class AnalyticsController {
   private final AnalyticsService service;
 
   private final OverviewService overview;
+  private final BreakdownService breakdown;
+  private final WealthService wealth;
+  private final DetailService detail;
+  private final com.keeper.budget.BudgetService budgets;
 
-  public AnalyticsController(AnalyticsService service, OverviewService overview) {
+  public AnalyticsController(
+      AnalyticsService service,
+      OverviewService overview,
+      BreakdownService breakdown,
+      WealthService wealth,
+      DetailService detail,
+      com.keeper.budget.BudgetService budgets) {
     this.service = service;
     this.overview = overview;
+    this.breakdown = breakdown;
+    this.wealth = wealth;
+    this.detail = detail;
+    this.budgets = budgets;
+  }
+
+  /**
+   * Money grouped by one thing (by) and optionally by day or month (bucket), with optional filters.
+   * by: none, category, subcategory, payee, account, tag, trip, person, currency, weekday, daypart,
+   * kind.
+   */
+  @Get("/breakdown")
+  public BreakdownService.Result breakdown(
+      @PathVariable UUID workspaceId,
+      @QueryValue(defaultValue = "category") String by,
+      @QueryValue(defaultValue = "none") String bucket,
+      @QueryValue(defaultValue = "EXPENSE") String type,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to,
+      @Nullable @QueryValue UUID categoryId,
+      @Nullable @QueryValue UUID accountId,
+      @Nullable @QueryValue UUID payeeId,
+      @Nullable @QueryValue UUID tagId,
+      @Nullable @QueryValue UUID tripId,
+      @Nullable @QueryValue UUID personId,
+      @QueryValue(defaultValue = "12") @Min(0) @Max(50) int limit) {
+    LocalDate[] range = range(from, to);
+    return breakdown.run(
+        workspaceId,
+        new BreakdownService.Query(
+            by,
+            bucket,
+            range[0],
+            range[1],
+            type,
+            categoryId,
+            accountId,
+            payeeId,
+            tagId,
+            tripId,
+            personId,
+            limit));
+  }
+
+  @Get("/sizes")
+  public DetailService.Sizes sizes(
+      @PathVariable UUID workspaceId,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to) {
+    LocalDate[] range = range(from, to);
+    return detail.sizes(workspaceId, range[0], range[1]);
+  }
+
+  @Get("/purchases")
+  public DetailService.Purchases purchases(
+      @PathVariable UUID workspaceId,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to,
+      @QueryValue(defaultValue = "100") @Min(1) @Max(500) int limit) {
+    LocalDate[] range = range(from, to);
+    return detail.purchases(workspaceId, range[0], range[1], limit);
+  }
+
+  @Get("/tree")
+  public DetailService.Tree tree(
+      @PathVariable UUID workspaceId,
+      @Nullable @QueryValue LocalDate from,
+      @Nullable @QueryValue LocalDate to) {
+    LocalDate[] range = range(from, to);
+    return detail.tree(workspaceId, range[0], range[1]);
+  }
+
+  /** Month-end balance of every account, investments and own-value assets. */
+  @Get("/wealth")
+  public WealthService.Wealth wealth(
+      @PathVariable UUID workspaceId,
+      @QueryValue(defaultValue = "12") @Min(2) @Max(60) int months) {
+    return wealth.wealth(workspaceId, months);
+  }
+
+  @Get("/investments")
+  public WealthService.Investments investments(@PathVariable UUID workspaceId) {
+    return wealth.investments(workspaceId);
+  }
+
+  @Get("/loans")
+  public WealthService.Loans loans(
+      @PathVariable UUID workspaceId,
+      @QueryValue(defaultValue = "12") @Min(2) @Max(60) int months) {
+    return wealth.loans(workspaceId, months);
+  }
+
+  @Get("/goals")
+  public java.util.List<WealthService.GoalProgress> goals(@PathVariable UUID workspaceId) {
+    return wealth.goals(workspaceId);
+  }
+
+  /** The budget summary of each of the last months, oldest first. */
+  @Get("/budgets")
+  public java.util.List<com.keeper.budget.BudgetService.Summary> budgets(
+      @PathVariable UUID workspaceId, @QueryValue(defaultValue = "6") @Min(1) @Max(24) int months) {
+    java.time.YearMonth last = java.time.YearMonth.now();
+    java.util.List<com.keeper.budget.BudgetService.Summary> out = new java.util.ArrayList<>();
+    for (int i = months - 1; i >= 0; i--)
+      out.add(budgets.summary(workspaceId, last.minusMonths(i)));
+    return out;
   }
 
   /** Period vs the one before, category changes, biggest purchases and the monthly mix. */
