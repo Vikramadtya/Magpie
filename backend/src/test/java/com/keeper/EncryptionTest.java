@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.keeper.common.db.Db;
+import com.keeper.crypto.EncryptionBackfill;
 import jakarta.inject.Inject;
 import java.time.LocalDate;
 import java.util.Map;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 class EncryptionTest extends ApiTestBase {
 
   @Inject Db db;
+  @Inject EncryptionBackfill backfill;
 
   private String ws(Session s) {
     return "/api/v1/workspaces/" + s.workspaceId();
@@ -109,5 +111,19 @@ class EncryptionTest extends ApiTestBase {
                 UUID.fromString(id))
             .orElseThrow();
     assertTrue(snapshot.contains("\"enc\"") && !snapshot.contains("Priya"));
+
+    // History written before encryption was switched on gets sealed by the backfill.
+    db.update(
+        "UPDATE transaction_revisions SET snapshot = ?::jsonb WHERE transaction_id = ?",
+        "{\"note\":\"Old plain text\"}",
+        UUID.fromString(id));
+    assertTrue(backfill.run() > 0);
+    String sealed =
+        db.one(
+                "SELECT snapshot::text FROM transaction_revisions WHERE transaction_id = ? LIMIT 1",
+                rs -> rs.getString(1),
+                UUID.fromString(id))
+            .orElseThrow();
+    assertTrue(sealed.contains("\"enc\"") && !sealed.contains("Old plain text"));
   }
 }

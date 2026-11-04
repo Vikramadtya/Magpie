@@ -98,7 +98,7 @@ public class EncryptionBackfill {
       List<Revision> rows =
           db.list(
               "SELECT id, workspace_id, snapshot::text FROM transaction_revisions "
-                  + "WHERE NOT (snapshot ? 'enc') LIMIT "
+                  + "WHERE NOT jsonb_exists(snapshot, 'enc') LIMIT "
                   + BATCH,
               rs -> new Revision(rs.getLong(1), rs.getObject(2, UUID.class), rs.getString(3)));
       for (Revision r : rows) {
