@@ -264,3 +264,41 @@ export interface Overview {
   stackCategories: string[]; monthly: { month: string; byCategory: Record<string, number> }[];
   dailySpend: number[]; missingCurrencies: string[];
 }
+
+// ---- chart data (analytics) ----
+export interface BreakdownRow { bucket: string; key: string; label: string; color: string | null; totalMinor: number; count: number }
+export interface Breakdown { currency: string; rows: BreakdownRow[]; missingCurrencies: string[] }
+export type BreakdownBy = 'none' | 'category' | 'subcategory' | 'payee' | 'account' | 'tag' | 'trip' | 'person' | 'currency' | 'weekday' | 'daypart' | 'kind';
+export interface BreakdownParams {
+  by: BreakdownBy; bucket?: 'none' | 'day' | 'month'; type?: 'EXPENSE' | 'INCOME'; from: string; to: string;
+  categoryId?: string; accountId?: string; payeeId?: string; tagId?: string; tripId?: string; personId?: string; limit?: number;
+}
+export interface SizeBucket { fromMinor: number | null; toMinor: number | null; count: number; totalMinor: number }
+export interface Sizes { currency: string; buckets: SizeBucket[]; total: number }
+export interface Purchase { id: string; date: string; title: string; category: string | null; amountMinor: number }
+export interface Purchases { currency: string; items: Purchase[] }
+export interface TreeLeaf { category: string; subcategory: string | null; payee: string | null; totalMinor: number }
+export interface SpendTree { currency: string; leaves: TreeLeaf[] }
+export interface AccountSeries { id: string; name: string; type: string; values: number[] }
+export interface Wealth {
+  currency: string; months: string[]; accounts: AccountSeries[]; investments: number[]; ownAssets: number[]; missingCurrencies: string[];
+}
+export interface InvestmentHistory {
+  currency: string;
+  holdings: { id: string; name: string; symbol: string; assetType: string | null; costMinor: number; valueMinor: number }[];
+  lots: { holdingId: string; name: string; boughtOn: string; costMinor: number }[];
+  invested: { date: string; minor: number }[];
+  value: { date: string; minor: number }[];
+  ownValues: { holdingId: string; name: string; asOf: string; valueMinor: number }[];
+  missingCurrencies: string[];
+}
+export interface LoanHistory {
+  currency: string;
+  history: { month: string; owedToMeMinor: number; iOweMinor: number }[];
+  people: { person: string; lentMinor: number; lentRepaidMinor: number; borrowedMinor: number; borrowedRepaidMinor: number }[];
+  missingCurrencies: string[];
+}
+export interface GoalProgress {
+  id: string; name: string; currency: string; targetMinor: number; targetDate: string | null; savedMinor: number;
+  points: { date: string; cumulativeMinor: number }[];
+}

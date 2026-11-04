@@ -1,5 +1,5 @@
 import { Trash2, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { lazy, Suspense, useState, type FormEvent } from 'react';
 import type { Household, HouseholdSummary } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
@@ -16,6 +16,8 @@ import { StateView } from '../components/ui/StateView';
 import { householdActions, useHouseholdAction, useHouseholds, useHouseholdSummary, useHouseholdTrips, useHouseholdWealth } from '../hooks/useHousehold';
 import { monthKey, shortDate } from '../lib/dates';
 import { parseMoney } from '../lib/money';
+
+const HouseholdCharts = lazy(() => import('../features/analytics/PeopleTab').then((m) => ({ default: m.HouseholdCharts })));
 
 export default function HouseholdPage() {
   const households = useHouseholds();
@@ -74,6 +76,7 @@ function HouseholdView({ household: h }: { household: Household }) {
       <StateView isLoading={summary.isLoading} error={summary.error} onRetry={() => void summary.refetch()}>
         {summary.data && <SpendingCard household={h} summary={summary.data} />}
       </StateView>
+      <Suspense fallback={null}><HouseholdCharts name={h.name} summary={summary.data} loading={summary.isLoading} error={summary.error} /></Suspense>
       {summary.data && <BudgetsCard household={h} summary={summary.data} />}
 
       {(trips.data ?? []).length > 0 && (

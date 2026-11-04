@@ -1,6 +1,6 @@
 import { endOfMonth, parseISO } from 'date-fns';
 import { Banknote, Inbox, Lightbulb, PiggyBank } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Dashboard } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
@@ -18,6 +18,10 @@ import { useInboxCount } from '../hooks/useInbox';
 import { isoDate, monthKey, shortDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { paletteColor } from '../lib/palette';
+
+const PaceCard = lazy(() => import('../features/analytics/DashboardCharts').then((m) => ({ default: m.PaceCard })));
+const NetWorthTrend = lazy(() => import('../features/analytics/DashboardCharts').then((m) => ({ default: m.NetWorthTrend })));
+const BudgetCompact = lazy(() => import('../features/analytics/DashboardCharts').then((m) => ({ default: m.BudgetCompact })));
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -52,8 +56,16 @@ export default function DashboardPage() {
 
             <NeedsAttention d={d} month={month} />
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <Suspense fallback={<div className="grid lg:grid-cols-2 gap-6"><Skeleton className="h-72" /><Skeleton className="h-72" /></div>}>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <PaceCard d={d} month={month} />
+                <NetWorthTrend />
+              </div>
+            </Suspense>
+
+            <div className="grid lg:grid-cols-3 gap-6">
               <TopCategories d={d} month={month} />
+              <Suspense fallback={<Skeleton className="h-72" />}><BudgetCompact d={d} /></Suspense>
               <UpcomingCard d={d} />
             </div>
 
@@ -188,7 +200,7 @@ function TopCategories({ d, month }: { d: Dashboard; month: string }) {
         <ul className="space-y-3">
           {d.topCategories.map((c, i) => (
             <li key={c.categoryId}>
-              <Link to={`/transactions?category=${c.categoryId}&from=${isoDate(first)}&to=${isoDate(endOfMonth(first))}`} className="flex justify-between text-sm mb-1 hover:underline">
+              <Link to={`/transactions?category=${c.categoryId}&from=${isoDate(first)}&to=${isoDate(endOfMonth(first))}`} className="flex justify-between gap-3 text-sm mb-1 hover:underline">
                 <span>{c.name}</span>
                 <span className="tabular-nums text-secondary">{formatMoney(c.totalMinor, d.currency)}</span>
               </Link>

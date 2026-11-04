@@ -1,9 +1,15 @@
 import { FxWarning } from '../../components/FxWarning';
+import { Segmented } from '../../components/ui/Segmented';
 import { StateView } from '../../components/ui/StateView';
+import { useDashboard } from '../../hooks/useInsights';
 import { useForecast } from '../../hooks/useExtras';
 import { cn } from '../../lib/cn';
-import { monthLabel, shortDate } from '../../lib/dates';
+import { monthKey, monthLabel, shortDate } from '../../lib/dates';
 import { formatMoney } from '../../lib/money';
+import { addMonths, format, parseISO } from 'date-fns';
+import { useState } from 'react';
+import { BandChart, RangeBars } from './charts';
+import { ChartCard } from './kit';
 
 export default function ForecastTab() {
   const forecast = useForecast();
@@ -31,6 +37,14 @@ export default function ForecastTab() {
             <Card label="Likely to spend" value={f.expense.totalMinor} currency={f.currency} sub={`${formatMoney(f.expense.fixedMinor, f.currency)} bills, ${formatMoney(f.expense.variableMinor, f.currency)} everyday`} tone="down" />
             <Card label="Likely left over" value={f.netMinor} currency={f.currency} sub={f.netMinor >= 0 ? 'Earned minus spent' : 'You may spend more than you earn'} tone={f.netMinor >= 0 ? 'up' : 'down'} />
           </div>
+
+          {f.categories.length > 0 && (
+            <ChartCard title="Everyday spending by category" hint="The expected amount for each category next month. The whisker is the range it will probably stay within.">
+              <RangeBars currency={f.currency} items={f.categories.slice(0, 8).map((c) => ({ label: c.name, value: c.forecastMinor, low: c.lowMinor, high: c.highMinor, color: c.color }))} />
+            </ChartCard>
+          )}
+
+          <NetWorthProjection f={f} />
 
           <div className="grid lg:grid-cols-2 gap-6">
             <FixedList title="Regular bills" items={f.fixedExpenses} currency={f.currency} empty="No recurring expenses next month." />
@@ -64,5 +78,30 @@ function FixedList({ title, items, currency, empty }: { title: string; items: { 
         </ul>
       )}
     </section>
+  );
+}
+
+/** Today's net worth carried forward as if every coming month looked like next month's forecast. */
+function NetWorthProjection({ f }: { f: import('../../api/types').Forecast }) {
+  const [months, setMonths] = useState(12);
+  const now = useDashboard(monthKey(new Date())).data;
+  const base = now?.netWorthMinor ?? 0;
+  const start = parseISO(`${f.month}-01`);
+  const low = f.income.lowMinor - f.expense.highMinor;
+  const high = f.income.highMinor - f.expense.lowMinor;
+  const data = [{ x: 'Now', mid: base, band: [base, base] as [number, number] }, ...Array.from({ length: months }, (_, i) => ({
+    x: format(addMonths(start, i), 'MMM yy'),
+    mid: base + f.netMinor * (i + 1),
+    band: [base + low * (i + 1), base + high * (i + 1)] as [number, number],
+  }))];
+  return (
+    <ChartCard
+      title="Net worth ahead (an estimate)"
+      hint={`Your net worth today, if every coming month looks like next month's forecast (${formatMoney(f.netMinor, f.currency)} left over). Real life will differ.`}
+      loading={!now}
+      actions={<Segmented value={String(months)} onChange={(v) => setMonths(Number(v))} options={[['6', '6 months'], ['12', '12 months']]} />}
+    >
+      <BandChart data={data} currency={f.currency} centreLabel="Expected" />
+    </ChartCard>
   );
 }

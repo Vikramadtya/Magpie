@@ -14,6 +14,12 @@ import { isoDate, shortDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { paletteColor } from '../lib/palette';
 
+const SpendingTab = lazy(() => import('../features/analytics/SpendingTab'));
+const OverTimeTab = lazy(() => import('../features/analytics/OverTimeTab'));
+const HabitsTab = lazy(() => import('../features/analytics/HabitsTab'));
+const BudgetsTab = lazy(() => import('../features/analytics/BudgetsTab'));
+const WealthTab = lazy(() => import('../features/analytics/WealthTab'));
+const PeopleTab = lazy(() => import('../features/analytics/PeopleTab'));
 const ForecastTab = lazy(() => import('../features/analytics/ForecastTab'));
 const PatternsTab = lazy(() => import('../features/analytics/PatternsTab'));
 const NetWorthChart = lazy(() => import('../components/charts/NetWorthChart'));
@@ -24,10 +30,14 @@ const RANGES = {
   month: { label: 'This month', from: () => startOfMonth(now()), to: () => endOfMonth(now()) },
   last: { label: 'Last month', from: () => startOfMonth(subMonths(now(), 1)), to: () => endOfMonth(subMonths(now(), 1)) },
   quarter: { label: 'Last 3 months', from: () => startOfMonth(subMonths(now(), 2)), to: () => endOfMonth(now()) },
+  half: { label: 'Last 6 months', from: () => startOfMonth(subMonths(now(), 5)), to: () => endOfMonth(now()) },
   ytd: { label: 'This year', from: () => startOfYear(now()), to: () => endOfMonth(now()) },
+  year: { label: 'Last 12 months', from: () => startOfMonth(subMonths(now(), 11)), to: () => endOfMonth(now()) },
 } as const;
 type RangeKey = keyof typeof RANGES;
-const TABS = [['overview', 'Overview'], ['forecast', 'Next month'], ['patterns', 'Worth a look']] as const;
+const TABS = [['overview', 'Overview'], ['spending', 'Spending'], ['time', 'Over time'], ['habits', 'Habits'], ['budgets', 'Budgets & goals'], ['wealth', 'Wealth'], ['people', 'People'], ['forecast', 'Next month'], ['patterns', 'Worth a look']] as const;
+/** Tabs whose charts follow the period chosen at the top. */
+const RANGED = new Set<string>(['overview', 'spending', 'habits', 'people']);
 
 export default function AnalyticsPage() {
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('overview');
@@ -38,14 +48,20 @@ export default function AnalyticsPage() {
     <>
       <PageHeader
         title="Analytics"
-        subtitle={tab === 'overview' ? `${format(parseISO(from), 'd MMM')} – ${format(parseISO(to), 'd MMM yyyy')}` : undefined}
-        actions={tab === 'overview' ? (
+        subtitle={RANGED.has(tab) ? `${format(parseISO(from), 'd MMM')} – ${format(parseISO(to), 'd MMM yyyy')}` : undefined}
+        actions={RANGED.has(tab) ? (
           <Select className="w-44" value={range} onChange={(e) => setRange(e.target.value as RangeKey)} aria-label="Period">
             {Object.entries(RANGES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </Select>
         ) : undefined}
       />
-      <Segmented className="mb-6" value={tab} onChange={setTab} options={TABS} />
+      <div className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto"><Segmented value={tab} onChange={setTab} options={TABS} className="whitespace-nowrap" /></div>
+      {tab === 'spending' && <Suspense fallback={<Skeleton className="h-64" />}><SpendingTab from={from} to={to} /></Suspense>}
+      {tab === 'time' && <Suspense fallback={<Skeleton className="h-64" />}><OverTimeTab /></Suspense>}
+      {tab === 'habits' && <Suspense fallback={<Skeleton className="h-64" />}><HabitsTab from={from} to={to} /></Suspense>}
+      {tab === 'budgets' && <Suspense fallback={<Skeleton className="h-64" />}><BudgetsTab /></Suspense>}
+      {tab === 'wealth' && <Suspense fallback={<Skeleton className="h-64" />}><WealthTab /></Suspense>}
+      {tab === 'people' && <Suspense fallback={<Skeleton className="h-64" />}><PeopleTab from={from} to={to} /></Suspense>}
       {tab === 'forecast' && <Suspense fallback={<Skeleton className="h-64" />}><ForecastTab /></Suspense>}
       {tab === 'patterns' && <Suspense fallback={<Skeleton className="h-64" />}><PatternsTab /></Suspense>}
       {tab === 'overview' && <Overview from={from} to={to} />}

@@ -129,6 +129,15 @@ export const insightsApi = {
   cashFlow: (ws: string, from: string, to: string) => api.get<T.Report<T.MonthFlow>>(ws, '/analytics/cash-flow', { from, to }),
   netWorth: (ws: string, months: number) => api.get<T.Report<T.NetWorthPoint>>(ws, '/analytics/net-worth', { months }),
   overview: (ws: string, from: string, to: string) => api.get<T.Overview>(ws, '/analytics/overview', { from, to }),
+  breakdown: (ws: string, p: T.BreakdownParams) => api.get<T.Breakdown>(ws, '/analytics/breakdown', { ...p }),
+  sizes: (ws: string, from: string, to: string) => api.get<T.Sizes>(ws, '/analytics/sizes', { from, to }),
+  purchases: (ws: string, from: string, to: string) => api.get<T.Purchases>(ws, '/analytics/purchases', { from, to, limit: 150 }),
+  tree: (ws: string, from: string, to: string) => api.get<T.SpendTree>(ws, '/analytics/tree', { from, to }),
+  wealth: (ws: string, months: number) => api.get<T.Wealth>(ws, '/analytics/wealth', { months }),
+  investmentHistory: (ws: string) => api.get<T.InvestmentHistory>(ws, '/analytics/investments'),
+  loanHistory: (ws: string, months: number) => api.get<T.LoanHistory>(ws, '/analytics/loans', { months }),
+  goalProgress: (ws: string) => api.get<T.GoalProgress[]>(ws, '/analytics/goals'),
+  budgetHistory: (ws: string, months: number) => api.get<T.BudgetSummary[]>(ws, '/analytics/budgets', { months }),
 };
 
 export const importApi = {
