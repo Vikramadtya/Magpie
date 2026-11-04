@@ -174,6 +174,14 @@ export const loansApi = {
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
 };
 
+export const refundsApi = {
+  overview: (ws: string) => api.get<T.RefundOverview>(ws, '/refunds'),
+  create: (ws: string, b: { transactionId: string; expectedMinor?: number; note?: string | null }) => api.post<T.Refund>(ws, '/refunds', b),
+  update: (ws: string, id: string, b: { expectedMinor: number; note?: string | null }) => api.patch<T.Refund>(ws, `/refunds/${id}`, b),
+  complete: (ws: string, id: string, b: { receivedMinor: number; receivedOn: string; accountId?: string | null }) => api.post<T.Refund>(ws, `/refunds/${id}/complete`, b),
+  remove: (ws: string, id: string) => api.del(ws, `/refunds/${id}`),
+};
+
 export const forecastApi = {
   forecast: (ws: string) => api.get<T.Forecast>(ws, '/forecast'),
   insights: (ws: string) => api.get<T.Insights>(ws, '/insights'),

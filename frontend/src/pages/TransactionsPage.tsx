@@ -1,9 +1,9 @@
-import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, User } from 'lucide-react';
+import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, Undo2, User } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import type { Transaction, TransactionFilters } from '../api/types';
+import type { Refund, Transaction, TransactionFilters } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
 import { Avatar } from '../components/ui/Avatar';
@@ -15,7 +15,9 @@ import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, StateView } from '../components/ui/StateView';
+import { canBeRefunded, MarkForRefund } from '../features/refunds/MarkForRefund';
 import { FilterBar } from '../features/transactions/FilterBar';
+import { useRefunds } from '../hooks/useRefunds';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { countActive, parseFilters, toParams } from '../lib/txFilters';
 import { useCategories, usePeople } from '../hooks/useReference';
@@ -47,6 +49,10 @@ export default function TransactionsPage() {
   const [commentsFor, setCommentsFor] = useState<Transaction | null>(null);
   const [tripFor, setTripFor] = useState<Transaction | null>(null);
   const [deletedOpen, setDeletedOpen] = useState(false);
+  const [refundFor, setRefundFor] = useState<Transaction | null>(null);
+  const navigate = useNavigate();
+  const refundList = useRefunds().data?.items;
+  const refundByTx = useMemo(() => new Map((refundList ?? []).map((r) => [r.transactionId, r])), [refundList]);
   const del = useDeleteTransaction();
   const bulk = useBulkTransactions();
   const assign = useAssignToTrip();
@@ -145,6 +151,9 @@ export default function TransactionsPage() {
                 selected={selected.has(t.id)}
                 canEdit={canEdit}
                 canTrip={trips.length > 0 && t.type === 'EXPENSE' && !t.loanId}
+                refund={refundByTx.get(t.id)}
+                canRefund={canBeRefunded(t)}
+                onRefund={() => (refundByTx.has(t.id) ? navigate('/refunds') : setRefundFor(t))}
                 onTrip={() => setTripFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
@@ -156,6 +165,8 @@ export default function TransactionsPage() {
           />
         </div>
       </StateView>
+
+      {refundFor && <MarkForRefund tx={refundFor} onClose={() => setRefundFor(null)} />}
 
       <ConfirmDialog
         open={!!toDelete}
@@ -175,15 +186,16 @@ export default function TransactionsPage() {
 interface RowProps {
   tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canTrip: boolean;
   onTrip: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
+  refund?: Refund; canRefund: boolean; onRefund: () => void;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
     <div>
       {showDate && <div className="px-5 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-secondary bg-primary/[0.025]">{prettyDate(tx.occurredOn)}</div>}
-      <div className={cn('group flex items-center gap-3.5 px-5 py-3 border-b border-border/60 transition-colors hover:bg-primary/[0.02]', pending && 'opacity-60', selected && 'bg-accent/10')}>
+      <div className={cn('group flex flex-wrap sm:flex-nowrap items-center gap-x-3.5 gap-y-1 px-5 py-3 border-b border-border/60 transition-colors hover:bg-primary/[0.02]', pending && 'opacity-60', selected && 'bg-accent/10')}>
         {selecting && <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Select ${title}`} className="w-4 h-4" />}
         {tx.type === 'TRANSFER'
           ? <span className="w-9 h-9 shrink-0 rounded-full bg-primary/[0.06] flex items-center justify-center text-secondary"><ArrowLeftRight className="w-4 h-4" /></span>
@@ -191,19 +203,21 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
           <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>
-          {(tx.loanId || tx.tripId || tx.spentById) && (
+          {(tx.loanId || tx.tripId || tx.spentById || refund) && (
             <p className="text-[11px] text-accent flex items-center gap-2 mt-0.5">
               {tx.loanId && <span className="inline-flex items-center gap-1"><Banknote className="w-3 h-3" />Loan{tx.loanPerson ? ` · ${tx.loanPerson}` : ''}</span>}
               {tx.spentById && <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{tx.spentByName}</span>}
               {tx.tripId && <span className="inline-flex items-center gap-1"><Plane className="w-3 h-3" />{tx.tripName}</span>}
+              {refund && <span className="inline-flex items-center gap-1"><Undo2 className="w-3 h-3" />{refund.status === 'DONE' ? `Refunded ${formatMoney(refund.receivedMinor ?? 0, refund.currency)}` : `Refund pending ${formatMoney(refund.expectedMinor, refund.currency)}`}</span>}
             </p>
           )}
         </div>
         <Amount minor={tx.direction * tx.amountMinor} currency={tx.currency} signed={tx.type !== 'TRANSFER'} className="text-[15px] font-semibold tracking-[-0.01em]" />
         {!pending && !selecting && (
-          <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <div className="flex gap-0.5 w-full sm:w-auto justify-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
             {canEdit && canTrip && <IconButton label={tx.tripId ? 'Change trip' : 'Add to a trip'} onClick={onTrip}><Plane className="w-4 h-4" /></IconButton>}
+            {canEdit && canRefund && <IconButton label={refund ? 'See refund' : 'Mark for refund'} onClick={onRefund}><Undo2 className="w-4 h-4" /></IconButton>}
             {canEdit && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
             {canEdit && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}
           </div>

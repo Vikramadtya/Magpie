@@ -159,6 +159,15 @@ export interface LoanPerson { person: string; netMinor: number; openLoans: numbe
 export interface LoanOverview { currency: string; owedToMeMinor: number; iOweMinor: number; people: LoanPerson[]; loans: Loan[] }
 export interface LoanDetail { loan: Loan; transactions: Transaction[] }
 
+// ---------- refunds ----------
+export interface Refund {
+  id: string; transactionId: string; status: 'PENDING' | 'DONE'; expectedMinor: number; receivedMinor: number | null;
+  currency: string; purchasedOn: string; purchaseMinor: number; title: string; categoryName: string | null;
+  accountId: string; accountName: string; note: string | null; completedOn: string | null; refundTransactionId: string | null;
+}
+/** Totals are in the base currency; items keep their own. */
+export interface RefundOverview { currency: string; pendingCount: number; pendingMinor: number; doneCount: number; receivedMinor: number; items: Refund[] }
+
 // ---------- forecast and insights ----------
 export interface ForecastLine { fixedMinor: number; variableMinor: number; totalMinor: number; lowMinor: number; highMinor: number }
 export interface CategoryForecast {

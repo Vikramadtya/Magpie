@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Gem, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane, Inbox, Users,
+  LayoutDashboard, Wallet, Receipt, Target, PieChart, Settings, TrendingUp, Gem, Repeat, ListTree, Store, PiggyBank, Upload, Banknote, Plane, Inbox, Users, Undo2,
 } from 'lucide-react';
 
 const ITEMS = [
@@ -13,6 +13,7 @@ const ITEMS = [
   { path: '/goals', label: 'Goals', icon: Target },
   { path: '/recurring', label: 'Recurring', icon: Repeat },
   { path: '/loans', label: 'Loans', icon: Banknote },
+  { path: '/refunds', label: 'Refunds', icon: Undo2 },
   { path: '/investments', label: 'Investments', icon: TrendingUp },
   { path: '/assets', label: 'Assets', icon: Gem },
   { path: '/analytics', label: 'Analytics', icon: PieChart },
@@ -28,7 +29,7 @@ const pick = (...paths: Item['path'][]) => paths.map((p) => ITEMS.find((i) => i.
 /** The sidebar, grouped so the long list reads as a few small ones. */
 export const NAV_GROUPS: { label?: string; items: Item[] }[] = [
   { items: pick('/dashboard', '/inbox', '/transactions') },
-  { label: 'Money', items: pick('/accounts', '/budgets', '/goals', '/recurring', '/loans') },
+  { label: 'Money', items: pick('/accounts', '/budgets', '/goals', '/recurring', '/loans', '/refunds') },
   { label: 'Insight', items: pick('/analytics', '/trips', '/investments', '/assets', '/household') },
   { label: 'Manage', items: pick('/categories', '/payees', '/import', '/settings') },
 ];
