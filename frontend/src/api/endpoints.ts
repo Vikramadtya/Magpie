@@ -129,7 +129,6 @@ export const insightsApi = {
   cashFlow: (ws: string, from: string, to: string) => api.get<T.Report<T.MonthFlow>>(ws, '/analytics/cash-flow', { from, to }),
   netWorth: (ws: string, months: number) => api.get<T.Report<T.NetWorthPoint>>(ws, '/analytics/net-worth', { months }),
   overview: (ws: string, from: string, to: string) => api.get<T.Overview>(ws, '/analytics/overview', { from, to }),
-  topPayees: (ws: string, from: string, to: string) => api.get<T.Report<T.PayeeSpend>>(ws, '/analytics/top-payees', { from, to, limit: 10 }),
 };
 
 export const importApi = {

@@ -109,6 +109,8 @@ export interface Dashboard {
   topCategories: { categoryId: string; name: string; color: string | null; totalMinor: number }[];
   /** Your spending per day of the month, and of the month before (index 0 = the 1st). */
   dailySpend: number[]; previousDailySpend: number[];
+  /** What makes up net worth, line by line; debts are negative. */
+  worth: { label: string; minor: number }[];
 }
 export interface Report<T> { currency: string; items: T[]; missingCurrencies: string[] }
 export interface FxQuote { available: boolean; rate: number | null; convertedMinor: number | null }

@@ -13,7 +13,9 @@ import com.keeper.transaction.TransactionView;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.inject.Singleton;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -44,7 +46,13 @@ public class DashboardService {
       List<Long> dailySpend,
       List<Long> previousDailySpend,
       /** Market value of holdings; already included in assets and net worth. */
-      long investmentsMinor) {}
+      long investmentsMinor,
+      /** What makes up net worth, line by line; the lines add up to it exactly. */
+      List<WorthLine> worth) {}
+
+  /** One line of the net worth sum, in the base currency; debts are negative. */
+  @Serdeable
+  public record WorthLine(String label, long minor) {}
 
   /** What someone else spent from the owner's accounts this month. */
   @Serdeable
@@ -84,15 +92,27 @@ public class DashboardService {
 
     long assets = 0;
     long liabilities = 0;
+    Map<String, Long> lines = new LinkedHashMap<>();
+    for (String label : WORTH_ORDER) lines.put(label, 0L);
     for (Account a : all) {
       if (a.memo()) continue; // someone else's money, not part of your net worth
       long inBase = converter.toBase(a.balanceMinor(), a.currency());
-      if (a.balanceMinor() >= 0 && !isLiability(a)) assets += inBase;
+      boolean asset = a.balanceMinor() >= 0 && !isLiability(a);
+      if (asset) assets += inBase;
       else liabilities += inBase;
+      lines.merge(asset ? accountLine(a) : DEBTS, inBase, Long::sum);
     }
 
-    long investments = investmentValue(ws, converter);
+    long[] held = holdingValues(ws, converter);
+    long investments = held[0] + held[1];
     assets += investments;
+    lines.put(INVESTMENTS, held[0]);
+    lines.put(OWN_ASSETS, held[1]);
+    List<WorthLine> worth =
+        lines.entrySet().stream()
+            .filter(e -> e.getValue() != 0)
+            .map(e -> new WorthLine(e.getKey(), e.getValue()))
+            .toList();
 
     AtomicLong income = new AtomicLong();
     AtomicLong expense = new AtomicLong();
@@ -149,20 +169,24 @@ public class DashboardService {
             .toList(),
         daily(ws, month),
         daily(ws, month.minusMonths(1)),
-        investments);
+        investments,
+        worth);
   }
 
-  /** Holdings at today's price, in the base currency. */
-  private long investmentValue(UUID ws, com.keeper.fx.FxConverter.Converter converter) {
-    AtomicLong total = new AtomicLong();
+  /** {market investments, gold/property and the like} at today's value, in the base currency. */
+  private long[] holdingValues(UUID ws, com.keeper.fx.FxConverter.Converter converter) {
+    long[] totals = new long[2];
     db.list(
-        "SELECT currency, SUM(ROUND(quantity * price_minor))::bigint FROM holdings WHERE workspace_id = ? GROUP BY currency",
+        "SELECT currency, COALESCE(asset_type IN "
+            + com.keeper.investment.HoldingRefresher.OWN_VALUE_KINDS
+            + ", FALSE), SUM(ROUND(quantity * price_minor))::bigint "
+            + "FROM holdings WHERE workspace_id = ? GROUP BY 1, 2",
         rs -> {
-          total.addAndGet(converter.toBase(rs.getLong(2), rs.getString(1)));
+          totals[rs.getBoolean(2) ? 1 : 0] += converter.toBase(rs.getLong(3), rs.getString(1));
           return null;
         },
         ws);
-    return total.get();
+    return totals;
   }
 
   /** {income, expense} of your own money for a month. */
@@ -203,6 +227,21 @@ public class DashboardService {
     java.util.TreeSet<String> all = new java.util.TreeSet<>(a);
     all.addAll(b);
     return List.copyOf(all);
+  }
+
+  private static final String DEBTS = "Cards and loans";
+  private static final String INVESTMENTS = "Investments";
+  private static final String OWN_ASSETS = "Gold, property and other assets";
+  private static final List<String> WORTH_ORDER =
+      List.of("Bank accounts", "Savings", "Cash", "Other accounts", INVESTMENTS, OWN_ASSETS, DEBTS);
+
+  private static String accountLine(Account a) {
+    return switch (a.type()) {
+      case "CHECKING" -> "Bank accounts";
+      case "SAVINGS" -> "Savings";
+      case "CASH" -> "Cash";
+      default -> "Other accounts";
+    };
   }
 
   private static boolean isLiability(Account a) {

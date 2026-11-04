@@ -53,11 +53,6 @@ export function useOverview(from: string, to: string) {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.analytics(id, 'overview', from, to), queryFn: () => insightsApi.overview(id, from, to) });
 }
-export function useTopPayees(from: string, to: string) {
-  const { id } = useWorkspace();
-  return useQuery({ queryKey: qk.analytics(id, 'payees', from, to), queryFn: () => insightsApi.topPayees(id, from, to) });
-}
-
 export function useHoldings() {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.holdings(id), queryFn: () => holdingsApi.list(id) });

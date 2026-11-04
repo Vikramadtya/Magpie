@@ -122,6 +122,54 @@ class PriceUploadTest extends ApiTestBase {
   }
 
   @Test
+  void netWorthIsListedLineByLineAndAddsUp() {
+    Session s = register("worth-lines");
+    String ws = "/api/v1/workspaces/" + s.workspaceId();
+    for (var a :
+        List.of(
+            Map.of("name", "Rainy day", "type", "SAVINGS", "openingBalanceMinor", 50_000),
+            Map.of("name", "Card", "type", "CREDIT_CARD", "openingBalanceMinor", -20_000))) {
+      var body = new java.util.HashMap<String, Object>(a);
+      body.put("currency", "USD");
+      post(s.token(), ws + "/accounts", body, Map.class);
+    }
+    post(
+        s.token(),
+        ws + "/holdings",
+        Map.of(
+            "name",
+            "Gold coins",
+            "assetType",
+            "GOLD",
+            "quantity",
+            1,
+            "unitPriceMinor",
+            7_000,
+            "priceMinor",
+            7_000,
+            "currency",
+            "USD"),
+        Map.class);
+
+    Map<?, ?> d = get(s.token(), ws + "/dashboard", Map.class);
+    var lines = new java.util.HashMap<Object, Integer>();
+    for (Object l : (List<?>) d.get("worth")) {
+      Map<?, ?> line = (Map<?, ?>) l;
+      lines.put(line.get("label"), ((Number) line.get("minor")).intValue());
+    }
+    assertEquals(
+        Map.of(
+            "Savings",
+            50_000,
+            "Gold, property and other assets",
+            7_000,
+            "Cards and loans",
+            -20_000),
+        lines);
+    assertEquals(37_000, ((Number) d.get("netWorthMinor")).intValue());
+  }
+
+  @Test
   void aHoldingIsTheSumOfItsPurchases() {
     Session s = register("lots");
     String base = "/api/v1/workspaces/" + s.workspaceId() + "/holdings";
