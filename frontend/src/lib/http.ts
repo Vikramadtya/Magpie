@@ -38,23 +38,47 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+/** The server could not be reached (asleep, restarting, offline): the session may still be fine. */
+export class ServerUnreachable extends Error {
+  constructor() {
+    super('Cannot reach the server');
+  }
+}
+
+const GIVE_UP_AFTER_MS = 100_000;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Asks for a new access token using the refresh cookie. Resolves null when the server answered and
+ * there is no usable session. A sleeping or restarting server (timeouts, 5xx) is waited out rather
+ * than treated as "signed out"; if it never answers this rejects with ServerUnreachable.
+ */
+async function requestRefresh(): Promise<string | null> {
+  const started = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await axios.post(`${env.API_URL}/api/v1/auth/refresh`, {}, { withCredentials: true, timeout: 25_000 });
+      accessToken = res.data.accessToken as string;
+      return accessToken;
+    } catch (e) {
+      const status = axios.isAxiosError(e) ? e.response?.status : undefined;
+      if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        accessToken = null;
+        return null;
+      }
+      if (Date.now() - started > GIVE_UP_AFTER_MS) throw new ServerUnreachable();
+      await pause(Math.min(1000 * 2 ** attempt, 10_000));
+    }
+  }
+}
+
 let refreshing: Promise<string | null> | null = null;
 
 /** Single-flight: concurrent 401s share one refresh call (refresh tokens are single-use). */
 export function refreshSession(): Promise<string | null> {
-  refreshing ??= axios
-    .post(`${env.API_URL}/api/v1/auth/refresh`, {}, { withCredentials: true })
-    .then((res) => {
-      accessToken = res.data.accessToken as string;
-      return accessToken;
-    })
-    .catch(() => {
-      accessToken = null;
-      return null;
-    })
-    .finally(() => {
-      refreshing = null;
-    });
+  refreshing ??= requestRefresh().finally(() => {
+    refreshing = null;
+  });
   return refreshing;
 }
 
@@ -65,12 +89,12 @@ http.interceptors.response.use(
     const isAuthCall = original?.url?.includes('/api/v1/auth/');
     if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
       original._retried = true;
-      const token = await refreshSession();
+      const token = await refreshSession().catch(() => undefined);
       if (token) {
         original.headers.Authorization = `Bearer ${token}`;
         return http(original);
       }
-      onSessionLost();
+      if (token === null) onSessionLost();
     }
     return Promise.reject(error);
   },

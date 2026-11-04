@@ -11,7 +11,11 @@ import io.micronaut.http.filter.ServerFilterPhase;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Fixed-window limiter: 10/min/IP on auth endpoints, 240/min/IP on everything else mutating. */
+/**
+ * Fixed-window limiter: 10/min/IP on auth endpoints, 240/min/IP on everything else mutating.
+ * Refreshing a session needs a valid cookie and runs on every page load and tab, so it has its own
+ * more generous bucket instead of competing with sign-in attempts.
+ */
 @ServerFilter("/api/**")
 public class RateLimitFilter implements Ordered {
   private static final long WINDOW_MS = 60_000;
@@ -23,14 +27,15 @@ public class RateLimitFilter implements Ordered {
   @RequestFilter
   @io.micronaut.core.annotation.Nullable
   public HttpResponse<?> limit(HttpRequest<?> request) {
-    boolean auth = request.getPath().startsWith("/api/v1/auth/");
+    boolean refresh = request.getPath().equals("/api/v1/auth/refresh");
+    boolean auth = request.getPath().startsWith("/api/v1/auth/") && !refresh;
     boolean mutating =
         request.getMethod() != HttpMethod.GET && request.getMethod() != HttpMethod.HEAD;
-    if (!auth && !mutating) {
+    if (!auth && !refresh && !mutating) {
       return null;
     }
-    int max = auth ? 10 : 240;
-    String key = (auth ? "auth:" : "write:") + clientIp(request);
+    int max = auth ? 10 : refresh ? 60 : 240;
+    String key = (auth ? "auth:" : refresh ? "refresh:" : "write:") + clientIp(request);
     long now = System.currentTimeMillis();
     Window w =
         windows.merge(

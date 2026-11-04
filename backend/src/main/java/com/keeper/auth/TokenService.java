@@ -43,15 +43,30 @@ public class TokenService {
     return issue(user, UUID.randomUUID());
   }
 
-  /** Exchanges a refresh token for a new pair. A replayed token revokes its whole family. */
+  /**
+   * How long after use a refresh token may be presented again without it counting as theft. A
+   * response can be lost (a sleeping server, a dropped connection) or two tabs can refresh at once;
+   * in both cases the browser still holds the token it just used.
+   */
+  static final Duration REPLAY_GRACE = Duration.ofSeconds(30);
+
+  /**
+   * Exchanges a refresh token for a new pair. Presenting a used token again after the grace period
+   * is treated as theft and ends the whole session.
+   */
   public Rotated rotate(String refreshToken) {
     var stored = refreshTokens.findByHash(hash(refreshToken)).orElseThrow(TokenService::invalid);
-    if (stored.revoked()) {
-      refreshTokens.revokeFamily(stored.familyId());
-      throw invalid();
-    }
-    if (stored.expiresAt().isBefore(Instant.now()) || !refreshTokens.revoke(stored.id())) {
-      throw invalid();
+    if (stored.expiresAt().isBefore(Instant.now())) throw invalid();
+    boolean claimed = stored.revokedAt() == null && refreshTokens.revoke(stored.id());
+    if (!claimed) {
+      // Used before. Fine only just after the rotation, and only if the session is still alive
+      // (signing out revokes every token, so a replay after sign-out stays refused).
+      Instant usedAt = stored.revokedAt() == null ? Instant.now() : stored.revokedAt();
+      boolean recent = usedAt.plus(REPLAY_GRACE).isAfter(Instant.now());
+      if (!recent || !refreshTokens.hasActive(stored.familyId())) {
+        refreshTokens.revokeFamily(stored.familyId());
+        throw invalid();
+      }
     }
     User user = users.findById(stored.userId()).orElseThrow(TokenService::invalid);
     return new Rotated(user, issue(user, stored.familyId()));

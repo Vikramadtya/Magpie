@@ -37,10 +37,23 @@ function Splash() {
   );
 }
 
+/** The server did not answer; the session is probably fine, so offer another try instead of the login page. */
+function Unreachable() {
+  const { retry } = useAuth();
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-4 px-4 text-center" role="alert">
+      <h1 className="text-xl font-semibold">Can't reach Keeper right now</h1>
+      <p className="text-sm text-secondary max-w-sm">The server may still be waking up. You are still signed in, so nothing is lost.</p>
+      <button type="button" onClick={retry} className="h-11 px-5 rounded-xl bg-accent text-white font-medium">Try again</button>
+    </div>
+  );
+}
+
 function RequireAuth() {
   const { status } = useAuth();
   const location = useLocation();
   if (status === 'loading') return <Splash />;
+  if (status === 'unreachable') return <Unreachable />;
   if (status === 'anon') return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   return <AppLayout />;
 }

@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authApi } from '../api/endpoints';
 import type { Me, Role, User, Workspace } from '../api/types';
-import { refreshSession, tokenStore } from '../lib/http';
+import axios from 'axios';
+import { refreshSession, ServerUnreachable, tokenStore } from '../lib/http';
 import { idbPersister, queryClient } from '../lib/queryClient';
 
-type Status = 'loading' | 'authed' | 'anon';
+/** 'unreachable': the server did not answer, so we cannot tell yet whether the session is still good. */
+type Status = 'loading' | 'authed' | 'anon' | 'unreachable';
 
 interface AuthContextValue {
   status: Status;
@@ -18,6 +20,8 @@ interface AuthContextValue {
   register: (body: { email: string; password: string; name: string; currency: string }) => Promise<void>;
   logout: () => Promise<void>;
   reload: () => Promise<void>;
+  /** Tries again after the server could not be reached. */
+  retry: () => void;
   /** Called after Google sign-in, when only the refresh cookie exists. */
   completeOAuth: () => Promise<boolean>;
 }
@@ -52,23 +56,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authed');
   }, []);
 
+  /** Signs back in from the refresh cookie. Only a definite "no session" signs the user out. */
+  const boot = useCallback(async (isCancelled: () => boolean = () => false) => {
+    setStatus('loading');
+    try {
+      const token = await refreshSession();
+      if (isCancelled()) return;
+      if (!token) return setStatus('anon');
+      await loadMe();
+    } catch (e) {
+      if (isCancelled()) return;
+      if (axios.isAxiosError(e) && e.response?.status === 401) clearSession();
+      else if (e instanceof ServerUnreachable || !axios.isAxiosError(e) || !e.response || e.response.status >= 500) setStatus('unreachable');
+      else clearSession();
+    }
+  }, [clearSession, loadMe]);
+
   useEffect(() => {
     tokenStore.onSessionLost(clearSession);
     let cancelled = false;
-    (async () => {
-      const token = await refreshSession();
-      if (cancelled) return;
-      if (!token) return setStatus('anon');
-      try {
-        await loadMe();
-      } catch {
-        if (!cancelled) clearSession();
-      }
-    })();
+    void boot(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [clearSession, loadMe]);
+  }, [clearSession, boot]);
 
   const value = useMemo<AuthContextValue>(() => {
     const workspaces = me?.workspaces ?? [];
@@ -107,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       reload: loadMe,
+      retry: () => void boot(),
       completeOAuth: async () => {
         const token = await refreshSession();
         if (!token) return false;
@@ -114,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true;
       },
     };
-  }, [status, me, workspaceId, clearSession, loadMe]);
+  }, [status, me, workspaceId, clearSession, loadMe, boot]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

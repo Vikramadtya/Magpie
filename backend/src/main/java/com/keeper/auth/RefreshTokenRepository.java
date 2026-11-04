@@ -9,7 +9,7 @@ import java.util.UUID;
 @Singleton
 public class RefreshTokenRepository {
 
-  public record Stored(UUID id, UUID userId, UUID familyId, Instant expiresAt, boolean revoked) {}
+  public record Stored(UUID id, UUID userId, UUID familyId, Instant expiresAt, Instant revokedAt) {}
 
   private final Db db;
 
@@ -28,14 +28,16 @@ public class RefreshTokenRepository {
 
   public Optional<Stored> findByHash(String hash) {
     return db.one(
-        "SELECT id, user_id, family_id, expires_at, revoked_at IS NOT NULL AS revoked FROM refresh_tokens WHERE token_hash = ?",
+        "SELECT id, user_id, family_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = ?",
         rs ->
             new Stored(
                 rs.getObject("id", UUID.class),
                 rs.getObject("user_id", UUID.class),
                 rs.getObject("family_id", UUID.class),
                 rs.getObject("expires_at", java.time.OffsetDateTime.class).toInstant(),
-                rs.getBoolean("revoked")),
+                rs.getObject("revoked_at", java.time.OffsetDateTime.class) == null
+                    ? null
+                    : rs.getObject("revoked_at", java.time.OffsetDateTime.class).toInstant()),
         hash);
   }
 
@@ -44,6 +46,14 @@ public class RefreshTokenRepository {
     return db.update(
             "UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL", id)
         == 1;
+  }
+
+  /** True while the session still has a usable token, i.e. it was rotated, not signed out. */
+  public boolean hasActive(UUID familyId) {
+    return db.count(
+            "SELECT count(*) FROM refresh_tokens WHERE family_id = ? AND revoked_at IS NULL AND expires_at > NOW()",
+            familyId)
+        > 0;
   }
 
   public void revokeFamily(UUID familyId) {
