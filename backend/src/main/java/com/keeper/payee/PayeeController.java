@@ -52,6 +52,15 @@ public class PayeeController {
         .orElseThrow(() -> new ResourceNotFoundException("Payee", id.toString()));
   }
 
+  @io.micronaut.serde.annotation.Serdeable
+  public record Applied(int updated) {}
+
+  /** Categorises past transactions using each payee's default category. */
+  @Post("/apply-defaults")
+  public Applied applyDefaults(@PathVariable UUID workspaceId) {
+    return new Applied(payees.applyDefaults(workspaceId));
+  }
+
   @Delete("/{id}")
   public void delete(@PathVariable UUID workspaceId, @PathVariable UUID id) {
     payees.delete(workspaceId, id);

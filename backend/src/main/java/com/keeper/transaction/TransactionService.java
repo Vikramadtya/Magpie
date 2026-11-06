@@ -181,9 +181,17 @@ public class TransactionService {
                 spentBy(ws, r.spentById())));
     transactions.replaceTags(id, validTags(ws, r.tagIds()));
     accounts.adjustBalance(ws, account.id(), direction * amounts.accountMinor());
+    learn(ws, r.payeeId(), categoryId, r.type());
     TransactionView created = get(ws, id);
     listeners.forEach(l -> l.created(ws, actor, created));
     return id;
+  }
+
+  /** A payee with no default category picks up the first one you give it (spending only). */
+  private void learn(UUID ws, UUID payeeId, UUID categoryId, String type) {
+    if (payeeId != null && categoryId != null && "EXPENSE".equals(type)) {
+      payees.learnDefault(ws, payeeId, categoryId);
+    }
   }
 
   /** A lent (memo) account takes spending only, and only while the loan is active. */
@@ -304,6 +312,7 @@ public class TransactionService {
               base,
               spentBy(ws, req.spentById()));
           transactions.replaceTags(id, validTags(ws, r.tagIds()));
+          learn(ws, r.payeeId(), categoryId, r.type());
           TransactionView after = get(ws, id);
           listeners.forEach(l -> l.updated(ws, actor, after));
         });

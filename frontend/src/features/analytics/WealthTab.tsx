@@ -7,7 +7,7 @@ import { useInvestmentHistory, useWealth } from '../../hooks/useCharts';
 import { assetKind } from '../../lib/assetKinds';
 import { paletteColor } from '../../lib/palette';
 import { Donut, PurchaseDots, RankedBars, Trend } from './charts';
-import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthName, type Series } from './kit';
+import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthName, type Series, whenVisible } from './kit';
 
 const DEBT_TYPES = new Set(['CREDIT_CARD', 'LOAN']);
 const GROUPS: { key: string; label: string; types: string[]; color: string }[] = [
@@ -108,7 +108,7 @@ export default function WealthTab() {
 
 const dayName = (d: string) => format(parseISO(d), 'd MMM yy');
 
-function Investments() {
+function InvestmentsView() {
   const q = useInvestmentHistory();
   const d = q.data;
   const currency = d?.currency ?? 'USD';
@@ -182,3 +182,5 @@ function Investments() {
     </>
   );
 }
+
+const Investments = whenVisible(InvestmentsView);

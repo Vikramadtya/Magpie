@@ -66,4 +66,23 @@ public class PayeeRepository {
         ws,
         payeeId);
   }
+
+  /** Remembers the category as this payee's default, but only when it has none yet. */
+  public void learnDefault(UUID ws, UUID payeeId, UUID categoryId) {
+    db.update(
+        "UPDATE payees SET default_category_id = ? WHERE workspace_id = ? AND id = ? AND default_category_id IS NULL",
+        categoryId,
+        ws,
+        payeeId);
+  }
+
+  /** Gives every uncategorised transaction its payee's default category; returns how many. */
+  public int applyDefaults(UUID ws) {
+    return db.update(
+        "UPDATE transactions t SET category_id = p.default_category_id, updated_at = NOW() "
+            + "FROM payees p JOIN categories c ON c.id = p.default_category_id "
+            + "WHERE t.payee_id = p.id AND t.workspace_id = ? AND t.category_id IS NULL AND t.deleted_at IS NULL "
+            + "AND t.type IN ('INCOME','EXPENSE') AND c.kind = t.type AND t.loan_id IS NULL",
+        ws);
+  }
 }

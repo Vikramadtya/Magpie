@@ -111,6 +111,8 @@ export interface Dashboard {
   dailySpend: number[]; previousDailySpend: number[];
   /** What makes up net worth, line by line; debts are negative. */
   worth: { label: string; minor: number }[];
+  /** What you can spend now: what you hold, less bills still due and money set aside. */
+  safe: { totalMinor: number; perDayMinor: number; daysLeft: number; lines: { label: string; minor: number }[] };
 }
 export interface Report<T> { currency: string; items: T[]; missingCurrencies: string[] }
 export interface FxQuote { available: boolean; rate: number | null; convertedMinor: number | null }

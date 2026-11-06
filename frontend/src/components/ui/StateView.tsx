@@ -7,6 +7,31 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('skeleton rounded-2xl', className)} />;
 }
 
+/** Placeholder rows shaped like a real list row (round badge, two lines, an amount). */
+export function SkeletonRows({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="glass-panel divide-y divide-border/60" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center gap-3.5 px-5 py-3.5">
+          <Skeleton className="w-9 h-9 !rounded-full shrink-0" />
+          <div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-1/3 !rounded-md" /><Skeleton className="h-3 w-1/2 !rounded-md" /></div>
+          <Skeleton className="h-4 w-16 !rounded-md" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A card-shaped placeholder with a heading line and a few body lines. */
+export function SkeletonCard({ lines = 3, className }: { lines?: number; className?: string }) {
+  return (
+    <div className={cn('glass-panel p-5 space-y-3', className)} aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-4 w-1/3 !rounded-md" />
+      {Array.from({ length: lines }, (_, i) => <Skeleton key={i} className="h-3 !rounded-md" />)}
+    </div>
+  );
+}
+
 interface Props {
   isLoading: boolean;
   error?: unknown;
@@ -25,11 +50,7 @@ export function StateView({ isLoading, error, isEmpty, onRetry, emptyTitle, empt
     return (
       <>
         {skeleton ?? (
-          <div className="space-y-3" aria-busy="true">
-            <Skeleton className="h-16" />
-            <Skeleton className="h-16" />
-            <Skeleton className="h-16" />
-          </div>
+          <SkeletonRows rows={5} />
         )}
       </>
     );

@@ -32,7 +32,7 @@ export default function CategoriesPage() {
   return (
     <>
       <PageHeader title="Categories" subtitle="Group your spending and income" actions={canEdit && <Button onClick={() => setEditing({ category: null, parent: null, kind })}><Plus className="w-4 h-4 mr-2" />New category</Button>} />
-      <Segmented className="mb-6" value={kind} onChange={setKind} options={[['EXPENSE', 'Expenses'], ['INCOME', 'Income']] as const} />
+      <Segmented className="mb-6" value={kind} onChange={setKind} options={[['EXPENSE', 'Spending'], ['INCOME', 'Income']] as const} />
       <StateView isLoading={categories.isLoading} error={categories.error} onRetry={() => void categories.refetch()} isEmpty={groups.length === 0} emptyTitle="No categories" emptyHint="Create one to start organizing.">
         <ul className="grid md:grid-cols-2 gap-4 items-start">
           {groups.map(({ parent, children }) => (

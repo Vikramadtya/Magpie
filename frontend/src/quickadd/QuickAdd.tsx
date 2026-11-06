@@ -291,7 +291,7 @@ function Form({ data, offline, onBadKey }: { data: Choices; offline: boolean; on
               onClick={() => { setType(t); setCategoryId(''); }}
               className={cn('px-4 py-1.5 rounded-full transition-all', type === t ? (t === 'INCOME' ? 'bg-emerald-400 text-emerald-950' : 'bg-white text-neutral-900') : 'text-white/70')}
             >
-              {t === 'EXPENSE' ? 'Expense' : 'Income'}
+              {t === 'EXPENSE' ? 'Spending' : 'Income'}
             </button>
           ))}
         </div>

@@ -13,7 +13,10 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { StateView } from '../components/ui/StateView';
+import { MoreLinks } from '../features/settings/MoreLinks';
 import { QuickAddKeys } from '../features/settings/QuickAddKeys';
+import { WeeklyDigest } from '../features/settings/WeeklyDigest';
+import { usePrivacy } from '../lib/privacy';
 import { useConnections, useCreateConnection, useRevokeConnection, useSplitPeople, useSplitPersonLabel } from '../hooks/useInbox';
 import { useActivity } from '../hooks/useInsights';
 import { errorMessage } from '../lib/http';
@@ -53,6 +56,7 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" subtitle={user?.email} />
       <div className="space-y-6 max-w-3xl">
+        <MoreLinks />
         <section className="glass-panel p-6">
           <h2 className="font-semibold mb-4">Your ledger</h2>
           <form onSubmit={save} className="grid sm:grid-cols-[1fr_8rem_auto] gap-3 items-end">
@@ -65,6 +69,8 @@ export default function SettingsPage() {
           </p>
         </section>
 
+        <PrivacySection />
+        <WeeklyDigest />
         <section className="glass-panel p-6">
           <h2 className="font-semibold mb-1">Connect your expense-split app</h2>
           <p className="text-sm text-secondary mb-4">
@@ -177,5 +183,18 @@ function ConnectionCode({ secret, endpoint, onClose }: { secret: string; endpoin
       </details>
       <div className="flex justify-end mt-5"><Button onClick={onClose}>Done</Button></div>
     </Modal>
+  );
+}
+
+function PrivacySection() {
+  const [on, toggle] = usePrivacy();
+  return (
+    <section className="glass-panel p-6 flex items-center justify-between gap-4">
+      <div>
+        <h2>Hide amounts</h2>
+        <p className="text-body text-secondary mt-1">Blurs every figure so you can use Keeper in public. Hover or press an amount to peek. Shortcut: <kbd className="rounded bg-primary/[0.06] px-1.5 text-caption">P</kbd>. Saved on this device.</p>
+      </div>
+      <Button variant={on ? 'default' : 'outline'} onClick={toggle} aria-pressed={on}>{on ? 'On' : 'Off'}</Button>
+    </section>
   );
 }

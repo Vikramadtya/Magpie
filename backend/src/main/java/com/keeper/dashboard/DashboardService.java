@@ -48,7 +48,14 @@ public class DashboardService {
       /** Market value of holdings; already included in assets and net worth. */
       long investmentsMinor,
       /** What makes up net worth, line by line; the lines add up to it exactly. */
-      List<WorthLine> worth) {}
+      List<WorthLine> worth,
+      /** Money you can spend now: what you hold, less what is already spoken for. */
+      SafeToSpend safe) {}
+
+  /** The lines add up to {@code totalMinor}; {@code perDayMinor} spreads it over the days left. */
+  @Serdeable
+  public record SafeToSpend(
+      long totalMinor, long perDayMinor, int daysLeft, List<WorthLine> lines) {}
 
   /** One line of the net worth sum, in the base currency; debts are negative. */
   @Serdeable
@@ -62,6 +69,7 @@ public class DashboardService {
   private final TransactionService transactions;
   private final BudgetService budgets;
   private final RecurringService recurring;
+  private final com.keeper.goal.GoalService goals;
   private final FxConverter fx;
   private final com.keeper.analytics.MissingRates missingRates;
   private final com.keeper.analytics.AnalyticsService analytics;
@@ -72,6 +80,7 @@ public class DashboardService {
       TransactionService transactions,
       BudgetService budgets,
       RecurringService recurring,
+      com.keeper.goal.GoalService goals,
       FxConverter fx,
       com.keeper.analytics.MissingRates missingRates,
       com.keeper.analytics.AnalyticsService analytics,
@@ -80,6 +89,7 @@ public class DashboardService {
     this.transactions = transactions;
     this.budgets = budgets;
     this.recurring = recurring;
+    this.goals = goals;
     this.fx = fx;
     this.missingRates = missingRates;
     this.analytics = analytics;
@@ -170,7 +180,41 @@ public class DashboardService {
         daily(ws, month),
         daily(ws, month.minusMonths(1)),
         investments,
-        worth);
+        worth,
+        safeToSpend(ws, converter, all));
+  }
+
+  /**
+   * Cash-like balances (bank, savings, cash) plus what cards and loans owe, less bills still due
+   * this month and money already saved for goals. Investments and other assets are not spendable.
+   */
+  private SafeToSpend safeToSpend(
+      UUID ws, com.keeper.fx.FxConverter.Converter converter, List<Account> all) {
+    long held = 0;
+    long owed = 0;
+    for (Account a : all) {
+      if (a.memo()) continue;
+      long inBase = converter.toBase(a.balanceMinor(), a.currency());
+      if ("CHECKING".equals(a.type()) || "SAVINGS".equals(a.type()) || "CASH".equals(a.type()))
+        held += inBase;
+      else if (isLiability(a)) owed += inBase;
+    }
+    java.time.LocalDate today = java.time.LocalDate.now();
+    int daysLeft = today.lengthOfMonth() - today.getDayOfMonth() + 1;
+    long bills = 0;
+    for (var u : recurring.upcoming(ws, daysLeft - 1)) {
+      if ("EXPENSE".equals(u.type())) bills += converter.toBase(u.amountMinor(), u.currency());
+    }
+    long saved = 0;
+    for (var g : goals.list(ws)) saved += converter.toBase(g.savedMinor(), g.currency());
+
+    long total = held + owed - bills - saved;
+    List<WorthLine> lines = new java.util.ArrayList<>();
+    lines.add(new WorthLine("In your bank, savings and cash", held));
+    if (owed != 0) lines.add(new WorthLine("Cards and loans to pay", owed));
+    if (bills != 0) lines.add(new WorthLine("Bills still due this month", -bills));
+    if (saved != 0) lines.add(new WorthLine("Set aside for goals", -saved));
+    return new SafeToSpend(total, Math.max(0, total) / Math.max(1, daysLeft), daysLeft, lines);
   }
 
   /** {market investments, gold/property and the like} at today's value, in the base currency. */

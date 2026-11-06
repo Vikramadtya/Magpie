@@ -4,7 +4,7 @@ import { useBreakdown, usePurchases, useSizes } from '../../hooks/useCharts';
 import { isoDate } from '../../lib/dates';
 import { formatMoney } from '../../lib/money';
 import { CalendarHeat, Columns, PurchaseDots } from './charts';
-import { ChartCard, compact } from './kit';
+import { ChartCard, compact, whenVisible } from './kit';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const PARTS = ['Days 1–7', 'Days 8–14', 'Days 15–21', 'Day 22 on'];
@@ -32,7 +32,7 @@ export default function HabitsTab({ from, to }: { from: string; to: string }) {
   );
 }
 
-function Weekdays({ from, to }: { from: string; to: string }) {
+function WeekdaysView({ from, to }: { from: string; to: string }) {
   const q = useBreakdown({ by: 'weekday', from, to });
   const days = useMemo(() => elapsedDays(from, to), [from, to]);
   const totals = new Map((q.data?.rows ?? []).map((r) => [Number(r.key), r.totalMinor]));
@@ -47,7 +47,7 @@ function Weekdays({ from, to }: { from: string; to: string }) {
   );
 }
 
-function PartOfMonth({ from, to }: { from: string; to: string }) {
+function PartOfMonthView({ from, to }: { from: string; to: string }) {
   const q = useBreakdown({ by: 'daypart', from, to });
   const days = useMemo(() => elapsedDays(from, to), [from, to]);
   const totals = new Map((q.data?.rows ?? []).map((r) => [Number(r.key), r.totalMinor]));
@@ -62,7 +62,7 @@ function PartOfMonth({ from, to }: { from: string; to: string }) {
   );
 }
 
-function Calendar() {
+function CalendarView() {
   const now = new Date();
   const from = isoDate(startOfMonth(subMonths(now, 5)));
   const to = isoDate(now);
@@ -75,7 +75,7 @@ function Calendar() {
   );
 }
 
-function Sizes({ from, to }: { from: string; to: string }) {
+function SizesView({ from, to }: { from: string; to: string }) {
   const q = useSizes(from, to);
   const currency = q.data?.currency ?? 'USD';
   const data = (q.data?.buckets ?? []).map((b) => ({
@@ -89,7 +89,7 @@ function Sizes({ from, to }: { from: string; to: string }) {
   );
 }
 
-function Biggest({ from, to }: { from: string; to: string }) {
+function BiggestView({ from, to }: { from: string; to: string }) {
   const q = usePurchases(from, to);
   const items = q.data?.items ?? [];
   const top = items[0];
@@ -99,3 +99,13 @@ function Biggest({ from, to }: { from: string; to: string }) {
     </ChartCard>
   );
 }
+
+const Weekdays = whenVisible(WeekdaysView);
+
+const PartOfMonth = whenVisible(PartOfMonthView);
+
+const Calendar = whenVisible(CalendarView);
+
+const Sizes = whenVisible(SizesView);
+
+const Biggest = whenVisible(BiggestView);

@@ -29,6 +29,8 @@ export function useDashboard(month: string) {
       topCategories: d.topCategories ?? [],
       dailySpend: d.dailySpend ?? [],
       previousDailySpend: d.previousDailySpend ?? [],
+      worth: d.worth ?? [],
+      safe: d.safe ?? { totalMinor: 0, perDayMinor: 0, daysLeft: 1, lines: [] },
       accounts: d.accounts ?? [],
       recent: d.recent ?? [],
       upcoming: d.upcoming ?? [],

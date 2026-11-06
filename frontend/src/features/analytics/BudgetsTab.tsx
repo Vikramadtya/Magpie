@@ -6,7 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { useBudgetHistory, useGoalProgress } from '../../hooks/useCharts';
 import { formatMoney } from '../../lib/money';
 import { BudgetHeat, GoalLine, PairBars, PairColumns } from './charts';
-import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthName } from './kit';
+import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthName, whenVisible } from './kit';
 
 export default function BudgetsTab() {
   const [months, setMonths] = useState(6);
@@ -50,12 +50,12 @@ export default function BudgetsTab() {
             data={(current?.lines ?? []).map((l) => ({ label: l.categoryName, a: l.amountMinor + l.rolloverMinor, b: l.spentMinor }))}
             currency={currency}
             a={{ name: 'Budget', color: '#8B8F9C' }}
-            b={{ name: 'Spent', color: 'var(--accent-blue)' }}
+            b={{ name: 'Spending', color: 'var(--accent-blue)' }}
             redWhenOver
           />
         </ChartCard>
         <ChartCard title="Budgets over the months" hint="All your budgets added together against what you spent in those categories." loading={q.isLoading} error={q.error} empty={!anyBudget} emptyText="Set budgets to see how you do against them.">
-          <PairColumns data={history.map((m) => ({ x: monthName(m.month), a: m.budgetedMinor, b: m.spentMinor }))} currency={currency} a={{ name: 'Budgeted', color: INCOME_COLOR }} b={{ name: 'Spent', color: EXPENSE_COLOR }} />
+          <PairColumns data={history.map((m) => ({ x: monthName(m.month), a: m.budgetedMinor, b: m.spentMinor }))} currency={currency} a={{ name: 'Budgeted', color: INCOME_COLOR }} b={{ name: 'Spending', color: EXPENSE_COLOR }} />
         </ChartCard>
       </div>
       <ChartCard title="Where you go over budget" hint="Share of each budget used, month by month." loading={q.isLoading} error={q.error} empty={heat.length === 0} emptyText="Set budgets to see how you do against them.">
@@ -77,7 +77,7 @@ function paceFor(g: GoalProgress, today: Date): number {
   return (g.savedMinor - before) / days;
 }
 
-function Goals() {
+function GoalsView() {
   const q = useGoalProgress();
   const goals = q.data ?? [];
   return (
@@ -116,3 +116,5 @@ function GoalCard({ g }: { g: GoalProgress }) {
     </div>
   );
 }
+
+const Goals = whenVisible(GoalsView);

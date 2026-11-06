@@ -9,7 +9,7 @@ import { useTrips } from '../../hooks/useTrips';
 import { isoDate } from '../../lib/dates';
 import { paletteColor } from '../../lib/palette';
 import { Columns, Donut, RankedBars, SpendTreemap, type TreeNode } from './charts';
-import { ChartCard, OTHER_COLOR } from './kit';
+import { ChartCard, OTHER_COLOR, whenVisible } from './kit';
 import type { BreakdownBy } from '../../api/types';
 
 interface Range { from: string; to: string }
@@ -39,7 +39,7 @@ export default function SpendingTab({ from, to }: Range) {
   );
 }
 
-function GroupChart({ from, to, by, title, hint, emptyText, donut }: Range & { by: BreakdownBy; title: string; hint: string; emptyText?: string; donut?: boolean }) {
+function GroupChartView({ from, to, by, title, hint, emptyText, donut }: Range & { by: BreakdownBy; title: string; hint: string; emptyText?: string; donut?: boolean }) {
   const q = useBreakdown({ by, from, to });
   const rows = q.data?.rows ?? [];
   const items = rows.map((r) => ({ label: r.label, value: r.totalMinor, color: r.key === 'other' ? OTHER_COLOR : r.color }));
@@ -50,7 +50,7 @@ function GroupChart({ from, to, by, title, hint, emptyText, donut }: Range & { b
   );
 }
 
-function CategoryChart({ from, to }: Range) {
+function CategoryChartView({ from, to }: Range) {
   const [view, setView] = useState<'bars' | 'share'>('bars');
   const q = useBreakdown({ by: 'category', from, to, limit: 10 });
   const rows = q.data?.rows ?? [];
@@ -70,7 +70,7 @@ function CategoryChart({ from, to }: Range) {
   );
 }
 
-function SubCategoryChart({ from, to }: Range) {
+function SubCategoryChartView({ from, to }: Range) {
   const categories = useCategories().data ?? [];
   const tops = useBreakdown({ by: 'category', from, to, limit: 0 });
   const withSubs = (tops.data?.rows ?? []).filter((r) => r.key && categories.some((c) => c.parentId === r.key));
@@ -93,7 +93,7 @@ function SubCategoryChart({ from, to }: Range) {
   );
 }
 
-function TreemapChart({ from, to }: Range) {
+function TreemapChartView({ from, to }: Range) {
   const q = useSpendTree(from, to);
   const data = useMemo<TreeNode[]>(() => {
     const cats = new Map<string, Map<string, Map<string, number>>>();
@@ -122,7 +122,7 @@ function TreemapChart({ from, to }: Range) {
   );
 }
 
-function PayeeChart({ from, to }: Range) {
+function PayeeChartView({ from, to }: Range) {
   const q = useBreakdown({ by: 'payee', from, to, limit: 10 });
   const rows = q.data?.rows ?? [];
   return (
@@ -132,7 +132,7 @@ function PayeeChart({ from, to }: Range) {
   );
 }
 
-function PayeeOverTime() {
+function PayeeOverTimeView() {
   const now = new Date();
   const from = isoDate(startOfMonth(subMonths(now, 11)));
   const to = isoDate(endOfMonth(now));
@@ -163,7 +163,7 @@ function PayeeOverTime() {
   );
 }
 
-function TripChart({ from, to }: Range) {
+function TripChartView({ from, to }: Range) {
   const trips = useTrips().data ?? [];
   const byTrip = useBreakdown({ by: 'trip', from, to });
   const [chosen, setChosen] = useState('');
@@ -191,3 +191,17 @@ function TripChart({ from, to }: Range) {
     </div>
   );
 }
+
+const GroupChart = whenVisible(GroupChartView);
+
+const CategoryChart = whenVisible(CategoryChartView);
+
+const SubCategoryChart = whenVisible(SubCategoryChartView);
+
+const TreemapChart = whenVisible(TreemapChartView);
+
+const PayeeChart = whenVisible(PayeeChartView);
+
+const PayeeOverTime = whenVisible(PayeeOverTimeView);
+
+const TripChart = whenVisible(TripChartView);

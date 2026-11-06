@@ -41,6 +41,7 @@ export const categoriesApi = {
 };
 
 export const payeesApi = {
+  applyDefaults: (ws: string) => api.post<{ updated: number }>(ws, '/payees/apply-defaults'),
   list: (ws: string) => api.get<T.Payee[]>(ws, '/payees'),
   create: (ws: string, name: string, defaultCategoryId?: string | null) => api.post<T.Payee>(ws, '/payees', { name, defaultCategoryId }),
   update: (ws: string, id: string, name: string, defaultCategoryId?: string | null) => api.patch<T.Payee>(ws, `/payees/${id}`, { name, defaultCategoryId }),
@@ -181,6 +182,17 @@ export const loansApi = {
   repay: (ws: string, id: string, b: { accountId: string; amountMinor: number; occurredOn: string; note?: string | null }) =>
     api.post<T.Loan>(ws, `/loans/${id}/payments`, b),
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
+};
+
+export const sampleApi = {
+  load: (ws: string) => api.post<{ accounts: number; transactions: number }>(ws, '/sample-data'),
+  clear: (ws: string) => api.del(ws, '/sample-data'),
+};
+
+export const digestApi = {
+  get: (ws: string) => api.get<{ configured: boolean; enabled: boolean; lastSentAt: string | null }>(ws, '/digest'),
+  save: (ws: string, b: { webhookUrl?: string; enabled: boolean }) => api.put<{ configured: boolean; enabled: boolean; lastSentAt: string | null }>(ws, '/digest', b),
+  test: (ws: string) => api.post<{ configured: boolean; enabled: boolean; lastSentAt: string | null }>(ws, '/digest/test'),
 };
 
 export const refundsApi = {

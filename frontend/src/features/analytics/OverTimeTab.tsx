@@ -6,7 +6,7 @@ import { useDashboard } from '../../hooks/useInsights';
 import { isoDate, monthKey } from '../../lib/dates';
 import { Columns, PairColumns, SavingsChart, StackedColumns, Trend } from './charts';
 import { PaceCard } from './DashboardCharts';
-import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthKeys, monthName, movingAverage, pivotRows, totalsByBucket } from './kit';
+import { ChartCard, EXPENSE_COLOR, INCOME_COLOR, monthKeys, monthName, movingAverage, pivotRows, totalsByBucket, whenVisible } from './kit';
 
 const WINDOWS = [[6, 'Last 6 months'], [12, 'Last 12 months'], [24, 'Last 24 months']] as const;
 const SHORT = (m: string) => format(new Date(`${m}-01T00:00:00`), 'MMM');
@@ -39,13 +39,13 @@ export default function OverTimeTab() {
         <ChartCard title="Spending per month" hint="Everything you spent, month by month." loading={loading} error={error} empty={!anySpend} emptyText="No spending in this period.">
           <Columns data={buckets.map((m, i) => ({ x: monthName(m), value: spendTotals[i].total }))} currency={currency} />
         </ChartCard>
-        <ChartCard title="Earned and spent" hint="Income next to spending for each month." loading={loading} error={error} empty={!anySpend && !incomeTotals.some((t) => t.total > 0)}>
-          <PairColumns data={buckets.map((m, i) => ({ x: monthName(m), a: incomeTotals[i].total, b: spendTotals[i].total }))} currency={currency} a={{ name: 'Earned', color: INCOME_COLOR }} b={{ name: 'Spent', color: EXPENSE_COLOR }} />
+        <ChartCard title="Income and spending" hint="Income next to spending for each month." loading={loading} error={error} empty={!anySpend && !incomeTotals.some((t) => t.total > 0)}>
+          <PairColumns data={buckets.map((m, i) => ({ x: monthName(m), a: incomeTotals[i].total, b: spendTotals[i].total }))} currency={currency} a={{ name: 'Earned', color: INCOME_COLOR }} b={{ name: 'Spending', color: EXPENSE_COLOR }} />
         </ChartCard>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <ChartCard title="Saved per month" hint="Earned minus spent (red when you spent more), with the share of income you kept as the line." loading={loading} error={error} empty={!anySpend && !incomeTotals.some((t) => t.total > 0)}>
+        <ChartCard title="Saved per month" hint="Income minus spending (red when you spent more), with the share of income you kept as the line." loading={loading} error={error} empty={!anySpend && !incomeTotals.some((t) => t.total > 0)}>
           <SavingsChart
             currency={currency}
             data={buckets.map((m, i) => {
@@ -87,7 +87,7 @@ export default function OverTimeTab() {
   );
 }
 
-function CategoriesOverTime({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
+function CategoriesOverTimeView({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
   const q = useBreakdown({ by: 'category', bucket: 'month', from, to, limit: 7 });
   const { data, series } = useMemo(() => pivotRows(q.data?.rows ?? [], buckets), [q.data, buckets]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -118,7 +118,7 @@ function CategoriesOverTime({ from, to, buckets }: { from: string; to: string; b
   );
 }
 
-function YearOnYear() {
+function YearOnYearView() {
   const now = new Date();
   const from = isoDate(startOfMonth(subMonths(now, 23)));
   const to = isoDate(endOfMonth(now));
@@ -138,7 +138,7 @@ function YearOnYear() {
   );
 }
 
-function IncomeSources({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
+function IncomeSourcesView({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
   const q = useBreakdown({ by: 'category', bucket: 'month', type: 'INCOME', from, to, limit: 6 });
   const { data, series } = useMemo(() => pivotRows(q.data?.rows ?? [], buckets), [q.data, buckets]);
   return (
@@ -148,7 +148,7 @@ function IncomeSources({ from, to, buckets }: { from: string; to: string; bucket
   );
 }
 
-function FixedVsEveryday({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
+function FixedVsEverydayView({ from, to, buckets }: { from: string; to: string; buckets: string[] }) {
   const q = useBreakdown({ by: 'kind', bucket: 'month', from, to });
   const { data, series } = useMemo(() => {
     const p = pivotRows(q.data?.rows ?? [], buckets);
@@ -161,13 +161,13 @@ function FixedVsEveryday({ from, to, buckets }: { from: string; to: string; buck
   );
 }
 
-function ThisMonthPace() {
+function ThisMonthPaceView() {
   const month = monthKey(new Date());
   const d = useDashboard(month).data;
   return d ? <PaceCard d={d} month={month} /> : <ChartCard title="Spending pace" loading><span /></ChartCard>;
 }
 
-function DayByDay() {
+function DayByDayView() {
   const now = new Date();
   const from = isoDate(subDays(now, 59));
   const to = isoDate(now);
@@ -183,3 +183,15 @@ function DayByDay() {
     </ChartCard>
   );
 }
+
+const CategoriesOverTime = whenVisible(CategoriesOverTimeView);
+
+const YearOnYear = whenVisible(YearOnYearView);
+
+const IncomeSources = whenVisible(IncomeSourcesView);
+
+const FixedVsEveryday = whenVisible(FixedVsEverydayView);
+
+const ThisMonthPace = whenVisible(ThisMonthPaceView);
+
+const DayByDay = whenVisible(DayByDayView);

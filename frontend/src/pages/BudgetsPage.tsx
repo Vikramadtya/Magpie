@@ -1,5 +1,6 @@
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -48,7 +49,8 @@ export default function BudgetsPage() {
         onRetry={() => void budgets.refetch()}
         isEmpty={!!b && b.lines.length === 0}
         emptyTitle="No budgets this month"
-        emptyHint="Set a limit for a category, or copy last month's budgets."
+        emptyHint="Set a limit for a category, copy last month's budgets, or let the monthly review suggest them from what you actually spend."
+        emptyAction={<Link to="/review"><Button variant="outline">Suggest from my spending</Button></Link>}
       >
         {b && (
           <div className="space-y-6">

@@ -1,3 +1,4 @@
+import logo from './assets/logo.svg';
 import { lazy } from 'react';
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
@@ -11,17 +12,12 @@ const LoginPage = lazyPage(() => import('./auth/LoginPage'));
 const AuthCallback = lazyPage(() => import('./auth/AuthCallback'));
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazyPage(() => import('./pages/TransactionsPage'));
-const AccountsPage = lazyPage(() => import('./pages/AccountsPage'));
-const BudgetsPage = lazyPage(() => import('./pages/BudgetsPage'));
-const GoalsPage = lazyPage(() => import('./pages/GoalsPage'));
-const RecurringPage = lazyPage(() => import('./pages/RecurringPage'));
-const InvestmentsPage = lazyPage(() => import('./pages/InvestmentsPage'));
-const AssetsPage = lazyPage(() => import('./pages/AssetsPage'));
 const AnalyticsPage = lazyPage(() => import('./pages/AnalyticsPage'));
-const LoansPage = lazyPage(() => import('./pages/LoansPage'));
+const PlanPage = lazy(() => import('./pages/SectionPage').then((m) => ({ default: m.PlanPage })));
+const WealthPage = lazy(() => import('./pages/SectionPage').then((m) => ({ default: m.WealthPage })));
+const ReviewPage = lazyPage(() => import('./pages/ReviewPage'));
 const RefundsPage = lazyPage(() => import('./pages/RefundsPage'));
 const InboxPage = lazyPage(() => import('./pages/InboxPage'));
-const TripsPage = lazyPage(() => import('./pages/TripsPage'));
 const HouseholdPage = lazyPage(() => import('./pages/HouseholdPage'));
 const TripDetailPage = lazyPage(() => import('./pages/TripDetailPage'));
 const CategoriesPage = lazyPage(() => import('./pages/CategoriesPage'));
@@ -31,8 +27,9 @@ const SettingsPage = lazyPage(() => import('./pages/SettingsPage'));
 
 function Splash() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center" role="status" aria-label="Loading">
-      <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-5" role="status" aria-label="Loading">
+      <img src={logo} alt="" className="w-16 h-16 rounded-[18px] shadow-lift saved-ring" />
+      <div className="w-24 h-1 rounded-full skeleton" />
     </div>
   );
 }
@@ -76,18 +73,22 @@ export const router = createBrowserRouter([
     children: [
       { path: '/dashboard', element: <DashboardPage /> },
       { path: '/transactions', element: <TransactionsPage /> },
-      { path: '/accounts', element: <AccountsPage /> },
-      { path: '/budgets', element: <BudgetsPage /> },
-      { path: '/goals', element: <GoalsPage /> },
-      { path: '/recurring', element: <RecurringPage /> },
-      { path: '/loans', element: <LoansPage /> },
-      { path: '/refunds', element: <RefundsPage /> },
+      { path: '/plan', element: <Navigate to="/plan/budgets" replace /> },
+      { path: '/plan/:tab', element: <PlanPage /> },
+      { path: '/wealth', element: <Navigate to="/wealth/accounts" replace /> },
+      { path: '/wealth/:tab', element: <WealthPage /> },
+      { path: '/budgets', element: <Navigate to="/plan/budgets" replace /> },
+      { path: '/goals', element: <Navigate to="/plan/goals" replace /> },
+      { path: '/recurring', element: <Navigate to="/plan/recurring" replace /> },
+      { path: '/accounts', element: <Navigate to="/wealth/accounts" replace /> },
+      { path: '/loans', element: <Navigate to="/wealth/loans" replace /> },
+      { path: '/investments', element: <Navigate to="/wealth/investments" replace /> },
+      { path: '/assets', element: <Navigate to="/wealth/assets" replace /> },
+      { path: '/trips', element: <Navigate to="/plan/trips" replace /> },
+      { path: '/review', element: <ReviewPage /> },
       { path: '/inbox', element: <InboxPage /> },
       { path: '/household', element: <HouseholdPage /> },
-      { path: '/trips', element: <TripsPage /> },
       { path: '/trips/:id', element: <TripDetailPage /> },
-      { path: '/investments', element: <InvestmentsPage /> },
-      { path: '/assets', element: <AssetsPage /> },
       { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/categories', element: <CategoriesPage /> },
       { path: '/payees', element: <PayeesPage /> },
