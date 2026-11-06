@@ -25,6 +25,8 @@ import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
+import { formatUnits, unitsForAmount } from '../lib/fractional';
+import { Segmented } from '../components/ui/Segmented';
 import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices, useLots, useAddPurchase, useRemovePurchase } from '../hooks/useExtras';
 import { buildPriceScript, parsePriceCsv } from '../lib/priceScript';
 import { ASSET_KINDS, assetKind } from '../lib/assetKinds';
@@ -181,6 +183,9 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
   const [symbol, setSymbol] = useState(holding?.symbol ?? '');
   const [name, setName] = useState(holding?.name ?? '');
   const [quantity, setQuantity] = useState('');
+  // Invest a sum of money (fractional shares) instead of counting whole units.
+  const [by, setBy] = useState<'units' | 'amount'>('units');
+  const [amount, setAmount] = useState('');
   const firstBuy = !holding || holding.lotCount === 0;
   const [paid, setPaid] = useState('');
   const [price, setPrice] = useState(holding ? toInputValue(holding.priceMinor, cur) : '');
@@ -220,9 +225,16 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const q = own?.single ? 1 : Number(quantity);
-    const paidMinor = parseMoney(paid || '0', currencyCode);
+    let q = own?.single ? 1 : Number(quantity);
+    let paidMinor = parseMoney(paid || '0', currencyCode);
     const priceMinor = parseMoney(price || '0', currencyCode);
+    if (firstBuy && !own?.single && by === 'amount') {
+      const sum = parseMoney(amount || '0', currencyCode);
+      const unit = parseMoney(paid || price || '0', currencyCode);
+      if (!sum || !unit) return setError('Enter the amount invested and the price per unit');
+      q = unitsForAmount(sum, unit);
+      paidMinor = unit;
+    }
     if (!name.trim() || (!own && !symbol.trim())) return setError(own ? 'Give it a name' : 'Symbol and name are required');
     if (!(q >= 0) || paidMinor === null || priceMinor === null) return setError('Check quantity, buy price and current price');
     save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: own ? '' : symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: 0, unitPriceMinor: paidMinor, priceMinor, currency: currencyCode, providerSymbol: own ? null : linked?.providerSymbol ?? null, exchange: own ? null : linked?.exchange ?? null, assetType: own ? own.id : linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
@@ -268,10 +280,26 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} /></Field>
         <Field label={own ? (own.single ? 'Current value' : `Current value / ${own.unit}`) : 'Current price / unit'}><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
         {firstBuy ? (
-          <div className={`grid gap-3 ${own?.single ? 'grid-cols-2' : 'grid-cols-3'}`}>
-            {!own?.single && <Field label={own ? `${own.unit[0].toUpperCase()}${own.unit.slice(1)}s bought` : 'Units bought'}><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>}
-            <Field label={own ? (own.single ? 'Paid' : `Bought at / ${own.unit}`) : 'Bought at / unit'}><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
-            <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
+          <div className="space-y-3">
+            {!own?.single && <Segmented value={by} onChange={setBy} options={[['units', 'I know the units'], ['amount', 'I invested an amount']] as const} />}
+            {by === 'amount' && !own?.single ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Amount invested"><MoneyInput value={amount} currency={currencyCode} onChange={setAmount} /></Field>
+                  <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
+                </div>
+                <Field label="Price per unit then" hint="Leave blank to use the current price above.">
+                  <MoneyInput value={paid} currency={currencyCode} onChange={setPaid} placeholder={price} />
+                </Field>
+                <FractionPreview amount={amount} unit={paid || price} currency={currencyCode} />
+              </>
+            ) : (
+              <div className={`grid gap-3 ${own?.single ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                {!own?.single && <Field label={own ? `${own.unit[0].toUpperCase()}${own.unit.slice(1)}s bought` : 'Units bought'}><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>}
+                <Field label={own ? (own.single ? 'Paid' : `Bought at / ${own.unit}`) : 'Bought at / unit'}><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
+                <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-secondary">{holding.lotCount} purchase{holding.lotCount === 1 ? '' : 's'} recorded. Add or remove buys with the <Layers className="w-3.5 h-3.5 inline" /> button on the holding.</p>
@@ -350,16 +378,19 @@ function PurchasesModal({ holding, canEdit, onClose }: { holding: Holding; canEd
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [qty, setQty] = useState('');
   const [price, setPrice] = useState('');
+  const [by, setBy] = useState<'units' | 'amount'>('units');
+  const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  const currentPrice = toInputValue(holding.priceMinor, holding.currency);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const q = Number(qty);
-    const unit = parseMoney(price || '0', holding.currency);
+    const unit = parseMoney((by === 'amount' ? price || currentPrice : price) || '0', holding.currency);
+    const q = by === 'amount' ? unitsForAmount(parseMoney(amount || '0', holding.currency) ?? 0, unit ?? 0) : Number(qty);
     if (!(q > 0) || unit === null || unit <= 0 || !date) return setError('Enter the date, units and price paid');
     setError('');
     add.mutate({ holdingId: holding.id, body: { boughtOn: date, quantity: q, unitPriceMinor: unit } }, {
-      onSuccess: () => { setQty(''); setPrice(''); toast.success('Purchase added'); },
+      onSuccess: () => { setQty(''); setPrice(''); setAmount(''); toast.success('Purchase added'); },
       onError: (err) => toast.error(errorMessage(err)),
     });
   };
@@ -381,15 +412,28 @@ function PurchasesModal({ holding, canEdit, onClose }: { holding: Holding; canEd
         {canEdit && (
           <form onSubmit={submit} className="space-y-3">
             <p className="text-sm font-medium">Add another purchase</p>
+            <Segmented value={by} onChange={setBy} options={[['units', 'By units'], ['amount', 'By amount']] as const} />
             <div className="grid grid-cols-3 gap-3">
               <Field label="Date" error={error}><Input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} /></Field>
-              <Field label="Units"><Input inputMode="decimal" value={qty} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQty(e.target.value)} /></Field>
-              <Field label="Price / unit"><MoneyInput value={price} currency={holding.currency} onChange={setPrice} /></Field>
+              {by === 'amount'
+                ? <Field label="Amount invested"><MoneyInput value={amount} currency={holding.currency} onChange={setAmount} /></Field>
+                : <Field label="Units"><Input inputMode="decimal" value={qty} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQty(e.target.value)} /></Field>}
+              <Field label="Price / unit"><MoneyInput value={price} currency={holding.currency} onChange={setPrice} placeholder={by === 'amount' ? currentPrice : undefined} /></Field>
             </div>
+            {by === 'amount' && <FractionPreview amount={amount} unit={price || currentPrice} currency={holding.currency} />}
             <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={add.isPending}>Add purchase</Button></div>
           </form>
         )}
       </div>
     </Modal>
   );
+}
+
+/** Shows how many (fractional) units an amount buys, so the result is clear before saving. */
+function FractionPreview({ amount, unit, currency }: { amount: string; unit: string; currency: string }) {
+  const sum = parseMoney(amount || '0', currency);
+  const price = parseMoney(unit || '0', currency);
+  const units = sum && price ? unitsForAmount(sum, price) : 0;
+  if (!units) return <p className="text-caption text-secondary">Enter an amount and a price to see how many units it buys.</p>;
+  return <p className="text-body rounded-xl bg-accent/[0.08] px-3 py-2">That buys <strong className="tabular-nums">{formatUnits(units)}</strong> {units < 1 ? 'of one unit' : units === 1 ? 'unit' : 'units'}.</p>;
 }

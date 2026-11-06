@@ -161,4 +161,32 @@ class PolishFeaturesTest extends ApiTestBase {
     assertEquals(true, off.get("configured")); // keeping the link when only the switch changes
     assertEquals(false, off.get("enabled"));
   }
+
+  @Test
+  void aSumOfMoneyBuysAFractionOfAShare() {
+    Session s = register("fraction");
+    // $50 at $188.37 a share is 0.26543504 of a share
+    Map<?, ?> h =
+        post(
+            s.token(),
+            ws(s) + "/holdings",
+            Map.of(
+                "symbol",
+                "ZZFRAC",
+                "name",
+                "Fractional",
+                "quantity",
+                0.26543504,
+                "unitPriceMinor",
+                18_837,
+                "priceMinor",
+                20_000,
+                "currency",
+                "USD"),
+            Map.class);
+    assertEquals(5_000, number(h, "costBasisMinor"));
+    assertEquals(0.26543504, ((Number) h.get("quantity")).doubleValue(), 1e-9);
+    // market value is the fraction times today's price, to the cent
+    assertEquals(5_309, number(h, "marketValueMinor"));
+  }
 }
