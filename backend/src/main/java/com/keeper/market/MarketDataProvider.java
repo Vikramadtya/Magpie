@@ -19,6 +19,13 @@ public interface MarketDataProvider {
 
   Optional<Quote> quote(String symbol);
 
+  /**
+   * Month-by-month (or finer) closing prices, oldest first; empty when the source has no history.
+   */
+  default List<PricePoint> history(String symbol) {
+    return List.of();
+  }
+
   /** Why the most recent call failed, or null when it worked; for the status page. */
   default String lastError() {
     return null;

@@ -26,6 +26,7 @@ import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
 import { formatUnits, unitsForAmount } from '../lib/fractional';
+import { PerformanceCard } from '../features/investments/PerformanceCard';
 import { Segmented } from '../components/ui/Segmented';
 import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices, useLots, useAddPurchase, useRemovePurchase } from '../hooks/useExtras';
 import { buildPriceScript, parsePriceCsv } from '../lib/priceScript';
@@ -127,6 +128,7 @@ export function HoldingsView({ assets }: { assets: boolean }) {
             </div>
           </div>
         )}
+        {!assets && market.length > 0 && <PerformanceCard />}
         <div className="glass-panel overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs font-medium text-secondary border-b border-border">
@@ -183,9 +185,6 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
   const [symbol, setSymbol] = useState(holding?.symbol ?? '');
   const [name, setName] = useState(holding?.name ?? '');
   const [quantity, setQuantity] = useState('');
-  // Invest a sum of money (fractional shares) instead of counting whole units.
-  const [by, setBy] = useState<'units' | 'amount'>('units');
-  const [amount, setAmount] = useState('');
   const firstBuy = !holding || holding.lotCount === 0;
   const [paid, setPaid] = useState('');
   const [price, setPrice] = useState(holding ? toInputValue(holding.priceMinor, cur) : '');
@@ -199,7 +198,9 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
   );
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 350);
-  const hits = useMarketSearch(linked ? '' : debouncedQuery);
+  const search = useMarketSearch(linked ? '' : debouncedQuery);
+  const hits = { isFetching: search.isFetching, data: search.data?.hits ?? [], unavailable: search.data?.unavailable ?? false };
+  const typed = query.trim().toUpperCase().replace(/\s+/g, '');
   const [picking, setPicking] = useState(false);
 
   const pick = async (hit: { symbol: string; name: string; exchange: string | null; type: string | null }) => {
@@ -225,16 +226,9 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    let q = own?.single ? 1 : Number(quantity);
-    let paidMinor = parseMoney(paid || '0', currencyCode);
+    const q = own?.single ? 1 : Number(quantity);
+    const paidMinor = parseMoney(paid || '0', currencyCode);
     const priceMinor = parseMoney(price || '0', currencyCode);
-    if (firstBuy && !own?.single && by === 'amount') {
-      const sum = parseMoney(amount || '0', currencyCode);
-      const unit = parseMoney(paid || price || '0', currencyCode);
-      if (!sum || !unit) return setError('Enter the amount invested and the price per unit');
-      q = unitsForAmount(sum, unit);
-      paidMinor = unit;
-    }
     if (!name.trim() || (!own && !symbol.trim())) return setError(own ? 'Give it a name' : 'Symbol and name are required');
     if (!(q >= 0) || paidMinor === null || priceMinor === null) return setError('Check quantity, buy price and current price');
     save.mutate({ id: holding?.id, body: { accountId: accountId || null, symbol: own ? '' : symbol.trim(), name: name.trim(), quantity: q, costBasisMinor: 0, unitPriceMinor: paidMinor, priceMinor, currency: currencyCode, providerSymbol: own ? null : linked?.providerSymbol ?? null, exchange: own ? null : linked?.exchange ?? null, assetType: own ? own.id : linked?.assetType ?? null, purchasedOn: purchasedOn || null } }, { onSuccess: onClose });
@@ -258,10 +252,13 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
               </div>
             </Field>
             {query.trim().length >= 2 && (
-              <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border divide-y divide-border text-sm" aria-label="Search results">
+              <ul className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border divide-y divide-border text-sm" aria-label="Search results">
                 {hits.isFetching && <li className="p-2 text-secondary">Searching…</li>}
-                {!hits.isFetching && (hits.data ?? []).length === 0 && <li className="p-2 text-secondary">No matches, or the price source is unavailable. You can enter the details by hand below.</li>}
-                {(hits.data ?? []).map((h) => (
+                {!hits.isFetching && hits.unavailable && (
+                  <li className="p-3 text-secondary">The price source did not answer just now, so search is unavailable. You can still add this by hand: use the symbol as typed below, then fill in the price. Keeper will look for a live price later.</li>
+                )}
+                {!hits.isFetching && !hits.unavailable && hits.data.length === 0 && <li className="p-3 text-secondary">No matches. Check the spelling, or use the symbol as typed below.</li>}
+                {hits.data.map((h) => (
                   <li key={`${h.symbol}-${h.exchange}`}>
                     <button type="button" disabled={picking} onClick={() => void pick(h)} className="w-full text-left p-2 hover:bg-black/5 dark:hover:bg-white/5">
                       <span className="font-medium">{h.symbol}</span> <span className="text-secondary">{h.name}</span>
@@ -269,6 +266,13 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
                     </button>
                   </li>
                 ))}
+                {!hits.isFetching && typed.length >= 2 && (
+                  <li>
+                    <button type="button" className="w-full text-left p-2 text-accent hover:bg-black/5 dark:hover:bg-white/5" onClick={() => { setSymbol(typed); if (!name.trim()) setName(query.trim()); setQuery(''); }}>
+                      Use “{typed}” as the symbol and enter the details myself
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
           </div>
@@ -280,26 +284,10 @@ function HoldingModal({ assets, holding, currency, onClose }: { assets: boolean;
         <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} /></Field>
         <Field label={own ? (own.single ? 'Current value' : `Current value / ${own.unit}`) : 'Current price / unit'}><MoneyInput value={price} currency={currencyCode} onChange={setPrice} /></Field>
         {firstBuy ? (
-          <div className="space-y-3">
-            {!own?.single && <Segmented value={by} onChange={setBy} options={[['units', 'I know the units'], ['amount', 'I invested an amount']] as const} />}
-            {by === 'amount' && !own?.single ? (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Amount invested"><MoneyInput value={amount} currency={currencyCode} onChange={setAmount} /></Field>
-                  <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
-                </div>
-                <Field label="Price per unit then" hint="Leave blank to use the current price above.">
-                  <MoneyInput value={paid} currency={currencyCode} onChange={setPaid} placeholder={price} />
-                </Field>
-                <FractionPreview amount={amount} unit={paid || price} currency={currencyCode} />
-              </>
-            ) : (
-              <div className={`grid gap-3 ${own?.single ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                {!own?.single && <Field label={own ? `${own.unit[0].toUpperCase()}${own.unit.slice(1)}s bought` : 'Units bought'}><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>}
-                <Field label={own ? (own.single ? 'Paid' : `Bought at / ${own.unit}`) : 'Bought at / unit'}><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
-                <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
-              </div>
-            )}
+          <div className={`grid gap-3 ${own?.single ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {!own?.single && <Field label={own ? `${own.unit[0].toUpperCase()}${own.unit.slice(1)}s bought` : 'Units bought'} hint={own ? undefined : 'Fractions are fine, e.g. 0.25'}><Input inputMode="decimal" value={quantity} onChange={(e) => /^\d*\.?\d{0,8}$/.test(e.target.value) && setQuantity(e.target.value)} /></Field>}
+            <Field label={own ? (own.single ? 'Paid' : `Bought at / ${own.unit}`) : 'Bought at / unit'}><MoneyInput value={paid} currency={currencyCode} onChange={setPaid} /></Field>
+            <Field label="Date bought"><Input type="date" value={purchasedOn} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPurchasedOn(e.target.value)} /></Field>
           </div>
         ) : (
           <p className="text-sm text-secondary">{holding.lotCount} purchase{holding.lotCount === 1 ? '' : 's'} recorded. Add or remove buys with the <Layers className="w-3.5 h-3.5 inline" /> button on the holding.</p>

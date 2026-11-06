@@ -209,7 +209,7 @@ export const forecastApi = {
 };
 
 export const marketApi = {
-  search: (q: string) => http.get<T.SecurityHit[]>('/api/v1/market/search', { params: { q } }).then((r) => r.data),
+  search: (q: string) => http.get<T.SecurityHit[]>('/api/v1/market/search', { params: { q } }).then((r) => ({ hits: r.data, unavailable: r.headers['x-search-unavailable'] === '1' })),
   status: () => http.get<T.MarketStatus>('/api/v1/market/status').then((r) => r.data),
   quote: (symbol: string) => http.get<T.PricedQuote>('/api/v1/market/quote', { params: { symbol } }).then((r) => r.data),
 };

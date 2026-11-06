@@ -76,9 +76,69 @@ public class YahooFinanceProvider implements MarketDataProvider, Ordered {
               .retrieve(HttpRequest.GET(uri).header("User-Agent", UA), Map.class);
       return parseSearch(body);
     } catch (RuntimeException e) {
-      LOG.warn("Yahoo search failed: {}", e.getMessage());
+      LOG.warn("Yahoo search failed on the first host: {}", e.getMessage());
+      // The other Yahoo host is separate infrastructure and often answers when the first does not.
+      try {
+        String uri =
+            "/v1/finance/search?quotesCount=10&newsCount=0&listsCount=0&q="
+                + URLEncoder.encode(query, StandardCharsets.UTF_8);
+        Map<?, ?> body =
+            chartClient
+                .toBlocking()
+                .retrieve(HttpRequest.GET(uri).header("User-Agent", UA), Map.class);
+        lastError.set(null);
+        return parseSearch(body);
+      } catch (RuntimeException second) {
+        lastError.set(describe(second));
+        LOG.warn("Yahoo search failed: {}", second.getMessage());
+        return List.of();
+      }
+    }
+  }
+
+  @Override
+  public List<PricePoint> history(String symbol) {
+    try {
+      String uri =
+          "/v8/finance/chart/"
+              + URLEncoder.encode(symbol, StandardCharsets.UTF_8)
+              + "?range=max&interval=1mo";
+      Map<?, ?> body =
+          chartClient
+              .toBlocking()
+              .retrieve(HttpRequest.GET(uri).header("User-Agent", UA), Map.class);
+      return parseHistory(body);
+    } catch (RuntimeException e) {
+      LOG.warn("Yahoo history failed for {}: {}", symbol, e.getMessage());
       return List.of();
     }
+  }
+
+  static List<PricePoint> parseHistory(Map<?, ?> body) {
+    List<PricePoint> points = new ArrayList<>();
+    if (!(body.get("chart") instanceof Map<?, ?> chart)) return points;
+    if (!(chart.get("result") instanceof List<?> results) || results.isEmpty()) return points;
+    if (!(results.get(0) instanceof Map<?, ?> result)) return points;
+    String currency =
+        result.get("meta") instanceof Map<?, ?> meta ? str(meta.get("currency")) : null;
+    if (!(result.get("timestamp") instanceof List<?> stamps)) return points;
+    if (!(result.get("indicators") instanceof Map<?, ?> ind)
+        || !(ind.get("quote") instanceof List<?> quotes)
+        || quotes.isEmpty()
+        || !(quotes.get(0) instanceof Map<?, ?> q)
+        || !(q.get("close") instanceof List<?> closes)) return points;
+    boolean minor = "GBp".equals(currency) || "ZAc".equals(currency);
+    for (int i = 0; i < Math.min(stamps.size(), closes.size()); i++) {
+      if (!(stamps.get(i) instanceof Number t) || !(closes.get(i) instanceof Number c)) continue;
+      BigDecimal price = new BigDecimal(c.toString());
+      if (minor) price = price.movePointLeft(2);
+      points.add(
+          new PricePoint(
+              Instant.ofEpochSecond(t.longValue()).atZone(java.time.ZoneOffset.UTC).toLocalDate(),
+              price,
+              minor ? currency.substring(0, 3).toUpperCase() : currency));
+    }
+    return points;
   }
 
   @Override

@@ -45,16 +45,19 @@ public class HoldingRefresher {
   private final MarketDataService market;
   private final FxConverter fx;
   private final ExecutorService executor;
+  private final HistoryBackfill history;
   private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
   public HoldingRefresher(
       Db db,
       MarketDataService market,
       FxConverter fx,
+      HistoryBackfill history,
       @Named(TaskExecutors.BLOCKING) ExecutorService executor) {
     this.db = db;
     this.market = market;
     this.fx = fx;
+    this.history = history;
     this.executor = executor;
   }
 
@@ -113,7 +116,9 @@ public class HoldingRefresher {
   /** Synchronously refreshes one workspace; returns how many holdings got a new price. */
   public int refreshWorkspace(UUID ws) {
     int linked = linkManual(ws, null);
-    return linked + apply(rows("workspace_id = ?", ws));
+    int updated = linked + apply(rows("workspace_id = ?", ws));
+    history.backfillMissing(ws);
+    return updated;
   }
 
   /**
@@ -129,11 +134,14 @@ public class HoldingRefresher {
             onlyId == null ? new Object[] {ws} : new Object[] {ws, onlyId});
     scope.forEach(r -> market.forget(r.symbol()));
     int linked = linkManual(ws, onlyId);
-    return linked
-        + apply(
-            onlyId == null
-                ? rows("workspace_id = ?", ws)
-                : rows("workspace_id = ? AND id = ?", ws, onlyId));
+    int updated =
+        linked
+            + apply(
+                onlyId == null
+                    ? rows("workspace_id = ?", ws)
+                    : rows("workspace_id = ? AND id = ?", ws, onlyId));
+    history.backfillMissing(ws);
+    return updated;
   }
 
   /** One price from an uploaded file; the currency is optional and defaults to the holding's. */

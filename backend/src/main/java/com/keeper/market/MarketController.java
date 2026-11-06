@@ -46,8 +46,15 @@ public class MarketController {
 
   /** Look a security up by name or ticker so the exact instrument is chosen, not typed. */
   @Get("/search")
-  public List<SecurityHit> search(@QueryValue @NotBlank @Size(min = 2, max = 60) String q) {
-    return market.search(q);
+  public io.micronaut.http.HttpResponse<List<SecurityHit>> search(
+      @QueryValue @NotBlank @Size(min = 2, max = 60) String q) {
+    List<SecurityHit> hits = market.search(q);
+    var response = io.micronaut.http.HttpResponse.ok(hits);
+    // An empty list can mean "no such security" or "the price source did not answer"; tell them
+    // apart.
+    return hits.isEmpty() && market.lastSearchFailed()
+        ? response.header("X-Search-Unavailable", "1")
+        : response;
   }
 
   @Get("/quote")

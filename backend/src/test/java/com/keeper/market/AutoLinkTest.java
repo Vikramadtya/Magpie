@@ -35,7 +35,7 @@ class AutoLinkTest {
 
   private static HoldingRefresher refresher(Map<String, Quote> quotes) {
     var market = new MarketDataService(List.of(provider(quotes)), true);
-    return new HoldingRefresher(null, market, null, null);
+    return new HoldingRefresher(null, market, null, null, null);
   }
 
   @Test

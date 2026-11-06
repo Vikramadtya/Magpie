@@ -92,6 +92,42 @@ public class MfApiProvider implements MarketDataProvider, Ordered {
     }
   }
 
+  @Override
+  public List<PricePoint> history(String symbol) {
+    if (!handles(symbol)) return List.of();
+    String code = symbol.substring(PREFIX.length()).trim();
+    if (!code.matches("\\d{1,8}")) return List.of();
+    try {
+      Map<?, ?> body = client.toBlocking().retrieve(HttpRequest.GET("/mf/" + code), Map.class);
+      return parseHistory(body);
+    } catch (RuntimeException e) {
+      LOG.warn("Fund history failed for {}: {}", symbol, e.getMessage());
+      return List.of();
+    }
+  }
+
+  /** The API lists every day newest first as dd-MM-yyyy; this returns them oldest first. */
+  static List<PricePoint> parseHistory(Map<?, ?> body) {
+    List<PricePoint> points = new ArrayList<>();
+    if (!(body.get("data") instanceof List<?> data)) return points;
+    var format = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    for (Object o : data) {
+      if (!(o instanceof Map<?, ?> row) || row.get("date") == null || row.get("nav") == null)
+        continue;
+      try {
+        points.add(
+            new PricePoint(
+                java.time.LocalDate.parse(String.valueOf(row.get("date")), format),
+                new BigDecimal(String.valueOf(row.get("nav"))),
+                "INR"));
+      } catch (RuntimeException skip) {
+        // a malformed row is skipped rather than losing the whole history
+      }
+    }
+    java.util.Collections.reverse(points);
+    return points;
+  }
+
   static List<SecurityHit> parseSearch(Object body) {
     List<SecurityHit> hits = new ArrayList<>();
     if (!(body instanceof List<?> rows)) return hits;

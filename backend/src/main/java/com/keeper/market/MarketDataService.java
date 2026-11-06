@@ -28,6 +28,9 @@ public class MarketDataService {
   private final ConcurrentHashMap<String, Cached<List<SecurityHit>>> searches =
       new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, Cached<Quote>> quotes = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Cached<List<PricePoint>>> histories =
+      new ConcurrentHashMap<>();
+  private volatile boolean searchFailed;
 
   public MarketDataService(
       List<MarketDataProvider> providers, @Value("${keeper.market.enabled:true}") boolean enabled) {
@@ -74,9 +77,40 @@ public class MarketDataService {
         if (!fundSource) stocksAnswered = true;
       }
     }
+    // Nothing found: either there is no match, or the price source did not answer. Say which.
+    searchFailed =
+        found.isEmpty()
+            && providers.stream()
+                .filter(p -> p.handles("AAPL"))
+                .anyMatch(p -> p.lastError() != null);
     if (found.isEmpty()) return List.of();
     searches.put(key, new Cached<>(found, Instant.now()));
     return found;
+  }
+
+  /**
+   * True when the last search found nothing because the source failed, not because nothing matched.
+   */
+  public boolean lastSearchFailed() {
+    return searchFailed;
+  }
+
+  /**
+   * Closing prices over time for a symbol, from the first source that has them (cached for hours).
+   */
+  public List<PricePoint> history(String symbol) {
+    if (!enabled || symbol == null || symbol.isBlank()) return List.of();
+    Cached<List<PricePoint>> hit = histories.get(symbol);
+    if (hit != null && hit.fresh(Duration.ofHours(6))) return hit.value();
+    for (MarketDataProvider p : providers) {
+      if (!p.handles(symbol)) continue;
+      List<PricePoint> points = p.history(symbol);
+      if (!points.isEmpty()) {
+        histories.put(symbol, new Cached<>(points, Instant.now()));
+        return points;
+      }
+    }
+    return hit == null ? List.of() : hit.value();
   }
 
   /** Drops the cached quote so the next lookup goes to the market (used by an explicit refresh). */
