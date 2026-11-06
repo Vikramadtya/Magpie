@@ -36,12 +36,15 @@ export default defineConfig({
     })
   ],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: (id: string) => {
-          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
-          if (id.includes('node_modules/react') || id.includes('react-router')) return 'react';
-          return undefined;
+        // React is named first, with a higher priority, so the chart library (large, needed only on
+        // Analytics) never becomes a dependency of the first screen.
+        advancedChunks: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|clsx|next-themes)[\\/]/, priority: 30 },
+            { name: 'charts', test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|es-toolkit|immer|redux|react-redux|@reduxjs|reselect|decimal\.js-light|eventemitter3|internmap|tiny-invariant)[\\/]/, priority: 20 },
+          ],
         },
       },
     },

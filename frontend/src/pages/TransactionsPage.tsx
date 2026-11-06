@@ -9,12 +9,11 @@ import { Amount } from '../components/ui/Amount';
 import { CategoryBadge } from '../components/ui/CategoryBadge';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
-import { Skeleton, StateView } from '../components/ui/StateView';
+import { Skeleton, SkeletonRows, StateView } from '../components/ui/StateView';
 import { canBeRefunded, MarkForRefund } from '../features/refunds/MarkForRefund';
 import { FilterBar } from '../features/transactions/FilterBar';
 import { useRefunds } from '../hooks/useRefunds';
@@ -45,7 +44,6 @@ export default function TransactionsPage() {
 
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [toDelete, setToDelete] = useState<Transaction | null>(null);
   const [commentsFor, setCommentsFor] = useState<Transaction | null>(null);
   const [tripFor, setTripFor] = useState<Transaction | null>(null);
   const [deletedOpen, setDeletedOpen] = useState(false);
@@ -133,8 +131,14 @@ export default function TransactionsPage() {
         onRetry={() => void list.refetch()}
         isEmpty={rows.length === 0}
         emptyTitle={hasFilters ? 'No matching transactions' : 'No transactions yet'}
-        emptyHint={hasFilters ? 'Try different filters.' : 'Press N to add your first one.'}
-        skeleton={<div className="space-y-2">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>}
+        emptyHint={hasFilters ? 'Try different filters, or clear them.' : 'Add what you spent today, or bring in a bank file and Keeper will do the rest.'}
+        emptyAction={!hasFilters && canEdit && (
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button onClick={() => dialog.open()}>Add a transaction</Button>
+            <Button variant="outline" onClick={() => navigate('/import')}>Import a bank file</Button>
+          </div>
+        )}
+        skeleton={<SkeletonRows rows={8} />}
       >
         <div className="glass-panel overflow-hidden">
           <Virtuoso
@@ -159,7 +163,7 @@ export default function TransactionsPage() {
                 onTrip={() => setTripFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
-                onDelete={() => setToDelete(t)}
+                onDelete={() => del.mutate(t)}
                 onComments={() => setCommentsFor(t)}
               />
             )}
@@ -170,14 +174,6 @@ export default function TransactionsPage() {
 
       {refundFor && <MarkForRefund tx={refundFor} onClose={() => setRefundFor(null)} />}
 
-      <ConfirmDialog
-        open={!!toDelete}
-        title="Delete transaction?"
-        message={toDelete?.transferId ? 'Both sides of this transfer will be removed and balances restored.' : 'The account balance will be restored.'}
-        busy={del.isPending}
-        onCancel={() => setToDelete(null)}
-        onConfirm={() => { if (toDelete) del.mutate(toDelete); setToDelete(null); }}
-      />
       <CommentsModal tx={commentsFor} onClose={() => setCommentsFor(null)} />
       {tripFor && <TripModal tx={tripFor} onClose={() => setTripFor(null)} />}
       <DeletedModal open={deletedOpen} onClose={() => setDeletedOpen(false)} />

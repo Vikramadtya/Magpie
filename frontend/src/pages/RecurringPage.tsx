@@ -122,7 +122,7 @@ function RuleModal({ rule, onClose }: { rule: RecurringRule | null; onClose: () 
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-black/5 dark:bg-white/10">
           {(['EXPENSE', 'INCOME'] as const).map((t) => (
-            <button key={t} type="button" onClick={() => { setType(t); setCategoryId(''); }} className={`py-1.5 text-sm font-medium rounded-md ${type === t ? 'bg-surface shadow-sm' : 'text-secondary'}`}>{t === 'EXPENSE' ? 'Expense' : 'Income'}</button>
+            <button key={t} type="button" onClick={() => { setType(t); setCategoryId(''); }} className={`py-1.5 text-sm font-medium rounded-md ${type === t ? 'bg-surface shadow-sm' : 'text-secondary'}`}>{t === 'EXPENSE' ? 'Spending' : 'Income'}</button>
           ))}
         </div>
         <Field label="Name" error={error}><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Netflix, Rent, Salary…" maxLength={160} autoFocus /></Field>

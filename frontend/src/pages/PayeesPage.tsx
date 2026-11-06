@@ -1,3 +1,7 @@
+import { errorMessage } from '../lib/http';
+import { payeesApi } from '../api/endpoints';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { Payee } from '../api/types';
@@ -47,6 +51,7 @@ export default function PayeesPage() {
   return (
     <>
       <PageHeader title="Payees & tags" subtitle="Who you pay, and labels for slicing your data" actions={canEdit && <Button onClick={() => setEditing('new')}><Plus className="w-4 h-4 mr-2" />New payee</Button>} />
+      <AutoCategories />
       <div className="grid lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2">
           <h2 className="font-semibold mb-3">Payees</h2>
@@ -142,5 +147,33 @@ function PayeeModal({ payee, onClose }: { payee: Payee | null; onClose: () => vo
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={create.isPending || update.isPending}>Save</Button></div>
       </form>
     </Modal>
+  );
+}
+
+/** How automatic categories work, with a one-click catch-up for what was entered before. */
+function AutoCategories() {
+  const { id: ws, canEdit } = useWorkspace();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const apply = async () => {
+    setBusy(true);
+    try {
+      const { updated } = await payeesApi.applyDefaults(ws);
+      toast.success(updated === 0 ? 'Nothing to update: every payee entry already has a category.' : `Categorised ${updated} past ${updated === 1 ? 'transaction' : 'transactions'}`);
+      await qc.invalidateQueries({ queryKey: ['ws', ws] });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="glass-panel p-5 mb-6 flex flex-wrap items-center gap-4">
+      <div className="flex-1 min-w-[16rem]">
+        <h2>Automatic categories</h2>
+        <p className="text-body text-secondary mt-1">Give a payee a category once and every new entry for it is categorised for you. Keeper also learns: the first time you file a payee under a category, it remembers. Example: <em>Swiggy → Dining Out</em>.</p>
+      </div>
+      {canEdit && <Button variant="outline" disabled={busy} onClick={() => void apply()}>Apply to past transactions</Button>}
+    </section>
   );
 }

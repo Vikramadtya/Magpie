@@ -35,7 +35,7 @@ export default function ForecastTab() {
           <div className="grid md:grid-cols-3 gap-4">
             <Card label="Likely to earn" value={f.income.totalMinor} currency={f.currency} sub={`${formatMoney(f.income.fixedMinor, f.currency)} regular, ${formatMoney(f.income.variableMinor, f.currency)} other`} tone="up" />
             <Card label="Likely to spend" value={f.expense.totalMinor} currency={f.currency} sub={`${formatMoney(f.expense.fixedMinor, f.currency)} bills, ${formatMoney(f.expense.variableMinor, f.currency)} everyday`} tone="down" />
-            <Card label="Likely left over" value={f.netMinor} currency={f.currency} sub={f.netMinor >= 0 ? 'Earned minus spent' : 'You may spend more than you earn'} tone={f.netMinor >= 0 ? 'up' : 'down'} />
+            <Card label="Likely left over" value={f.netMinor} currency={f.currency} sub={f.netMinor >= 0 ? 'Income minus spending' : 'You may spend more than you earn'} tone={f.netMinor >= 0 ? 'up' : 'down'} />
           </div>
 
           {f.categories.length > 0 && (
@@ -47,7 +47,7 @@ export default function ForecastTab() {
           <NetWorthProjection f={f} />
 
           <div className="grid lg:grid-cols-2 gap-6">
-            <FixedList title="Regular bills" items={f.fixedExpenses} currency={f.currency} empty="No recurring expenses next month." />
+            <FixedList title="Regular bills" items={f.fixedExpenses} currency={f.currency} empty="No recurring bills next month." />
             <FixedList title="Regular income" items={f.fixedIncome} currency={f.currency} empty="No recurring income next month." />
           </div>
         </div>

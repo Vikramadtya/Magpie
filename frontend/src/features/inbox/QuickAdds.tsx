@@ -45,7 +45,7 @@ function CaptureCard({ item, accounts }: { item: QuickCapture; accounts: Account
     <li className="glass-panel p-4">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{item.payeeText ?? item.note ?? (item.type === 'INCOME' ? 'Income' : 'Expense')}</p>
+          <p className="font-medium truncate">{item.payeeText ?? item.note ?? (item.type === 'INCOME' ? 'Income' : 'Spending')}</p>
           <p className="text-xs text-secondary truncate">
             {prettyDate(item.occurredOn)} · {item.accountName ?? 'Account removed'}{item.categoryName ? ` · ${item.categoryName}` : ''}
             {item.payeeText && item.note ? ` · ${item.note}` : ''}

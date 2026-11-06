@@ -260,7 +260,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
                 }}
                 className={cn('py-1.5 text-sm font-medium rounded-md transition-colors disabled:opacity-40', type === t ? 'bg-surface shadow-sm' : 'text-secondary')}
               >
-                {t[0] + t.slice(1).toLowerCase()}
+                {t === 'EXPENSE' ? 'Spending' : t[0] + t.slice(1).toLowerCase()}
               </button>
             ))}
           </div>

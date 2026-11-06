@@ -1,7 +1,7 @@
 import { addMonths, format, parseISO, startOfMonth } from 'date-fns';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import type { BreakdownRow } from '../../api/types';
-import { Skeleton } from '../../components/ui/StateView';
+import { Skeleton, SkeletonCard } from '../../components/ui/StateView';
 import { cn } from '../../lib/cn';
 import { formatCompact } from '../../lib/money';
 import { paletteColor } from '../../lib/palette';
@@ -82,4 +82,27 @@ export function totalsByBucket(rows: BreakdownRow[], buckets: string[]): { total
 /** Average of the last `n` values at each point (fewer at the start). */
 export function movingAverage(values: number[], n: number): number[] {
   return values.map((_, i) => Math.round(sum(values.slice(Math.max(0, i - n + 1), i + 1)) / Math.min(n, i + 1)));
+}
+
+
+/**
+ * Wraps a chart that fetches its own data so it only mounts (and so only fetches and draws) once it
+ * is about to scroll into view. A long Analytics tab then costs a few requests, not dozens.
+ */
+export function whenVisible<P extends object>(Chart: ComponentType<P>): ComponentType<P> {
+  function Lazy(props: P) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined');
+    useEffect(() => {
+      const el = ref.current;
+      if (seen || !el) return;
+      const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setSeen(true), { rootMargin: '320px 0px' });
+      io.observe(el);
+      return () => io.disconnect();
+    }, [seen]);
+    if (seen) return <Chart {...props} />;
+    return <div ref={ref}><SkeletonCard lines={5} className="min-h-[20rem]" /></div>;
+  }
+  Lazy.displayName = `Lazy(${Chart.displayName ?? Chart.name})`;
+  return Lazy;
 }

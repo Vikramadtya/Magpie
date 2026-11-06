@@ -83,8 +83,8 @@ function Overview({ from, to }: { from: string; to: string }) {
           <FxWarning currencies={[...new Set([...o.missingCurrencies, ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={o.currency} />
 
           <div className="grid xl:grid-cols-3 gap-3 sm:gap-4">
-            <Stat label="Earned" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" />
-            <Stat label="Spent" value={formatMoney(o.current.expenseMinor, o.currency)} tone="expense" footer={<><Delta current={o.current.expenseMinor} previous={o.previous.expenseMinor} inverse /> vs the period before</>} />
+            <Stat label="Income" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" />
+            <Stat label="Spending" value={formatMoney(o.current.expenseMinor, o.currency)} tone="expense" footer={<><Delta current={o.current.expenseMinor} previous={o.previous.expenseMinor} inverse /> vs the period before</>} />
             <Stat label={o.current.savingsMinor >= 0 ? 'Left over' : 'Overspent'} value={formatMoney(Math.abs(o.current.savingsMinor), o.currency)} />
           </div>
 
@@ -130,7 +130,7 @@ function Overview({ from, to }: { from: string; to: string }) {
 
           <div className="grid lg:grid-cols-2 gap-6">
             <section className="glass-panel p-5">
-              <h2 className="font-semibold mb-1">Earned and spent</h2>
+              <h2 className="font-semibold mb-1">Income and spending</h2>
               <p className="text-xs text-secondary mb-3">Each month, for the last 12 months</p>
               <Suspense fallback={<Skeleton className="h-64" />}>{cash.data ? <CashFlowChart months={cash.data.items} currency={cash.data.currency} /> : <Skeleton className="h-64" />}</Suspense>
             </section>

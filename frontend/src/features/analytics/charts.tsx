@@ -14,7 +14,7 @@ const GRID = 'var(--border-color)';
 const shorten = (s: string, n = 16) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** Horizontal bars, biggest first: the clearest way to compare named things. */
-export function RankedBars({ items, currency, label = 'Spent' }: { items: { label: string; value: number; color?: string | null }[]; currency: string; label?: string }) {
+export function RankedBars({ items, currency, label = 'Spending' }: { items: { label: string; value: number; color?: string | null }[]; currency: string; label?: string }) {
   return (
     <div style={{ height: Math.max(120, items.length * 34 + 16) }} role="img" aria-label={label}>
       <ResponsiveContainer width="100%" height="100%">
@@ -71,7 +71,7 @@ export function Donut({ items, currency }: { items: { label: string; value: numb
 }
 
 /** One bar per x. `format` turns a value into text (money by default). */
-export function Columns({ data, currency, color = 'var(--accent-blue)', label = 'Spent', format: fmt, height = 224, ticks = true }: {
+export function Columns({ data, currency, color = 'var(--accent-blue)', label = 'Spending', format: fmt, height = 224, ticks = true }: {
   data: { x: string; value: number }[]; currency: string; color?: string; label?: string; format?: (v: number) => string; height?: number; ticks?: boolean;
 }) {
   return (

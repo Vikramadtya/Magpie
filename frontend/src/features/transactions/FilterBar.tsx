@@ -23,7 +23,7 @@ const PRESETS: { label: string; range: () => { from: string; to: string } }[] = 
   { label: 'This year', range: () => ({ from: day(startOfYear(new Date())), to: day(new Date()) }) },
 ];
 
-const TYPE_OPTIONS: [TxType | '', string][] = [['', 'All'], ['EXPENSE', 'Expenses'], ['INCOME', 'Income'], ['TRANSFER', 'Transfers']];
+const TYPE_OPTIONS: [TxType | '', string][] = [['', 'All'], ['EXPENSE', 'Spending'], ['INCOME', 'Income'], ['TRANSFER', 'Transfers']];
 
 const NONE: never[] = [];
 
