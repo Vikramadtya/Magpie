@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import type { Refund, Transaction, TransactionFilters } from '../api/types';
+import type { Category, Refund, Transaction, TransactionFilters } from '../api/types';
 import { useAuth, useWorkspace } from '../auth/AuthProvider';
 import { Amount } from '../components/ui/Amount';
-import { Avatar } from '../components/ui/Avatar';
+import { CategoryBadge } from '../components/ui/CategoryBadge';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -51,6 +51,7 @@ export default function TransactionsPage() {
   const [deletedOpen, setDeletedOpen] = useState(false);
   const [refundFor, setRefundFor] = useState<Transaction | null>(null);
   const navigate = useNavigate();
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c.parentId ? categories.find((p) => p.id === c.parentId) ?? c : c])), [categories]);
   const refundList = useRefunds().data?.items;
   const refundByTx = useMemo(() => new Map((refundList ?? []).map((r) => [r.transactionId, r])), [refundList]);
   const del = useDeleteTransaction();
@@ -152,6 +153,7 @@ export default function TransactionsPage() {
                 canEdit={canEdit}
                 canTrip={trips.length > 0 && t.type === 'EXPENSE' && !t.loanId}
                 refund={refundByTx.get(t.id)}
+                category={categoryById.get(t.categoryId ?? '')}
                 canRefund={canBeRefunded(t)}
                 onRefund={() => (refundByTx.has(t.id) ? navigate('/refunds') : setRefundFor(t))}
                 onTrip={() => setTripFor(t)}
@@ -186,10 +188,10 @@ export default function TransactionsPage() {
 interface RowProps {
   tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canTrip: boolean;
   onTrip: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
-  refund?: Refund; canRefund: boolean; onRefund: () => void;
+  refund?: Refund; canRefund: boolean; onRefund: () => void; category?: Category;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund, category }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
@@ -199,7 +201,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
         {selecting && <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Select ${title}`} className="w-4 h-4" />}
         {tx.type === 'TRANSFER'
           ? <span className="w-9 h-9 shrink-0 rounded-full bg-primary/[0.06] flex items-center justify-center text-secondary"><ArrowLeftRight className="w-4 h-4" /></span>
-          : <Avatar name={tx.categoryName ?? title} size={36} />}
+          : <CategoryBadge name={tx.categoryName ?? title} icon={category?.icon} color={category?.color} size={36} />}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{title}</p>
           <p className="text-xs text-secondary truncate">{tx.accountName}{tx.categoryName ? ` · ${tx.categoryName}` : ''}{tx.payeeName && tx.note ? ` · ${tx.note}` : ''}{tx.origCurrency && tx.origAmountMinor ? ` · ${formatMoney(tx.origAmountMinor, tx.origCurrency)}` : ''}</p>

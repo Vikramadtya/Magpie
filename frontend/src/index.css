@@ -12,7 +12,7 @@
     --text-rgb: 17 19 24;
     --muted-rgb: 107 112 128;
     --accent-rgb: 74 91 240;
-    --border-rgb: 231 231 226;
+    --border-rgb: 234 234 229;
 
     --bg-main: rgb(var(--bg-rgb));
     --bg-sidebar: rgb(var(--sidebar-rgb));
@@ -30,13 +30,13 @@
   }
 
   .dark {
-    --bg-rgb: 10 11 14;
-    --sidebar-rgb: 14 16 20;
-    --surface-rgb: 20 22 27;
-    --text-rgb: 243 244 246;
-    --muted-rgb: 139 144 160;
-    --accent-rgb: 124 140 255;
-    --border-rgb: 34 37 44;
+    --bg-rgb: 11 12 16;
+    --sidebar-rgb: 15 17 22;
+    --surface-rgb: 22 24 31;
+    --text-rgb: 244 245 248;
+    --muted-rgb: 150 155 172;
+    --accent-rgb: 129 145 255;
+    --border-rgb: 36 39 48;
 
     --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.03), 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -12px rgb(0 0 0 / 0.6);
     --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.05), 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px -14px rgb(0 0 0 / 0.8);
@@ -73,14 +73,22 @@ body {
 
 ::selection { background: rgb(var(--accent-rgb) / 0.2); }
 
-/* Surfaces */
+/* One scale for headings, so a page never has to pick its own size. */
+@layer base {
+  h2 { font-size: 1.0625rem; line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
+  h3 { font-size: 0.9375rem; line-height: 1.4; font-weight: 600; }
+}
+
+/* Surfaces: depth from a soft shadow rather than an outline; the outline returns only in dark mode. */
 .glass-panel {
   background-color: var(--bg-surface);
   box-shadow: var(--shadow-card);
-  border: 1px solid var(--border-color);
-  border-radius: 18px;
+  border: 1px solid transparent;
+  border-radius: 20px;
   transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
+
+.dark .glass-panel { border-color: var(--border-color); }
 
 a.glass-panel:hover {
   box-shadow: var(--shadow-lift);
@@ -137,3 +145,22 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* Slim scrollbars that stay out of the way */
 * { scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+
+
+/* Privacy mode: figures blur until pressed or hovered. */
+html.privacy .tabular-nums,
+html.privacy [data-money] { filter: blur(7px); transition: filter 0.2s ease; }
+html.privacy .tabular-nums:hover,
+html.privacy [data-money]:hover { filter: none; }
+
+/* A small, satisfying "saved": the tick draws itself. */
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.saved-ring { animation: pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.saved-tick { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw 0.35s 0.15s ease-out forwards; }
+
+/* Phone: keep content clear of the bottom bar and the notch. */
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+
+/* Pressing feels like something: a short scale on buttons. */
+button:active:not(:disabled) { transform: scale(0.985); }

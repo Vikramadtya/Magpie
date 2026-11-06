@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { saved } from '../../lib/feedback';
 import { payeesApi, peopleApi } from '../../api/endpoints';
 import type { Category, Transaction, TxType } from '../../api/types';
 import { useWorkspace } from '../../auth/AuthProvider';
@@ -228,7 +229,7 @@ function TransactionForm({ tx, preset, onClose }: FormProps) {
         setNote('');
         setDestAmount('');
         setIdempotencyKey(crypto.randomUUID());
-        toast.success('Saved');
+        saved('Saved');
       } else {
         onClose();
       }

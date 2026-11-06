@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { BreakdownRow } from '../../api/types';
 import { Skeleton } from '../../components/ui/StateView';
 import { cn } from '../../lib/cn';
-import { exponent } from '../../lib/money';
+import { formatCompact } from '../../lib/money';
 import { paletteColor } from '../../lib/palette';
 
 export const INCOME_COLOR = '#2FB67C';
@@ -39,9 +39,7 @@ export const monthName = (m: string) => format(parseISO(`${m}-01`), 'MMM yy');
 export const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 /** A short number for chart axes: 12K, 1.5M. */
-export function compact(minor: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(minor / 10 ** exponent(currency));
-}
+export const compact = formatCompact;
 
 export interface Series { key: string; label: string; color: string }
 

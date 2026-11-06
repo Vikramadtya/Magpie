@@ -6,6 +6,14 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // One type scale for the whole app: use these, not one-off pixel sizes.
+      fontSize: {
+        display: ['2.5rem', { lineHeight: '1.05', letterSpacing: '-0.035em', fontWeight: '600' }],
+        title: ['1.75rem', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '600' }],
+        heading: ['1.0625rem', { lineHeight: '1.4', letterSpacing: '-0.01em', fontWeight: '600' }],
+        body: ['0.875rem', { lineHeight: '1.5' }],
+        caption: ['0.75rem', { lineHeight: '1.4' }],
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },

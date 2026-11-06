@@ -1,88 +1,80 @@
 import { Link } from 'react-router-dom';
 import type { Dashboard } from '../../api/types';
+import { Sparkline } from '../../components/ui/Sparkline';
+import { ProgressBar } from '../../components/ui/ProgressBar';
 import { useNetWorth } from '../../hooks/useInsights';
 import { monthKey } from '../../lib/dates';
 import { formatMoney } from '../../lib/money';
-import { PairBars, Trend } from './charts';
-import { ChartCard, monthName, sum } from './kit';
 
-/** This month's running spending against last month's, day by day. */
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** Running total of spending this month against last month, as two light lines (no chart library). */
 export function PaceCard({ d, month }: { d: Dashboard; month: string }) {
-  const length = Math.max(d.dailySpend.length, d.previousDailySpend.length);
   const now = new Date();
   const elapsed = month === monthKey(now) ? Math.min(now.getDate(), d.dailySpend.length) : d.dailySpend.length;
-  let a = 0;
-  let b = 0;
-  const data = Array.from({ length }, (_, i) => {
-    a += d.dailySpend[i] ?? 0;
-    b += d.previousDailySpend[i] ?? 0;
-    return { bucket: String(i + 1), thisMonth: i < elapsed ? a : undefined, lastMonth: i < d.previousDailySpend.length ? b : undefined };
-  });
+  const running = (xs: number[]) => xs.reduce<number[]>((acc, v) => [...acc, (acc[acc.length - 1] ?? 0) + v], []);
+  const thisMonth = running(d.dailySpend.slice(0, elapsed));
+  const lastMonth = running(d.previousDailySpend);
   const spent = sum(d.dailySpend.slice(0, elapsed));
-  const last = sum(d.previousDailySpend);
   const projected = elapsed < d.dailySpend.length && elapsed > 0 ? Math.round((spent / elapsed) * d.dailySpend.length) : null;
   return (
-    <ChartCard
-      title="Spending pace"
-      hint={projected !== null ? `Running total this month against last. At this rate: about ${formatMoney(projected, d.currency)}.` : 'Running total this month against last.'}
-      empty={spent === 0 && last === 0}
-      emptyText="Record some spending to see your pace."
-    >
-      <Trend
-        data={data}
-        currency={d.currency}
-        xFormat={(v) => v}
-        series={[{ key: 'thisMonth', label: 'This month', color: 'var(--accent-blue)' }, { key: 'lastMonth', label: 'Last month', color: '#8B8F9C' }]}
-        height={224}
-      />
-    </ChartCard>
+    <section className="glass-panel p-5">
+      <h2>Spending pace</h2>
+      <p className="text-caption text-secondary mt-0.5 mb-3">
+        This month (solid) against last month (dashed){projected !== null && <>. At this rate: about <strong className="text-primary">{formatMoney(projected, d.currency)}</strong></>}.
+      </p>
+      {spent === 0 && sum(d.previousDailySpend) === 0
+        ? <p className="text-body text-secondary py-8 text-center">Record some spending to see your pace.</p>
+        : <Sparkline values={thisMonth} compare={lastMonth} label="Spending pace this month against last month" height={120} />}
+    </section>
   );
 }
 
-/** Net worth month by month. */
+/** Net worth over the last year as one light line. */
 export function NetWorthTrend() {
   const q = useNetWorth(12);
   const items = q.data?.items ?? [];
   return (
-    <ChartCard
-      title="Net worth over time"
-      hint="Past months count investments at what you paid; this month uses today's value."
-      loading={q.isLoading}
-      error={q.error}
-      empty={items.length < 2}
-      actions={<Link to="/analytics" className="text-sm text-accent">More</Link>}
-    >
-      <Trend
-        data={items.map((p) => ({ bucket: p.month, net: p.netWorthMinor }))}
-        currency={q.data?.currency ?? 'USD'}
-        xFormat={monthName}
-        series={[{ key: 'net', label: 'Net worth', color: 'var(--accent-blue)' }]}
-        mode="area"
-        height={224}
-      />
-    </ChartCard>
+    <section className="glass-panel p-5">
+      <div className="flex items-center justify-between">
+        <h2>Net worth, 12 months</h2>
+        <Link to="/analytics" className="text-body text-accent">More</Link>
+      </div>
+      <p className="text-caption text-secondary mt-0.5 mb-3">Past months count investments at what you paid.</p>
+      {items.length < 2
+        ? <p className="text-body text-secondary py-8 text-center">Needs a couple of months of history.</p>
+        : <Sparkline values={items.map((p) => p.netWorthMinor)} label="Net worth over the last 12 months" height={120} />}
+    </section>
   );
 }
 
-/** Each budget with how much of it is spent. */
+/** Each budget as a bar: how much of it is used. */
 export function BudgetCompact({ d }: { d: Dashboard }) {
-  const lines = [...d.budgets.lines].sort((x, y) => y.spentMinor / Math.max(y.amountMinor + y.rolloverMinor, 1) - x.spentMinor / Math.max(x.amountMinor + x.rolloverMinor, 1)).slice(0, 6);
+  const lines = [...d.budgets.lines].sort((x, y) => y.spentMinor / Math.max(y.amountMinor + y.rolloverMinor, 1) - x.spentMinor / Math.max(x.amountMinor + x.rolloverMinor, 1)).slice(0, 5);
   return (
-    <ChartCard
-      title="Budgets: planned and spent"
-      hint="Red means a budget is used up."
-      empty={lines.length === 0}
-      emptyText="No budgets for this month yet."
-      actions={<Link to="/budgets" className="text-sm text-accent">Manage</Link>}
-    >
-      <PairBars
-        data={lines.map((l) => ({ label: l.categoryName, a: l.amountMinor + l.rolloverMinor, b: l.spentMinor }))}
-        currency={d.currency}
-        a={{ name: 'Budget', color: '#8B8F9C' }}
-        b={{ name: 'Spent', color: 'var(--accent-blue)' }}
-        redWhenOver
-      />
-    </ChartCard>
+    <section className="glass-panel p-5">
+      <div className="flex justify-between items-center mb-3">
+        <h2>Budgets</h2>
+        <Link to="/plan/budgets" className="text-body text-accent">Manage</Link>
+      </div>
+      {lines.length === 0 ? (
+        <p className="text-body text-secondary">No budgets this month. <Link to="/plan/budgets" className="text-accent">Set one</Link></p>
+      ) : (
+        <ul className="space-y-3.5">
+          {lines.map((l) => {
+            const total = l.amountMinor + l.rolloverMinor;
+            return (
+              <li key={l.categoryId}>
+                <div className="flex justify-between text-body mb-1.5 gap-3">
+                  <span className="truncate">{l.categoryName}</span>
+                  <span className="text-secondary tabular-nums shrink-0">{formatMoney(l.spentMinor, d.currency)} / {formatMoney(total, d.currency)}</span>
+                </div>
+                <ProgressBar value={total > 0 ? (l.spentMinor / total) * 100 : 100} label={l.categoryName} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
-

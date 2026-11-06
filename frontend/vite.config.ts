@@ -13,18 +13,23 @@ export default defineConfig({
       manifest: {
         name: 'Keeper',
         short_name: 'Keeper',
-        description: 'Personal budget and expense tracker',
-        theme_color: '#ffffff',
+        description: 'Your money, calmly.',
+        theme_color: '#4A5BF0',
+        background_color: '#F6F6F3',
+        display: 'standalone',
+        start_url: '/dashboard',
         icons: [
           {
             src: 'web-app-manifest-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
             src: 'web-app-manifest-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }

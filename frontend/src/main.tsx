@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { initPrivacy } from './lib/privacy';
 import * as Sentry from '@sentry/react';
 import './index.css';
 import { env } from './lib/env';
@@ -35,6 +36,7 @@ if (isQuickAdd) {
   document.title = 'Quick add';
 }
 const boot = isQuickAdd ? import('./quickadd/QuickAddApp') : import('./App');
+initPrivacy();
 const root = createRoot(document.getElementById('root')!);
 void boot.then(({ default: Root }) =>
   root.render(

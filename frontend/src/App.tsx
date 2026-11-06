@@ -1,3 +1,4 @@
+import logo from './assets/logo.svg';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Suspense } from 'react';
 import { RouterProvider } from 'react-router-dom';
@@ -15,8 +16,9 @@ function DataProvider() {
   // Wait for auth so the cache buster (user id) is known; otherwise a reload would always discard the cache.
   if (status === 'loading') {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center" role="status" aria-label="Loading">
-        <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen w-full flex flex-col items-center justify-center gap-5" role="status" aria-label="Loading">
+        <img src={logo} alt="" className="w-16 h-16 rounded-[18px] shadow-lift saved-ring" />
+        <div className="w-24 h-1 rounded-full skeleton" />
       </div>
     );
   }

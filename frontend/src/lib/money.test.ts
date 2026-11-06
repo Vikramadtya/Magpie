@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, parseMoney, parseSignedMoney, toInputValue } from './money';
+import { formatCompact, formatMoney, parseMoney, parseSignedMoney, toInputValue } from './money';
 
 describe('money', () => {
   it('parses amounts into minor units', () => {
@@ -20,6 +20,16 @@ describe('money', () => {
   it('round-trips through the input value', () => {
     expect(toInputValue(123450, 'USD')).toBe('1234.50');
     expect(parseMoney(toInputValue(99, 'USD'), 'USD')).toBe(99);
+  });
+  it('groups rupees as lakh and crore', () => {
+    expect(formatMoney(1234567850, 'INR')).toBe('₹1,23,45,678.50');
+  });
+  it('shortens amounts for charts', () => {
+    expect(formatCompact(123456700, 'INR')).toBe('12.3L');
+    expect(formatCompact(2500000000, 'INR')).toBe('2.5Cr');
+    expect(formatCompact(450000, 'INR')).toBe('4.5K');
+    expect(formatCompact(-250000, 'INR')).toBe('-2.5K');
+    expect(formatCompact(123456700, 'USD')).toBe('1.2M');
   });
   it('formats with the currency', () => {
     expect(formatMoney(1250, 'USD')).toContain('12.50');
