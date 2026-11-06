@@ -50,8 +50,13 @@ export function CommandPalette() {
         dialog.open();
       }
     };
+    const openSearch = () => setOpen(true);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    window.addEventListener('keeper:search', openSearch);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('keeper:search', openSearch);
+    };
   }, [dialog]);
 
   const run = (fn: () => void) => () => {
