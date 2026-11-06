@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { endOfMonth, parseISO } from 'date-fns';
 import { Banknote, ClipboardCheck, Inbox, Lightbulb, PiggyBank, Undo2 } from 'lucide-react';
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { sampleApi } from '../api/endpoints';
 import type { Dashboard } from '../api/types';
@@ -45,8 +45,13 @@ export default function DashboardPage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const dash = useDashboard(month);
   const d = dash.data;
+  // Once setup has started it stays until finished, even though the first account makes the ledger non-empty.
+  const [setup, setSetup] = useState(false);
+  useEffect(() => {
+    if (d && d.accounts.length === 0) setSetup(true);
+  }, [d]);
 
-  if (d && d.accounts.length === 0) return <SetupWizard />;
+  if (setup) return <SetupWizard onDone={() => setSetup(false)} />;
 
   return (
     <>
@@ -57,7 +62,7 @@ export default function DashboardPage() {
         onRetry={() => void dash.refetch()}
         skeleton={
           <div className="space-y-6">
-            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6"><Skeleton className="h-72 !rounded-[20px]" /><Skeleton className="h-72 !rounded-[20px]" /></div>
+            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6 [&>*]:min-w-0"><Skeleton className="h-72 !rounded-[20px]" /><Skeleton className="h-72 !rounded-[20px]" /></div>
             <SkeletonCard lines={2} />
             <SkeletonRows rows={4} />
           </div>
@@ -68,25 +73,25 @@ export default function DashboardPage() {
             <FxWarning currencies={d.missingCurrencies} base={d.currency} />
             <SampleBanner d={d} />
 
-            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6">
+            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6 [&>*]:min-w-0">
               <SafeCard d={d} />
               <NetWorthCard d={d} />
             </div>
 
             <NeedsAttention d={d} month={month} />
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-6 [&>*]:min-w-0">
               <MonthCard d={d} month={month} onMonth={setMonth} />
               <Suspense fallback={<SkeletonCard lines={4} className="h-full" />}><PaceCard d={d} month={month} /></Suspense>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 [&>*]:min-w-0">
               <TopCategories d={d} month={month} />
               <Suspense fallback={<SkeletonCard lines={4} />}><BudgetCompact d={d} /></Suspense>
-              <UpcomingCard d={d} />
+              <div className="md:col-span-2 xl:col-span-1 [&>section]:h-full"><UpcomingCard d={d} /></div>
             </div>
 
-            <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
+            <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 [&>*]:min-w-0">
               <RecentActivity d={d} />
               <Suspense fallback={<SkeletonCard lines={4} />}><NetWorthTrend /></Suspense>
             </div>

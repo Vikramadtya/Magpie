@@ -64,8 +64,8 @@ export default function AccountsPage() {
                     <button className="w-full text-left" onClick={() => navigate(`/transactions?account=${a.id}`)}>
                       <div className="flex items-center gap-3">
                         <span className="w-9 h-9 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">{(() => { const Icon = TYPE_ICONS[a.type]; return <Icon className="w-[18px] h-[18px]" />; })()}</span>
-                        <p className="font-medium truncate flex-1">{a.name}</p>
-                        <span className="text-[11px] font-medium text-secondary border border-border rounded-full px-2 py-0.5">{a.currency}</span>
+                        <p className="font-medium line-clamp-2 leading-snug flex-1 min-w-0">{a.name}</p>
+                        {a.currency !== baseCurrency && <span className="text-[11px] font-medium text-secondary bg-primary/[0.06] rounded-full px-2 py-0.5">{a.currency}</span>}
                       </div>
                       <p className="text-[26px] leading-tight font-semibold mt-4 tabular-nums tracking-[-0.025em]"><Amount minor={a.balanceMinor} currency={a.currency} /></p>
                       {a.memo && <p className="text-[11px] text-accent mt-0.5">{a.shareStatus === 'ACTIVE' ? 'Lent to you · not in your net worth' : 'No longer shared with you'}</p>}

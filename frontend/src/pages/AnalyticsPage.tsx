@@ -82,7 +82,7 @@ function Overview({ from, to }: { from: string; to: string }) {
         <div className="space-y-6">
           <FxWarning currencies={[...new Set([...o.missingCurrencies, ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={o.currency} />
 
-          <div className="grid xl:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid sm:grid-cols-3 gap-3 sm:gap-4">
             <Stat label="Income" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" />
             <Stat label="Spending" value={formatMoney(o.current.expenseMinor, o.currency)} tone="expense" footer={<><Delta current={o.current.expenseMinor} previous={o.previous.expenseMinor} inverse /> vs the period before</>} />
             <Stat label={o.current.savingsMinor >= 0 ? 'Left over' : 'Overspent'} value={formatMoney(Math.abs(o.current.savingsMinor), o.currency)} />

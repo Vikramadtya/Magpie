@@ -126,7 +126,11 @@ export default function ReviewPage() {
                     {earned.now > 0 && saved >= 0 && <p className="text-body text-secondary mt-1">{Math.round((saved * 100) / earned.now)}% of your income.</p>}
                   </div>
                   {spendChange !== null && (
-                    <p className="text-body">You spent <strong>{Math.abs(spendChange)}% {spendChange <= 0 ? 'less' : 'more'}</strong> than the month before ({formatMoney(spent.before, currency)}).</p>
+                    <p className="text-body">
+                      {spendChange === 0
+                        ? <>Spending was about the same as the month before ({formatMoney(spent.before, currency)}).</>
+                        : <>You spent <strong>{Math.abs(spendChange)}% {spendChange < 0 ? 'less' : 'more'}</strong> than the month before ({formatMoney(spent.before, currency)}).</>}
+                    </p>
                   )}
                   {spent.now === 0 && earned.now === 0 && <p className="text-body text-secondary">No activity recorded in {monthLabel}. Pick another month below.</p>}
                 </div>
@@ -201,7 +205,7 @@ export default function ReviewPage() {
                         <li key={s.key} className="py-3 grid grid-cols-[1fr_9rem] items-center gap-3">
                           <div className="min-w-0">
                             <p className="text-body font-medium truncate">{s.label}</p>
-                            <p className="text-caption text-secondary">Usually {formatMoney(Math.round(s.sum / 3), currency)}{lastLimits.has(s.key) ? ` · last limit ${formatMoney(lastLimits.get(s.key) ?? 0, currency)}` : ''}</p>
+                            <p className="text-caption text-secondary">Usually {formatMoney(Math.round(s.sum / 3 / 100) * 100, currency)}{lastLimits.has(s.key) ? ` · last limit ${formatMoney(lastLimits.get(s.key) ?? 0, currency)}` : ''}</p>
                           </div>
                           <MoneyInput aria-label={`Limit for ${s.label}`} value={limits[s.key] ?? toInputValue(s.suggested, currency)} currency={currency} onChange={(v) => setLimits({ ...limits, [s.key]: v })} />
                         </li>
@@ -216,9 +220,9 @@ export default function ReviewPage() {
           )}
         </section>
 
-        <div className="flex items-center justify-between mt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
           <Button variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
-          <label className="text-caption text-secondary flex items-center gap-2">
+          <label className="text-caption text-secondary flex items-center gap-2 order-last basis-full justify-center sm:order-none sm:basis-auto">
             Reviewing
             <input type="month" value={month} max={monthKey(new Date())} onChange={(e) => e.target.value && setMonth(e.target.value)} className="h-9 rounded-lg border border-border bg-surface px-2 text-body text-primary" aria-label="Month to review" />
           </label>

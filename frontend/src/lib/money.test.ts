@@ -33,5 +33,7 @@ describe('money', () => {
   });
   it('formats with the currency', () => {
     expect(formatMoney(1250, 'USD')).toContain('12.50');
+    expect(formatMoney(1200, 'USD')).not.toContain('.00');
+    expect(formatMoney(1800000, 'INR')).toBe('₹18,000');
   });
 });

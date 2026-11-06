@@ -13,13 +13,17 @@ const formatters = new Map<string, Intl.NumberFormat>();
 /** Rupees group as 12,34,567 (lakh and crore); every other currency follows the browser. */
 const localeFor = (currency: string) => (currency === 'INR' ? 'en-IN' : undefined);
 
+/** Whole amounts read cleaner without ".00" (₹18,000); anything with paise or cents keeps both digits. */
 export function formatMoney(minor: number, currency: string, opts: { sign?: boolean } = {}): string {
-  let f = formatters.get(currency);
+  const exp = exponent(currency);
+  const whole = minor % 10 ** exp === 0;
+  const key = `${currency}:${whole}`;
+  let f = formatters.get(key);
   if (!f) {
-    f = new Intl.NumberFormat(localeFor(currency), { style: 'currency', currency });
-    formatters.set(currency, f);
+    f = new Intl.NumberFormat(localeFor(currency), { style: 'currency', currency, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}) });
+    formatters.set(key, f);
   }
-  const text = f.format(minor / 10 ** exponent(currency));
+  const text = f.format(minor / 10 ** exp);
   return opts.sign && minor > 0 ? `+${text}` : text;
 }
 

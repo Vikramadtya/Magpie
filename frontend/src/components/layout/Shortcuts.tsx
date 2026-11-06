@@ -38,7 +38,7 @@ export function useShortcuts(togglePrivacy: () => void) {
       armed = 0;
       if (key === 'g') armed = Date.now();
       else if (key === 'p') togglePrivacy();
-      else if (key === '?') window.dispatchEvent(new Event('keeper:shortcuts'));
+      else if (key === '?' || (key === '/' && e.shiftKey)) window.dispatchEvent(new Event('keeper:shortcuts'));
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

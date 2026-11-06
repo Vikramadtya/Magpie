@@ -27,7 +27,7 @@ const ACCOUNT_TYPES: [AccountType, string][] = [['CHECKING', 'Bank account'], ['
 const STEPS = ['Currency', 'Account', 'Budget', 'Done'];
 
 /** Four short steps for an empty ledger, or a one-click tour with sample data. */
-export function SetupWizard() {
+export function SetupWizard({ onDone }: { onDone: () => void }) {
   const ws = useWorkspace();
   const { reload } = useAuth();
   const qc = useQueryClient();
@@ -80,7 +80,9 @@ export function SetupWizard() {
     const c = categories.find((x) => x.kind === 'EXPENSE' && x.name.toLowerCase() === name.toLowerCase());
     return c && incomeMinor > 0 ? [{ id: c.id, name: c.name, minor: Math.round((incomeMinor * share) / 100) * 100 }] : [];
   });
-  const unique = proposals.filter((p, i) => proposals.findIndex((q) => q.id === p.id) === i);
+  // Rent sits inside Housing, so suggesting both would count it twice.
+  const hasRent = proposals.some((p) => p.name.toLowerCase() === 'rent');
+  const unique = proposals.filter((p, i) => proposals.findIndex((q) => q.id === p.id) === i && !(hasRent && p.name.toLowerCase() === 'housing'));
 
   const saveBudgets = () => run(async () => {
     const month = monthKey(new Date());
@@ -94,6 +96,7 @@ export function SetupWizard() {
     await sampleApi.load(ws.id);
     await refresh();
     toast.success('Sample data added. Clear it any time from the Home page.');
+    onDone();
   });
 
   return (
@@ -168,8 +171,8 @@ export function SetupWizard() {
             <div className="w-14 h-14 rounded-full bg-green-500/15 text-green-600 flex items-center justify-center mx-auto saved-ring"><Check className="w-7 h-7" /></div>
             <div><h2>You are all set</h2><p className="text-body text-secondary mt-1">Add what you spent today, or head to your Home page.</p></div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-1" onClick={() => { void refresh(); dialog.open(); }}>Add a transaction</Button>
-              <Button variant="outline" className="flex-1" onClick={() => void refresh()}>Go to Home</Button>
+              <Button className="flex-1" onClick={() => { void refresh(); onDone(); dialog.open(); }}>Add a transaction</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { void refresh(); onDone(); }}>Go to Home</Button>
             </div>
           </div>
         )}

@@ -37,7 +37,7 @@ export function NetWorthTrend() {
   return (
     <section className="glass-panel p-5">
       <div className="flex items-center justify-between">
-        <h2>Net worth, 12 months</h2>
+        <h2>Net worth trend</h2>
         <Link to="/analytics" className="text-body text-accent">More</Link>
       </div>
       <p className="text-caption text-secondary mt-0.5 mb-3">Past months count investments at what you paid.</p>
@@ -60,16 +60,18 @@ export function BudgetCompact({ d }: { d: Dashboard }) {
       {lines.length === 0 ? (
         <p className="text-body text-secondary">No budgets this month. <Link to="/plan/budgets" className="text-accent">Set one</Link></p>
       ) : (
-        <ul className="space-y-3.5">
+        <ul className="space-y-4">
           {lines.map((l) => {
             const total = l.amountMinor + l.rolloverMinor;
+            const pct = total > 0 ? Math.round((l.spentMinor / total) * 100) : 100;
             return (
               <li key={l.categoryId}>
-                <div className="flex justify-between text-body mb-1.5 gap-3">
-                  <span className="truncate">{l.categoryName}</span>
-                  <span className="text-secondary tabular-nums shrink-0">{formatMoney(l.spentMinor, d.currency)} / {formatMoney(total, d.currency)}</span>
+                <div className="flex justify-between gap-3 text-body mb-1.5">
+                  <span className="truncate" title={l.categoryName}>{l.categoryName}</span>
+                  <span className={pct > 100 ? 'text-red-500 tabular-nums shrink-0' : 'text-secondary tabular-nums shrink-0'}>{pct}%</span>
                 </div>
-                <ProgressBar value={total > 0 ? (l.spentMinor / total) * 100 : 100} label={l.categoryName} />
+                <ProgressBar value={Math.min(pct, 100)} label={l.categoryName} />
+                <p className="text-caption text-secondary tabular-nums mt-1">{formatMoney(l.spentMinor, d.currency)} of {formatMoney(total, d.currency)}</p>
               </li>
             );
           })}
