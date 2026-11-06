@@ -86,6 +86,25 @@ public class WealthService {
       long savedMinor,
       List<GoalPoint> points) {}
 
+  @Serdeable
+  public record AccountPoint(LocalDate date, long minor) {}
+
+  @Serdeable
+  public record AccountFlow(String month, long inMinor, long outMinor) {}
+
+  /**
+   * One account's balance over time (weekly, ending today) and what came in and went out each
+   * month.
+   */
+  @Serdeable
+  public record AccountHistory(
+      UUID id,
+      String name,
+      String type,
+      String currency,
+      List<AccountPoint> points,
+      List<AccountFlow> flows) {}
+
   private final Db db;
   private final FxConverter fx;
 
@@ -391,5 +410,58 @@ public class WealthService {
               g.id(), g.name(), g.currency(), g.target(), g.date(), running[0], points));
     }
     return out;
+  }
+
+  public AccountHistory accountHistory(UUID ws, UUID accountId) {
+    record Acc(String name, String type, String currency, long opening) {}
+    Acc acc =
+        db.one(
+                "SELECT name, type, currency, opening_balance_minor FROM accounts WHERE id = ? AND workspace_id = ?",
+                rs -> new Acc(rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4)),
+                accountId,
+                ws)
+            .orElseThrow(
+                () ->
+                    new com.keeper.common.exception.ResourceNotFoundException(
+                        "Account", accountId.toString()));
+    Map<LocalDate, Long> perDay = new TreeMap<>();
+    Map<String, long[]> months = new TreeMap<>();
+    db.list(
+        "SELECT occurred_on, direction, amount_minor FROM transactions WHERE account_id = ? AND deleted_at IS NULL",
+        rs -> {
+          LocalDate d = rs.getObject(1, LocalDate.class);
+          long signed = rs.getInt(2) * rs.getLong(3);
+          perDay.merge(d, signed, Long::sum);
+          long[] m = months.computeIfAbsent(YearMonth.from(d).toString(), k -> new long[2]);
+          m[signed >= 0 ? 0 : 1] += Math.abs(signed);
+          return null;
+        },
+        accountId);
+
+    List<AccountPoint> points = new ArrayList<>();
+    long running = acc.opening();
+    LocalDate today = LocalDate.now();
+    LocalDate first = perDay.isEmpty() ? today : perDay.keySet().iterator().next();
+    points.add(new AccountPoint(first.minusDays(1), running));
+    // the balance at the end of each week; the last point is today
+    LocalDate weekEnd =
+        first.with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY));
+    var it = perDay.entrySet().iterator();
+    var next = it.hasNext() ? it.next() : null;
+    for (; !weekEnd.isAfter(today); weekEnd = weekEnd.plusWeeks(1)) {
+      while (next != null && !next.getKey().isAfter(weekEnd)) {
+        running += next.getValue();
+        next = it.hasNext() ? it.next() : null;
+      }
+      points.add(new AccountPoint(weekEnd, running));
+    }
+    while (next != null) {
+      running += next.getValue();
+      next = it.hasNext() ? it.next() : null;
+    }
+    points.add(new AccountPoint(today, running));
+    List<AccountFlow> flows = new ArrayList<>();
+    months.forEach((m, v) -> flows.add(new AccountFlow(m, v[0], v[1])));
+    return new AccountHistory(accountId, acc.name(), acc.type(), acc.currency(), points, flows);
   }
 }

@@ -1,4 +1,5 @@
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, LineChart, Pencil, Plus, Trash2 } from 'lucide-react';
+import { BudgetHistory } from '../features/history/lazy';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useWorkspace } from '../auth/AuthProvider';
@@ -28,6 +29,7 @@ export default function BudgetsPage() {
   const copy = useCopyBudgets();
   const remove = useRemoveBudget();
   const [editing, setEditing] = useState<BudgetLine | 'new' | null>(null);
+  const [history, setHistory] = useState<BudgetLine | null>(null);
   const b = budgets.data;
 
   return (
@@ -82,12 +84,15 @@ export default function BudgetsPage() {
                         {l.rolloverMinor > 0 ? `Includes ${formatMoney(l.rolloverMinor, b.currency)} carried over` : l.rollover ? 'Unspent carries over' : ''}
                         {l.includeOthers ? `${l.rollover ? ' · ' : ''}Counts others' spending` : ''}
                       </p>
+                      <div className="flex gap-0.5">
+                        <IconButton label="History" onClick={() => setHistory(l)}><LineChart className="w-4 h-4" /></IconButton>
                       {canEdit && (
                         <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                           <IconButton label="Edit budget" onClick={() => setEditing(l)}><Pencil className="w-4 h-4" /></IconButton>
                           <IconButton label="Remove budget" onClick={() => remove.mutate({ categoryId: l.categoryId, month })}><Trash2 className="w-4 h-4" /></IconButton>
                         </div>
                       )}
+                      </div>
                     </div>
                   </li>
                 );
@@ -96,6 +101,7 @@ export default function BudgetsPage() {
           </div>
         )}
       </StateView>
+      {history && <BudgetHistory categoryId={history.categoryId} name={history.categoryName} currency={b?.currency ?? 'USD'} onClose={() => setHistory(null)} />}
       {editing && <BudgetModal line={editing === 'new' ? null : editing} month={month} existing={new Set(b?.lines.map((l) => l.categoryId))} currency={b?.currency ?? 'USD'} onClose={() => setEditing(null)} />}
     </>
   );

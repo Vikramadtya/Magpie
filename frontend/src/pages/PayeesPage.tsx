@@ -2,7 +2,8 @@ import { errorMessage } from '../lib/http';
 import { payeesApi } from '../api/endpoints';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { LineChart, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { SpendingHistory } from '../features/history/lazy';
 import { useState, type FormEvent } from 'react';
 import type { Payee } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
@@ -20,11 +21,12 @@ import { groupCategories } from '../features/transactions/TransactionDialog';
 import { useCategories, useCreatePayee, useCreatePerson, useCreateTag, useDeletePayee, useDeletePerson, useDeleteTag, usePayees, usePeople, useTags, useUpdatePayee } from '../hooks/useReference';
 
 export default function PayeesPage() {
-  const { canEdit } = useWorkspace();
+  const { canEdit, baseCurrency } = useWorkspace();
   const payees = usePayees();
   const tags = useTags();
   const categories = useCategories().data ?? [];
   const [editing, setEditing] = useState<Payee | 'new' | null>(null);
+  const [history, setHistory] = useState<Payee | null>(null);
   const [deleting, setDeleting] = useState<Payee | null>(null);
   const [tagName, setTagName] = useState('');
   const del = useDeletePayee();
@@ -64,6 +66,7 @@ export default function PayeesPage() {
                     <p className="text-sm font-medium truncate">{p.name}</p>
                     {p.defaultCategoryId && <p className="text-xs text-secondary">Defaults to {nameOf(p.defaultCategoryId)}</p>}
                   </div>
+                  <IconButton label="History" onClick={() => setHistory(p)}><LineChart className="w-4 h-4" /></IconButton>
                   {canEdit && <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity"><IconButton label="Edit" onClick={() => setEditing(p)}><Pencil className="w-4 h-4" /></IconButton><IconButton label="Delete" onClick={() => setDeleting(p)}><Trash2 className="w-4 h-4" /></IconButton></div>}
                 </li>
               ))}
@@ -112,6 +115,7 @@ export default function PayeesPage() {
           </div>
         </section>
       </div>
+      {history && <SpendingHistory title={history.name} subtitle="What you spent at this payee, last two years" payeeId={history.id} currency={baseCurrency} onClose={() => setHistory(null)} />}
       {editing && <PayeeModal payee={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       <ConfirmDialog open={!!deleting} title={`Delete ${deleting?.name}?`} message="Transactions keep their amounts but lose this payee." onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />
     </>

@@ -144,4 +144,107 @@ public class HistoryBackfill {
     }
     return added;
   }
+
+  /** A day and an amount in minor units. */
+  @io.micronaut.serde.annotation.Serdeable
+  public record Pt(LocalDate date, long minor) {}
+
+  /** What the detail charts need: price per unit, what it was worth, and what was paid in. */
+  @io.micronaut.serde.annotation.Serdeable
+  public record Detail(String currency, List<Pt> prices, List<Pt> value, List<Pt> invested) {}
+
+  /** Keeps the last price of each week, so years of daily NAVs stay a few hundred points. */
+  static List<PricePoint> weekly(List<PricePoint> prices) {
+    if (prices.size() < 400) return prices;
+    List<PricePoint> out = new ArrayList<>();
+    java.time.temporal.WeekFields wf = java.time.temporal.WeekFields.ISO;
+    for (int i = 0; i < prices.size(); i++) {
+      LocalDate d = prices.get(i).date();
+      boolean lastOfWeek =
+          i == prices.size() - 1
+              || d.get(wf.weekOfWeekBasedYear())
+                  != prices.get(i + 1).date().get(wf.weekOfWeekBasedYear())
+              || d.getYear() != prices.get(i + 1).date().getYear();
+      if (lastOfWeek) out.add(prices.get(i));
+    }
+    return out;
+  }
+
+  /**
+   * The history of one holding for its detail view: weekly market prices from the first purchase,
+   * value (units held then times price) and money paid in. Without market history (a hand-priced
+   * holding) it falls back to the prices recorded in Keeper.
+   */
+  public Detail detail(UUID ws, UUID holdingId) {
+    record Row(String symbol, String currency, long priceMinor) {}
+    Row row =
+        db.one(
+                "SELECT provider_symbol, currency, price_minor FROM holdings WHERE id = ? AND workspace_id = ?",
+                rs -> new Row(rs.getString(1), rs.getString(2), rs.getLong(3)),
+                holdingId,
+                ws)
+            .orElseThrow();
+    record Lot(LocalDate on, BigDecimal quantity, long cost) {}
+    List<Lot> lots =
+        db.list(
+            "SELECT bought_on, quantity, cost_minor FROM holding_lots WHERE holding_id = ? ORDER BY bought_on",
+            rs -> new Lot(rs.getObject(1, LocalDate.class), rs.getBigDecimal(2), rs.getLong(3)),
+            holdingId);
+    LocalDate first = lots.isEmpty() ? LocalDate.now() : lots.get(0).on();
+    LocalDate today = LocalDate.now();
+
+    List<Pt> prices = new ArrayList<>();
+    List<PricePoint> series =
+        row.symbol() == null ? List.of() : weekly(this.market.history(row.symbol()));
+    if (!series.isEmpty()) {
+      String quoted = series.get(0).currency() == null ? row.currency() : series.get(0).currency();
+      for (PricePoint p : series) {
+        if (p.date().isBefore(first.minusDays(7))) continue;
+        long minor =
+            p.price()
+                .movePointRight(CurrencyUnits.exponent(quoted))
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
+        if (!quoted.equals(row.currency())) {
+          OptionalLong converted = fx.convert(minor, quoted, row.currency());
+          if (converted.isEmpty()) continue;
+          minor = converted.getAsLong();
+        }
+        prices.add(new Pt(p.date(), minor));
+      }
+    } else {
+      // recorded daily snapshots only
+      prices.addAll(
+          db.list(
+              "SELECT as_of, price_minor FROM holding_values WHERE holding_id = ? ORDER BY as_of",
+              rs -> new Pt(rs.getObject(1, LocalDate.class), rs.getLong(2)),
+              holdingId));
+    }
+    // today's price is always the last point
+    prices.removeIf(p -> !p.date().isBefore(today));
+    prices.add(new Pt(today, row.priceMinor()));
+
+    List<Pt> value = new ArrayList<>();
+    List<Pt> invested = new ArrayList<>();
+    for (Pt p : prices) {
+      BigDecimal units =
+          lots.stream()
+              .filter(l -> !l.on().isAfter(p.date()))
+              .map(Lot::quantity)
+              .reduce(BigDecimal.ZERO, BigDecimal::add);
+      if (units.signum() <= 0) continue;
+      value.add(
+          new Pt(
+              p.date(),
+              units
+                  .multiply(BigDecimal.valueOf(p.minor()))
+                  .setScale(0, RoundingMode.HALF_UP)
+                  .longValue()));
+      invested.add(
+          new Pt(
+              p.date(),
+              lots.stream().filter(l -> !l.on().isAfter(p.date())).mapToLong(Lot::cost).sum()));
+    }
+    return new Detail(row.currency(), prices, value, invested);
+  }
 }

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { endOfMonth, parseISO } from 'date-fns';
-import { Banknote, ClipboardCheck, Inbox, Lightbulb, PiggyBank, Undo2 } from 'lucide-react';
+import { Banknote, ClipboardCheck, Inbox, LineChart, Lightbulb, PiggyBank, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { sampleApi } from '../api/endpoints';
@@ -15,6 +15,7 @@ import { MonthPicker } from '../components/ui/MonthPicker';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Skeleton, SkeletonCard, SkeletonRows, StateView } from '../components/ui/StateView';
+import { NetWorthHistory, SpendingHistory } from '../features/history/lazy';
 import { SetupWizard } from '../features/onboarding/SetupWizard';
 import { useTransactionDialog } from '../features/transactions/TransactionDialog';
 import { useLoans } from '../hooks/useExtras';
@@ -150,11 +151,16 @@ function SafeCard({ d }: { d: Dashboard }) {
 
 /** Net worth as a sum you can check: what you have, less what you owe. */
 function NetWorthCard({ d }: { d: Dashboard }) {
+  const [history, setHistory] = useState(false);
   return (
+    <>
     <section className="glass-panel p-6 flex flex-col">
       <div className="flex items-center justify-between">
         <h2 className="text-body font-medium text-secondary">Net worth</h2>
-        <Link to="/wealth" className="text-caption text-accent">Details</Link>
+        <span className="flex items-center gap-3 text-caption">
+          <button type="button" onClick={() => setHistory(true)} className="text-accent">History</button>
+          <Link to="/wealth" className="text-accent">Details</Link>
+        </span>
       </div>
       <p className="text-[2rem] leading-tight font-semibold tracking-[-0.03em] mt-1.5 tabular-nums">
         <CountUp value={d.netWorthMinor} format={(n) => formatMoney(n, d.currency)} />
@@ -169,6 +175,8 @@ function NetWorthCard({ d }: { d: Dashboard }) {
         ))}
       </ul>
     </section>
+    {history && <NetWorthHistory currency={d.currency} onClose={() => setHistory(false)} />}
+    </>
   );
 }
 
@@ -236,6 +244,7 @@ function NeedsAttention({ d, month }: { d: Dashboard; month: string }) {
 
 function TopCategories({ d, month }: { d: Dashboard; month: string }) {
   const categories = useCategories().data ?? [];
+  const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const max = d.topCategories[0]?.totalMinor || 1;
   const first = parseISO(`${month}-01`);
   return (
@@ -252,17 +261,21 @@ function TopCategories({ d, month }: { d: Dashboard; month: string }) {
             const cat = categories.find((x) => x.id === c.categoryId);
             return (
               <li key={c.categoryId}>
-                <Link to={`/transactions?category=${c.categoryId}&from=${isoDate(first)}&to=${isoDate(endOfMonth(first))}`} className="flex items-center gap-2.5 text-body mb-1.5 hover:underline">
-                  <CategoryBadge name={c.name} icon={cat?.icon} color={c.color ?? cat?.color} size={26} />
-                  <span className="flex-1 truncate">{c.name}</span>
-                  <span className="tabular-nums text-secondary">{formatMoney(c.totalMinor, d.currency)}</span>
-                </Link>
+                <div className="flex items-center gap-2.5 text-body mb-1.5">
+                  <Link to={`/transactions?category=${c.categoryId}&from=${isoDate(first)}&to=${isoDate(endOfMonth(first))}`} className="flex flex-1 min-w-0 items-center gap-2.5 hover:underline">
+                    <CategoryBadge name={c.name} icon={cat?.icon} color={c.color ?? cat?.color} size={26} />
+                    <span className="flex-1 truncate">{c.name}</span>
+                    <span className="tabular-nums text-secondary">{formatMoney(c.totalMinor, d.currency)}</span>
+                  </Link>
+                  <button type="button" aria-label={`History of ${c.name}`} title="History" onClick={() => setHistory({ id: c.categoryId, name: c.name })} className="p-1 rounded-md text-secondary hover:text-accent hover:bg-black/5 dark:hover:bg-white/10"><LineChart className="w-4 h-4" /></button>
+                </div>
                 <ProgressBar tone="accent" color={c.color ?? paletteColor(i)} value={(c.totalMinor / max) * 100} label={c.name} />
               </li>
             );
           })}
         </ul>
       )}
+      {history && <SpendingHistory title={history.name} categoryId={history.id} currency={d.currency} onClose={() => setHistory(null)} />}
     </section>
   );
 }

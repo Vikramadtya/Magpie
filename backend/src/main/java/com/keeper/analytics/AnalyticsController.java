@@ -111,6 +111,13 @@ public class AnalyticsController {
     return wealth.wealth(workspaceId, months);
   }
 
+  /** One account's balance over time, and money in and out per month. */
+  @Get("/accounts/{accountId}/history")
+  public WealthService.AccountHistory accountHistory(
+      @PathVariable UUID workspaceId, @PathVariable UUID accountId) {
+    return wealth.accountHistory(workspaceId, accountId);
+  }
+
   @Get("/investments")
   public WealthService.Investments investments(@PathVariable UUID workspaceId) {
     return wealth.investments(workspaceId);

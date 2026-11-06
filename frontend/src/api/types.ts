@@ -285,6 +285,13 @@ export interface AccountSeries { id: string; name: string; type: string; values:
 export interface Wealth {
   currency: string; months: string[]; accounts: AccountSeries[]; investments: number[]; ownAssets: number[]; missingCurrencies: string[];
 }
+export interface HistoryPoint { date: string; minor: number }
+/** One holding over time: price per unit, what it was worth, and what was paid in. */
+export interface HoldingHistory { currency: string; prices: HistoryPoint[]; value: HistoryPoint[]; invested: HistoryPoint[] }
+/** One account's balance over time, and money in and out per month. */
+export interface AccountHistory {
+  id: string; name: string; type: string; currency: string; points: HistoryPoint[]; flows: { month: string; inMinor: number; outMinor: number }[];
+}
 export interface InvestmentHistory {
   currency: string;
   holdings: { id: string; name: string; symbol: string; assetType: string | null; costMinor: number; valueMinor: number }[];

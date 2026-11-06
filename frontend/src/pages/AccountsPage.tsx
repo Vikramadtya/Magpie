@@ -1,4 +1,5 @@
-import { Banknote, CreditCard, Landmark, Pencil, PiggyBank, Plus, Share2, Trash2, TrendingUp, Wallet, X, type LucideIcon } from 'lucide-react';
+import { AccountHistory } from '../features/history/lazy';
+import { Banknote, CreditCard, Landmark, LineChart, Pencil, PiggyBank, Plus, Share2, Trash2, TrendingUp, Wallet, X, type LucideIcon } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Account, AccountType } from '../api/types';
@@ -30,6 +31,7 @@ export default function AccountsPage() {
   const [editing, setEditing] = useState<Account | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Account | null>(null);
   const [sharing, setSharing] = useState<Account | null>(null);
+  const [history, setHistory] = useState<Account | null>(null);
   const remove = useDeleteAccount();
   const navigate = useNavigate();
   const list = accounts.data ?? [];
@@ -71,8 +73,9 @@ export default function AccountsPage() {
                       {a.memo && <p className="text-[11px] text-accent mt-0.5">{a.shareStatus === 'ACTIVE' ? 'Lent to you · not in your net worth' : 'No longer shared with you'}</p>}
                       {a.currency !== baseCurrency && <p className="text-xs text-secondary mt-1">Converted to {baseCurrency} in reports</p>}
                     </button>
+                    <Button variant="ghost" size="sm" className="mt-2 -ml-2 text-accent" onClick={() => setHistory(a)}><LineChart className="w-3.5 h-3.5 mr-1.5" />History</Button>
                     {canEdit && (
-                      <div className="flex gap-1 mt-3 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      <div className="flex gap-1 mt-1 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                         {!a.memo && <Button variant="ghost" size="sm" onClick={() => setSharing(a)}><Share2 className="w-3.5 h-3.5 mr-1.5" />Lend</Button>}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(a)}><Pencil className="w-3.5 h-3.5 mr-1.5" />Edit</Button>
                         <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
@@ -87,6 +90,7 @@ export default function AccountsPage() {
       </StateView>
 
       {sharing && <LendModal account={sharing} onClose={() => setSharing(null)} />}
+      {history && <AccountHistory account={history} onClose={() => setHistory(null)} />}
       {editing && <AccountModal account={editing === 'new' ? null : editing} defaultCurrency={baseCurrency} onClose={() => setEditing(null)} />}
       <ConfirmDialog
         open={!!deleting}

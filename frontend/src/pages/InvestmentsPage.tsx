@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
-import { Download, Layers, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
+import { Download, Layers, LineChart, Pencil, Plus, RefreshCw, Search, Tag, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ import { StateView } from '../components/ui/StateView';
 import { useDeleteHolding, useHoldings, useInvestmentSummary, useSaveHolding, useSetPrice } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
 import { formatUnits, unitsForAmount } from '../lib/fractional';
+import { HoldingHistory } from '../features/history/lazy';
 import { PerformanceCard } from '../features/investments/PerformanceCard';
 import { Segmented } from '../components/ui/Segmented';
 import { useMarketSearch, useRefreshHolding, useRefreshHoldings, useUploadPrices, useLots, useAddPurchase, useRemovePurchase } from '../hooks/useExtras';
@@ -48,6 +49,7 @@ export function HoldingsView({ assets }: { assets: boolean }) {
   const [deleting, setDeleting] = useState<Holding | null>(null);
   const [offline, setOffline] = useState(false);
   const [buying, setBuying] = useState<Holding | null>(null);
+  const [history, setHistory] = useState<Holding | null>(null);
   const del = useDeleteHolding();
   const refresh = useRefreshHoldings();
   const refreshOne = useRefreshHolding();
@@ -138,10 +140,10 @@ export function HoldingsView({ assets }: { assets: boolean }) {
               {list.map((h) => (
                 <tr key={h.id} className="border-b border-border/60 last:border-0 group hover:bg-primary/[0.02]">
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => setHistory(h)} title="See its history" className="flex items-center gap-3 text-left w-full group/name">
                       <Avatar name={h.name} size={36} />
-                      <div className="min-w-0"><p className="font-semibold truncate">{h.name}</p><p className="text-xs text-secondary truncate">{assetKind(h.assetType)?.label ?? (h.symbol.startsWith('MF:') ? 'Mutual fund' : h.symbol)}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
-                    </div>
+                      <div className="min-w-0"><p className="font-semibold truncate group-hover/name:text-accent transition-colors">{h.name}</p><p className="text-xs text-secondary truncate">{assetKind(h.assetType)?.label ?? (h.symbol.startsWith('MF:') ? 'Mutual fund' : h.symbol)}{h.exchange ? ` · ${h.exchange}` : ''}</p></div>
+                    </button>
                   </td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{assetKind(h.assetType)?.single ? '' : h.quantity}</td>
                   <td className="px-3 py-3.5 text-right tabular-nums">{h.quantity > 0 ? formatMoney(Math.round(h.costBasisMinor / h.quantity), h.currency) : '—'}<p className="text-xs text-secondary mt-0.5">{h.lotCount > 1 ? `${h.lotCount} buys · since ${format(parseISO(h.purchasedOn!), 'd MMM yyyy')}` : h.purchasedOn ? `Bought ${format(parseISO(h.purchasedOn), 'd MMM yyyy')}` : 'Date not set'}</p></td>
@@ -151,6 +153,7 @@ export function HoldingsView({ assets }: { assets: boolean }) {
                   <td className="px-3 py-3.5 text-right whitespace-nowrap">
                     {canEdit && (
                       <div className="inline-flex items-center gap-0.5">
+                        <IconButton label="History" onClick={() => setHistory(h)}><LineChart className="w-4 h-4" /></IconButton>
                         <IconButton label="Purchases" onClick={() => setBuying(h)}><Layers className="w-4 h-4" /></IconButton>
                         {!assetKind(h.assetType) && <IconButton label="Refresh this price" disabled={refreshOne.isPending && refreshOne.variables === h.id} onClick={() => refreshOne.mutate(h.id, { onSuccess: (x) => (x.priceSource === 'LIVE' ? toast.success(`${x.symbol} updated`) : toast.error(`No live price found for ${x.symbol}`)), onError: (e) => toast.error(errorMessage(e)) })}><RefreshCw className={`w-4 h-4 ${refreshOne.isPending && refreshOne.variables === h.id ? 'animate-spin' : ''}`} /></IconButton>}
                         <span className="inline-flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -169,6 +172,7 @@ export function HoldingsView({ assets }: { assets: boolean }) {
       </StateView>
       {editing && <HoldingModal assets={assets} holding={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
       {buying && <PurchasesModal holding={buying} canEdit={canEdit} onClose={() => setBuying(null)} />}
+      {history && <HoldingHistory holding={history} onClose={() => setHistory(null)} />}
       {offline && <OfflinePricesModal holdings={list} onClose={() => setOffline(false)} />}
       {pricing && <PriceModal holding={pricing} onClose={() => setPricing(null)} />}
       <ConfirmDialog open={!!deleting} title={`Remove ${deleting?.symbol}?`} message="This only removes the holding record." confirmLabel="Remove" onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />

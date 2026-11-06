@@ -62,4 +62,19 @@ class HistoryBackfillTest {
             buys, List.of(p("2025-09-30", "50")), LocalDate.parse("2026-04-10"));
     assertTrue(values.isEmpty());
   }
+
+  @Test
+  void yearsOfDailyPricesBecomeOneLastPricePerWeek() {
+    var daily = new java.util.ArrayList<PricePoint>();
+    LocalDate d = LocalDate.parse("2024-01-01");
+    for (int i = 0; i < 800; i++)
+      daily.add(new PricePoint(d.plusDays(i), BigDecimal.valueOf(i + 1), "INR"));
+
+    var weekly = HistoryBackfill.weekly(daily);
+
+    assertTrue(weekly.size() < 130 && weekly.size() > 100);
+    assertEquals(daily.get(799), weekly.get(weekly.size() - 1)); // the newest price is kept
+    // a short history is left alone
+    assertEquals(3, HistoryBackfill.weekly(daily.subList(0, 3)).size());
+  }
 }

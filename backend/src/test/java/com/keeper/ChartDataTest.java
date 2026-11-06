@@ -276,4 +276,30 @@ class ChartDataTest extends ApiTestBase {
         0L,
         db.count("SELECT count(*) FROM holding_values WHERE workspace_id = ?", UUID.randomUUID()));
   }
+
+  @Test
+  void anAccountHasABalanceHistoryThatEndsAtItsBalance() {
+    Session s = register("acct-history");
+    String acc = account(s, "Main", "CHECKING", 10_000);
+    spend(s, acc, null, 2_500, LocalDate.now().minusDays(20), null);
+    spend(s, acc, null, 500, LocalDate.now().minusDays(3), null);
+
+    var h = get(s.token(), ws(s) + "/analytics/accounts/" + acc + "/history", Map.class);
+    @SuppressWarnings("unchecked")
+    var points = (List<Map<String, Object>>) h.get("points");
+    assertEquals(
+        10_000, ((Number) points.get(0).get("minor")).intValue()); // opening, before any activity
+    assertEquals(
+        7_000, ((Number) points.get(points.size() - 1).get("minor")).intValue()); // balance today
+    @SuppressWarnings("unchecked")
+    var flows = (List<Map<String, Object>>) h.get("flows");
+    assertEquals(
+        3_000, flows.stream().mapToInt(f -> ((Number) f.get("outMinor")).intValue()).sum());
+
+    var other = register("acct-history-other");
+    var peek =
+        HttpRequest.GET(ws(other) + "/analytics/accounts/" + acc + "/history")
+            .bearerAuth(other.token());
+    assertTrue(statusOf(peek).getCode() >= 400);
+  }
 }

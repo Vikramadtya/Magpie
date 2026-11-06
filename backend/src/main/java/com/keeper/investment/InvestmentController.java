@@ -79,6 +79,13 @@ public class InvestmentController {
           BigDecimal quantity,
       @Min(0) @Max(1_000_000_000_000L) long unitPriceMinor) {}
 
+  /** Price, value and money paid in over time, for the charts on one holding. */
+  @Get("/holdings/{id}/history")
+  public HistoryBackfill.Detail history(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    get(workspaceId, id);
+    return history.detail(workspaceId, id);
+  }
+
   @Get("/holdings/{id}/lots")
   public List<HoldingLots.Lot> purchases(@PathVariable UUID workspaceId, @PathVariable UUID id) {
     get(workspaceId, id);
@@ -150,6 +157,7 @@ public class InvestmentController {
   private final com.keeper.market.MarketDataService market;
   private final HoldingRefresher refresher;
   private final HoldingLots lots;
+  private final HistoryBackfill history;
 
   public InvestmentController(
       Db db,
@@ -157,8 +165,10 @@ public class InvestmentController {
       FxConverter fx,
       com.keeper.market.MarketDataService market,
       HoldingRefresher refresher,
-      HoldingLots lots) {
+      HoldingLots lots,
+      HistoryBackfill history) {
     this.lots = lots;
+    this.history = history;
     this.db = db;
     this.refs = refs;
     this.fx = fx;

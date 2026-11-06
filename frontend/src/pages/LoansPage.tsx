@@ -1,4 +1,5 @@
-import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, LineChart, Plus, Trash2 } from 'lucide-react';
+import { LoanHistory } from '../features/history/lazy';
 import { useState, type FormEvent } from 'react';
 import type { Loan } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
@@ -29,6 +30,7 @@ export default function LoansPage() {
   const [creating, setCreating] = useState(false);
   const [repaying, setRepaying] = useState<Loan | null>(null);
   const [deleting, setDeleting] = useState<Loan | null>(null);
+  const [charting, setCharting] = useState<Loan | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const del = useDeleteLoan();
   const data = loans.data;
@@ -95,7 +97,8 @@ export default function LoansPage() {
                   <div className="mt-4"><ProgressBar tone="accent" value={(l.repaidMinor / l.principalMinor) * 100} label="Repaid" /></div>
                   <div className="flex items-center gap-2 mt-4">
                     {canEdit && l.status === 'OPEN' && <Button size="sm" variant="outline" onClick={() => setRepaying(l)}>{l.direction === 'LENT' ? 'Record repayment received' : 'Record repayment'}</Button>}
-                    <Button size="sm" variant="ghost" onClick={() => setOpen(open === l.id ? null : l.id)}>{open === l.id ? 'Hide history' : 'History'}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setOpen(open === l.id ? null : l.id)}>{open === l.id ? 'Hide payments' : 'Payments'}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setCharting(l)}><LineChart className="w-4 h-4 mr-1.5" />History</Button>
                     {canEdit && <IconButton className="ml-auto sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" label="Delete loan" onClick={() => setDeleting(l)}><Trash2 className="w-4 h-4" /></IconButton>}
                   </div>
                   {open === l.id && <History id={l.id} />}
@@ -107,6 +110,7 @@ export default function LoansPage() {
       </StateView>
       {creating && <NewLoanModal people={data?.people.map((p) => p.person) ?? []} onClose={() => setCreating(false)} />}
       {repaying && <RepayModal loan={repaying} onClose={() => setRepaying(null)} />}
+      {charting && <LoanHistory loan={charting} onClose={() => setCharting(null)} />}
       <ConfirmDialog
         open={!!deleting}
         title="Delete this loan?"

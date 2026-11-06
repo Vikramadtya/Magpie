@@ -102,7 +102,7 @@ public class YahooFinanceProvider implements MarketDataProvider, Ordered {
       String uri =
           "/v8/finance/chart/"
               + URLEncoder.encode(symbol, StandardCharsets.UTF_8)
-              + "?range=max&interval=1mo";
+              + "?range=10y&interval=1wk";
       Map<?, ?> body =
           chartClient
               .toBlocking()

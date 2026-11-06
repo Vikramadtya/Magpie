@@ -125,6 +125,7 @@ export const recurringApi = {
 };
 
 export const insightsApi = {
+  accountHistory: (ws: string, id: string) => api.get<T.AccountHistory>(ws, `/analytics/accounts/${id}/history`),
   dashboard: (ws: string, month: string) => api.get<T.Dashboard>(ws, '/dashboard', { month }),
   spending: (ws: string, from: string, to: string) => api.get<T.Report<T.CategorySpend>>(ws, '/analytics/spending-by-category', { from, to }),
   cashFlow: (ws: string, from: string, to: string) => api.get<T.Report<T.MonthFlow>>(ws, '/analytics/cash-flow', { from, to }),
@@ -167,6 +168,7 @@ export const holdingsApi = {
   refreshOne: (ws: string, id: string) => api.post<T.Holding>(ws, `/holdings/${id}/refresh`),
   setPrice: (ws: string, id: string, priceMinor: number) => api.put<T.Holding>(ws, `/holdings/${id}/price`, { priceMinor }),
   lots: (ws: string, id: string) => api.get<T.Lot[]>(ws, `/holdings/${id}/lots`),
+  history: (ws: string, id: string) => api.get<T.HoldingHistory>(ws, `/holdings/${id}/history`),
   addLot: (ws: string, id: string, b: T.PurchaseInput) => api.post<T.Holding>(ws, `/holdings/${id}/lots`, b),
   removeLot: (ws: string, id: string, lotId: string) => api.del(ws, `/holdings/${id}/lots/${lotId}`),
   uploadPrices: (ws: string, prices: { symbol: string; price: number; currency?: string }[]) =>

@@ -189,4 +189,39 @@ class PolishFeaturesTest extends ApiTestBase {
     // market value is the fraction times today's price, to the cent
     assertEquals(5_309, number(h, "marketValueMinor"));
   }
+
+  @Test
+  void aHoldingHasAHistoryOfPriceValueAndPaidIn() {
+    Session s = register("holding-history");
+    Map<?, ?> h =
+        post(
+            s.token(),
+            ws(s) + "/holdings",
+            Map.of(
+                "symbol",
+                "ZZHIST",
+                "name",
+                "History",
+                "quantity",
+                4,
+                "unitPriceMinor",
+                1_000,
+                "priceMinor",
+                1_500,
+                "currency",
+                "USD",
+                "purchasedOn",
+                LocalDate.now().minusDays(30).toString()),
+            Map.class);
+    Map<?, ?> history = get(s.token(), ws(s) + "/holdings/" + h.get("id") + "/history", Map.class);
+    assertEquals("USD", history.get("currency"));
+    List<?> prices = (List<?>) history.get("prices");
+    List<?> value = (List<?>) history.get("value");
+    List<?> invested = (List<?>) history.get("invested");
+    assertFalse(prices.isEmpty());
+    // the last point is today: 4 units at 15.00, with 40.00 paid in
+    assertEquals(1_500, number((Map<?, ?>) prices.get(prices.size() - 1), "minor"));
+    assertEquals(6_000, number((Map<?, ?>) value.get(value.size() - 1), "minor"));
+    assertEquals(4_000, number((Map<?, ?>) invested.get(invested.size() - 1), "minor"));
+  }
 }

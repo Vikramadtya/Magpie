@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { insightsApi } from '../api/endpoints';
+import { holdingsApi, insightsApi } from '../api/endpoints';
 import type { BreakdownParams } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { qk } from './keys';
@@ -42,4 +42,13 @@ export function useGoalProgress() {
 export function useBudgetHistory(months: number) {
   const { id } = useWorkspace();
   return useQuery({ queryKey: qk.analytics(id, 'budget-history', months), queryFn: () => insightsApi.budgetHistory(id, months), staleTime: STALE });
+}
+
+export function useHoldingHistory(id: string | null) {
+  const { id: ws } = useWorkspace();
+  return useQuery({ queryKey: qk.analytics(ws, 'holding-history', id), queryFn: () => holdingsApi.history(ws, id!), enabled: !!id, staleTime: STALE });
+}
+export function useAccountHistory(id: string | null) {
+  const { id: ws } = useWorkspace();
+  return useQuery({ queryKey: qk.analytics(ws, 'account-history', id), queryFn: () => insightsApi.accountHistory(ws, id!), enabled: !!id, staleTime: STALE });
 }

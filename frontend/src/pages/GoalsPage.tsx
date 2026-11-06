@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { LineChart, Pencil, Plus, Trash2 } from 'lucide-react';
+import { GoalHistory } from '../features/history/lazy';
 import { useState, type FormEvent } from 'react';
 import type { Goal } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
@@ -24,6 +25,7 @@ export default function GoalsPage() {
   const goals = useGoals();
   const [editing, setEditing] = useState<Goal | 'new' | null>(null);
   const [funding, setFunding] = useState<Goal | null>(null);
+  const [history, setHistory] = useState<Goal | null>(null);
   const [deleting, setDeleting] = useState<Goal | null>(null);
   const del = useDeleteGoal();
   const list = goals.data ?? [];
@@ -66,7 +68,10 @@ export default function GoalsPage() {
                     {done ? <Badge tone="good">Goal reached</Badge> : g.projectedDate ? <Badge tone="accent">On pace for {format(parseISO(g.projectedDate), 'd MMM yyyy')}</Badge> : <Badge>No pace yet</Badge>}
                     {g.targetDate && <span>Target {format(parseISO(g.targetDate), 'd MMM yyyy')}</span>}
                   </p>
-                  {canEdit && !done && <Button size="sm" variant="outline" onClick={() => setFunding(g)}><Plus className="w-4 h-4 mr-1.5" />Add funds</Button>}
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" onClick={() => setHistory(g)}><LineChart className="w-4 h-4 mr-1.5" />History</Button>
+                    {canEdit && !done && <Button size="sm" variant="outline" onClick={() => setFunding(g)}><Plus className="w-4 h-4 mr-1.5" />Add funds</Button>}
+                  </div>
                 </div>
               </li>
             );
@@ -75,6 +80,7 @@ export default function GoalsPage() {
       </StateView>
       {editing && <GoalModal goal={editing === 'new' ? null : editing} currency={baseCurrency} onClose={() => setEditing(null)} />}
       {funding && <FundModal goal={funding} onClose={() => setFunding(null)} />}
+      {history && <GoalHistory goal={history} onClose={() => setHistory(null)} />}
       <ConfirmDialog open={!!deleting} title="Delete goal?" message={`"${deleting?.name}" and its contribution history will be removed.`} onCancel={() => setDeleting(null)} onConfirm={() => { if (deleting) del.mutate(deleting.id); setDeleting(null); }} />
     </>
   );
