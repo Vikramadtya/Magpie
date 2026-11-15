@@ -50,10 +50,12 @@ public class QuickKeyController {
       @Pattern(regexp = "^\\d{5,25}$") String discordUserId) {}
 
   private final Db db;
+  private final com.keeper.billing.Entitlements entitlements;
   private final SecureRandom random = new SecureRandom();
 
-  public QuickKeyController(Db db) {
+  public QuickKeyController(Db db, com.keeper.billing.Entitlements entitlements) {
     this.db = db;
+    this.entitlements = entitlements;
   }
 
   private static KeyView map(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -79,6 +81,7 @@ public class QuickKeyController {
   @Post
   public Created create(
       Authentication auth, @PathVariable UUID workspaceId, @Valid @Body Request body) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.QUICK_ADD);
     byte[] raw = new byte[32];
     random.nextBytes(raw);
     String secret = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(raw);

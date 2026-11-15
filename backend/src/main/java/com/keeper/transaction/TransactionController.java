@@ -106,9 +106,12 @@ public class TransactionController {
   public record NormalisedRequest(@Positive @Max(MAX_MINOR) long baseAmountMinor) {}
 
   private final TransactionService service;
+  private final com.keeper.billing.Entitlements entitlements;
 
-  public TransactionController(TransactionService service) {
+  public TransactionController(
+      TransactionService service, com.keeper.billing.Entitlements entitlements) {
     this.service = service;
+    this.entitlements = entitlements;
   }
 
   /** Every filter the list and the summary share. Several ids are comma-separated. */
@@ -266,6 +269,7 @@ public class TransactionController {
       @PathVariable UUID workspaceId,
       @Nullable @Header("Idempotency-Key") @Size(max = 100) String idempotencyKey,
       @Valid @Body Request body) {
+    entitlements.checkRoom(workspaceId, com.keeper.billing.Limit.TRANSACTIONS_PER_MONTH);
     return service.create(workspaceId, Actor.id(auth), idempotencyKey, body);
   }
 

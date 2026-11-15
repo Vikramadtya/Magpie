@@ -27,9 +27,11 @@ public class BudgetController {
   public record Copied(int copied) {}
 
   private final BudgetService service;
+  private final com.keeper.billing.Entitlements entitlements;
 
-  public BudgetController(BudgetService service) {
+  public BudgetController(BudgetService service, com.keeper.billing.Entitlements entitlements) {
     this.service = service;
+    this.entitlements = entitlements;
   }
 
   @Get
@@ -44,6 +46,7 @@ public class BudgetController {
       @PathVariable UUID categoryId,
       @PathVariable String month,
       @Valid @Body Request body) {
+    entitlements.checkBudgetRoom(workspaceId, categoryId, parse(month));
     service.set(
         workspaceId,
         categoryId,

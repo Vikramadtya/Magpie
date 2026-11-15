@@ -43,9 +43,14 @@ public class ImportController {
   public record Undone(int removed) {}
 
   private final ImportService imports;
+  private final com.keeper.billing.Entitlements entitlements;
   private final TransactionService transactions;
 
-  public ImportController(ImportService imports, TransactionService transactions) {
+  public ImportController(
+      ImportService imports,
+      TransactionService transactions,
+      com.keeper.billing.Entitlements entitlements) {
+    this.entitlements = entitlements;
     this.imports = imports;
     this.transactions = transactions;
   }
@@ -64,6 +69,8 @@ public class ImportController {
   @Post("/imports/commit")
   public ImportService.Result commit(
       Authentication auth, @PathVariable UUID workspaceId, @Valid @Body CommitRequest body) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.IMPORT);
+    entitlements.require(workspaceId, com.keeper.billing.Feature.IMPORT);
     return imports.commit(
         workspaceId, Actor.id(auth), body.accountId(), body.fileName(), body.rows());
   }

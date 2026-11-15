@@ -42,9 +42,14 @@ public class HouseholdController {
       @Min(0) @Max(1_000_000_000_000L) long amountMinor) {}
 
   private final HouseholdService service;
+  private final com.keeper.billing.Entitlements entitlements;
   private final HouseholdReport report;
 
-  public HouseholdController(HouseholdService service, HouseholdReport report) {
+  public HouseholdController(
+      HouseholdService service,
+      HouseholdReport report,
+      com.keeper.billing.Entitlements entitlements) {
+    this.entitlements = entitlements;
     this.service = service;
     this.report = report;
   }
@@ -56,6 +61,7 @@ public class HouseholdController {
 
   @Post
   public Household create(Authentication auth, @Valid @Body NameRequest body) {
+    entitlements.requireUser(Actor.id(auth), com.keeper.billing.Feature.HOUSEHOLD);
     return service.create(Actor.id(auth), body.name());
   }
 
@@ -66,6 +72,7 @@ public class HouseholdController {
 
   @Post("/{id}/members")
   public void invite(Authentication auth, @PathVariable UUID id, @Valid @Body InviteRequest body) {
+    entitlements.requireUser(Actor.id(auth), com.keeper.billing.Feature.HOUSEHOLD);
     service.invite(Actor.id(auth), id, body.email());
   }
 

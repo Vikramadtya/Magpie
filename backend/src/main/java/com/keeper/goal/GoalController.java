@@ -35,9 +35,11 @@ public class GoalController {
       @Max(1_000_000_000_000L) long amountMinor, @NotNull LocalDate occurredOn) {}
 
   private final GoalService service;
+  private final com.keeper.billing.Entitlements entitlements;
 
-  public GoalController(GoalService service) {
+  public GoalController(GoalService service, com.keeper.billing.Entitlements entitlements) {
     this.service = service;
+    this.entitlements = entitlements;
   }
 
   @Get
@@ -47,6 +49,7 @@ public class GoalController {
 
   @Post
   public GoalService.Goal create(@PathVariable UUID workspaceId, @Valid @Body Request body) {
+    entitlements.checkRoom(workspaceId, com.keeper.billing.Limit.GOALS);
     return service.create(workspaceId, body);
   }
 

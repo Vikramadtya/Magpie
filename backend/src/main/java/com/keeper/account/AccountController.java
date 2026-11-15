@@ -41,9 +41,11 @@ public class AccountController {
       @Min(-1_000_000_000_000L) @Max(1_000_000_000_000L) Long openingBalanceMinor) {}
 
   private final AccountService service;
+  private final com.keeper.billing.Entitlements entitlements;
 
-  public AccountController(AccountService service) {
+  public AccountController(AccountService service, com.keeper.billing.Entitlements entitlements) {
     this.service = service;
+    this.entitlements = entitlements;
   }
 
   @Get
@@ -55,6 +57,7 @@ public class AccountController {
   @Post
   public Account create(
       Authentication auth, @PathVariable UUID workspaceId, @Valid @Body CreateRequest body) {
+    entitlements.checkRoom(workspaceId, com.keeper.billing.Limit.ACCOUNTS);
     return service.create(workspaceId, Actor.id(auth), body);
   }
 
