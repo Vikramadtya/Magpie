@@ -21,6 +21,7 @@ public class AnalyticsController {
   private final WealthService wealth;
   private final DetailService detail;
   private final com.keeper.budget.BudgetService budgets;
+  private final com.keeper.billing.Entitlements entitlements;
 
   public AnalyticsController(
       AnalyticsService service,
@@ -28,7 +29,9 @@ public class AnalyticsController {
       BreakdownService breakdown,
       WealthService wealth,
       DetailService detail,
-      com.keeper.budget.BudgetService budgets) {
+      com.keeper.budget.BudgetService budgets,
+      com.keeper.billing.Entitlements entitlements) {
+    this.entitlements = entitlements;
     this.service = service;
     this.overview = overview;
     this.breakdown = breakdown;
@@ -57,7 +60,7 @@ public class AnalyticsController {
       @Nullable @QueryValue UUID tripId,
       @Nullable @QueryValue UUID personId,
       @QueryValue(defaultValue = "12") @Min(0) @Max(50) int limit) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return breakdown.run(
         workspaceId,
         new BreakdownService.Query(
@@ -80,7 +83,7 @@ public class AnalyticsController {
       @PathVariable UUID workspaceId,
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return detail.sizes(workspaceId, range[0], range[1]);
   }
 
@@ -90,7 +93,7 @@ public class AnalyticsController {
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to,
       @QueryValue(defaultValue = "100") @Min(1) @Max(500) int limit) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return detail.purchases(workspaceId, range[0], range[1], limit);
   }
 
@@ -99,7 +102,7 @@ public class AnalyticsController {
       @PathVariable UUID workspaceId,
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return detail.tree(workspaceId, range[0], range[1]);
   }
 
@@ -108,6 +111,7 @@ public class AnalyticsController {
   public WealthService.Wealth wealth(
       @PathVariable UUID workspaceId,
       @QueryValue(defaultValue = "12") @Min(2) @Max(60) int months) {
+    months = entitlements.clampMonths(workspaceId, months);
     return wealth.wealth(workspaceId, months);
   }
 
@@ -120,6 +124,7 @@ public class AnalyticsController {
 
   @Get("/investments")
   public WealthService.Investments investments(@PathVariable UUID workspaceId) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.LIVE_INVESTMENTS);
     return wealth.investments(workspaceId);
   }
 
@@ -127,6 +132,7 @@ public class AnalyticsController {
   public WealthService.Loans loans(
       @PathVariable UUID workspaceId,
       @QueryValue(defaultValue = "12") @Min(2) @Max(60) int months) {
+    months = entitlements.clampMonths(workspaceId, months);
     return wealth.loans(workspaceId, months);
   }
 
@@ -139,6 +145,7 @@ public class AnalyticsController {
   @Get("/budgets")
   public java.util.List<com.keeper.budget.BudgetService.Summary> budgets(
       @PathVariable UUID workspaceId, @QueryValue(defaultValue = "6") @Min(1) @Max(24) int months) {
+    months = entitlements.clampMonths(workspaceId, months);
     java.time.YearMonth last = java.time.YearMonth.now();
     java.util.List<com.keeper.budget.BudgetService.Summary> out = new java.util.ArrayList<>();
     for (int i = months - 1; i >= 0; i--)
@@ -152,7 +159,7 @@ public class AnalyticsController {
       @PathVariable UUID workspaceId,
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return overview.overview(workspaceId, range[0], range[1]);
   }
 
@@ -161,7 +168,7 @@ public class AnalyticsController {
       @PathVariable UUID workspaceId,
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return service.spendingByCategory(workspaceId, range[0], range[1]);
   }
 
@@ -170,7 +177,8 @@ public class AnalyticsController {
       @PathVariable UUID workspaceId,
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to) {
-    LocalDate[] range = range(from, to == null ? LocalDate.now() : to);
+    LocalDate[] range =
+        entitlements.clamp(workspaceId, range(from, to == null ? LocalDate.now() : to));
     if (from == null) range[0] = range[1].minusMonths(11).withDayOfMonth(1);
     return service.cashFlow(workspaceId, range[0], range[1]);
   }
@@ -179,6 +187,7 @@ public class AnalyticsController {
   public AnalyticsService.Report<AnalyticsService.NetWorthPoint> netWorth(
       @PathVariable UUID workspaceId,
       @QueryValue(defaultValue = "12") @Min(1) @Max(60) int months) {
+    months = entitlements.clampMonths(workspaceId, months);
     return service.netWorth(workspaceId, months);
   }
 
@@ -188,7 +197,7 @@ public class AnalyticsController {
       @Nullable @QueryValue LocalDate from,
       @Nullable @QueryValue LocalDate to,
       @QueryValue(defaultValue = "10") int limit) {
-    LocalDate[] range = range(from, to);
+    LocalDate[] range = entitlements.clamp(workspaceId, range(from, to));
     return service.topPayees(workspaceId, range[0], range[1], limit);
   }
 

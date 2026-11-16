@@ -12,15 +12,18 @@ import org.slf4j.LoggerFactory;
 public class DigestJob {
   private static final Logger LOG = LoggerFactory.getLogger(DigestJob.class);
   private final DigestService service;
+  private final com.keeper.billing.Entitlements entitlements;
 
-  public DigestJob(DigestService service) {
+  public DigestJob(DigestService service, com.keeper.billing.Entitlements entitlements) {
     this.service = service;
+    this.entitlements = entitlements;
   }
 
   @Scheduled(fixedDelay = "1h", initialDelay = "2m")
   public void run() {
     try {
       for (UUID ws : service.due(Instant.now())) {
+        if (!entitlements.planOfWorkspace(ws).pro()) continue;
         try {
           service.send(ws);
         } catch (RuntimeException e) {

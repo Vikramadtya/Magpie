@@ -109,6 +109,15 @@ flyway:
       enabled: true
 
 keeper:
+  billing:
+    # Off until you are ready: while off, every workspace behaves as Pro and no limit applies.
+    enforce: "${BILLING_ENFORCE:false}"
+    currency: "${BILLING_CURRENCY:INR}"
+    price-monthly-minor: "${BILLING_PRICE_MONTHLY_MINOR:14900}"
+    price-yearly-minor: "${BILLING_PRICE_YEARLY_MINOR:149900}"
+  admin:
+    # Comma-separated emails that may create codes and grant access.
+    emails: "${ADMIN_EMAILS:}"
   crypto:
     # 32 random bytes, base64. Keep it only in the server environment and back it up: without it
     # encrypted notes cannot be read.

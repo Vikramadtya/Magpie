@@ -23,19 +23,30 @@ public class RateLimitFilter implements Ordered {
   private record Window(long start, int count) {}
 
   private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
+  private final boolean enabled;
+
+  public RateLimitFilter(
+      @io.micronaut.context.annotation.Value("${keeper.rate-limit.enabled:true}") boolean enabled) {
+    this.enabled = enabled;
+  }
 
   @RequestFilter
   @io.micronaut.core.annotation.Nullable
   public HttpResponse<?> limit(HttpRequest<?> request) {
     boolean refresh = request.getPath().equals("/api/v1/auth/refresh");
+    // Guessing codes must be slow: a few tries a minute per address.
+    boolean codeTry =
+        request.getPath().endsWith("/billing/redeem")
+            || request.getPath().endsWith("/billing/quote");
     boolean auth = request.getPath().startsWith("/api/v1/auth/") && !refresh;
     boolean mutating =
         request.getMethod() != HttpMethod.GET && request.getMethod() != HttpMethod.HEAD;
-    if (!auth && !refresh && !mutating) {
+    if (!enabled || (!auth && !refresh && !codeTry && !mutating)) {
       return null;
     }
-    int max = auth ? 10 : refresh ? 60 : 240;
-    String key = (auth ? "auth:" : refresh ? "refresh:" : "write:") + clientIp(request);
+    int max = auth || codeTry ? 10 : refresh ? 60 : 240;
+    String key =
+        (auth ? "auth:" : codeTry ? "code:" : refresh ? "refresh:" : "write:") + clientIp(request);
     long now = System.currentTimeMillis();
     Window w =
         windows.merge(

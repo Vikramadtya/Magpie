@@ -43,9 +43,10 @@ public class AuthController {
   public record SessionResponse(String accessToken, int expiresIn, UserView user) {}
 
   @Serdeable
-  public record MeResponse(UserView user, List<Workspace> workspaces) {}
+  public record MeResponse(UserView user, List<Workspace> workspaces, boolean admin) {}
 
   private final AuthService auth;
+  private final com.keeper.billing.Admins admins;
   private final TokenService tokens;
   private final UserRepository users;
   private final WorkspaceService workspaces;
@@ -56,7 +57,9 @@ public class AuthController {
       TokenService tokens,
       UserRepository users,
       WorkspaceService workspaces,
-      SessionCookies cookies) {
+      SessionCookies cookies,
+      com.keeper.billing.Admins admins) {
+    this.admins = admins;
     this.auth = auth;
     this.tokens = tokens;
     this.users = users;
@@ -103,7 +106,7 @@ public class AuthController {
   public MeResponse me(Authentication authentication) {
     UUID id = Actor.id(authentication);
     User user = users.findById(id).orElseThrow(() -> new UnauthorizedException("No session"));
-    return new MeResponse(view(user), workspaces.list(id));
+    return new MeResponse(view(user), workspaces.list(id), admins.isAdmin(id));
   }
 
   private HttpResponse<SessionResponse> session(User user) {

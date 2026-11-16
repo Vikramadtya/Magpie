@@ -82,6 +82,7 @@ public class InvestmentController {
   /** Price, value and money paid in over time, for the charts on one holding. */
   @Get("/holdings/{id}/history")
   public HistoryBackfill.Detail history(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.LIVE_INVESTMENTS);
     get(workspaceId, id);
     return history.detail(workspaceId, id);
   }
@@ -158,6 +159,7 @@ public class InvestmentController {
   private final HoldingRefresher refresher;
   private final HoldingLots lots;
   private final HistoryBackfill history;
+  private final com.keeper.billing.Entitlements entitlements;
 
   public InvestmentController(
       Db db,
@@ -166,7 +168,9 @@ public class InvestmentController {
       com.keeper.market.MarketDataService market,
       HoldingRefresher refresher,
       HoldingLots lots,
-      HistoryBackfill history) {
+      HistoryBackfill history,
+      com.keeper.billing.Entitlements entitlements) {
+    this.entitlements = entitlements;
     this.lots = lots;
     this.history = history;
     this.db = db;
@@ -235,6 +239,9 @@ public class InvestmentController {
 
   @Post("/holdings")
   public Holding create(@PathVariable UUID workspaceId, @Valid @Body Request body) {
+    entitlements.checkRoom(workspaceId, com.keeper.billing.Limit.HOLDINGS);
+    if (body.providerSymbol() != null)
+      entitlements.require(workspaceId, com.keeper.billing.Feature.LIVE_INVESTMENTS);
     refs.account(workspaceId, body.accountId());
     Resolved r = resolve(body);
     UUID id = UUID.randomUUID();
@@ -321,6 +328,7 @@ public class InvestmentController {
   /** Re-fetches live prices for every linked holding right now. */
   @Post("/holdings/refresh")
   public List<Holding> refresh(@PathVariable UUID workspaceId) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.LIVE_INVESTMENTS);
     refresher.refreshNow(workspaceId, null);
     return list(workspaceId);
   }
@@ -350,6 +358,7 @@ public class InvestmentController {
   /** Re-fetches the live price of a single holding right now. */
   @Post("/holdings/{id}/refresh")
   public Holding refreshOne(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.LIVE_INVESTMENTS);
     get(workspaceId, id);
     refresher.refreshNow(workspaceId, id);
     return get(workspaceId, id);
