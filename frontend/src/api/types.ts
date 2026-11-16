@@ -6,7 +6,29 @@ export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 export interface User { id: string; email: string; name: string }
 export interface Workspace { id: string; name: string; baseCurrency: string; role: Role }
 export interface Session { accessToken: string; expiresIn: number; user: User }
-export interface Me { user: User; workspaces: Workspace[] }
+export interface Me { user: User; workspaces: Workspace[]; admin?: boolean }
+
+// ---------- plans and codes ----------
+export interface PlanLimits {
+  accounts: number | null; budgets: number | null; goals: number | null; holdings: number | null; transactionsPerMonth: number | null;
+  historyMonths: number | null; importFiles: boolean; digest: boolean; household: boolean; quickAdd: boolean; liveInvestments: boolean;
+}
+export interface Billing {
+  plan: 'FREE' | 'PRO'; source: string; proUntil: string | null; enforced: boolean; paymentsOpen: boolean; limits: PlanLimits;
+  usage: { accounts: number; budgets: number; goals: number; holdings: number; transactionsThisMonth: number };
+  prices: { currency: string; monthlyMinor: number; yearlyMinor: number };
+}
+export interface PlanQuote { interval: 'MONTHLY' | 'YEARLY'; currency: string; baseMinor: number; discountMinor: number; firstPaymentMinor: number; code: string | null; note: string | null }
+export interface PlanCode {
+  id: string; code: string; kind: 'ACCESS' | 'DISCOUNT'; description: string | null; active: boolean; startsAt: string | null; expiresAt: string | null;
+  maxRedemptions: number | null; perUserLimit: number; redeemedCount: number; accessDays: number | null; discountPercent: number | null;
+  discountMinor: number | null; discountCycles: number | null; createdAt: string; status: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'USED_UP' | 'OFF';
+}
+export interface CodeInput {
+  code?: string; kind: 'ACCESS' | 'DISCOUNT'; description?: string; startsAt?: string | null; expiresAt?: string | null; maxRedemptions?: number | null;
+  perUserLimit?: number; accessDays?: number | null; discountPercent?: number | null; discountMinor?: number | null; discountCycles?: number | null;
+}
+export interface CodeRedemption { email: string; name: string | null; redeemedAt: string; grantsUntil: string | null }
 
 export interface Account {
   id: string; name: string; type: AccountType; currency: string;

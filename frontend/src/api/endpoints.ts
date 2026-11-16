@@ -186,6 +186,22 @@ export const loansApi = {
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
 };
 
+export const billingApi = {
+  get: (ws: string) => api.get<T.Billing>(ws, '/billing'),
+  redeem: (ws: string, code: string) => api.post<{ redeemed: { code: string; days: number; accessUntil: string }; summary: T.Billing }>(ws, '/billing/redeem', { code }),
+  quote: (ws: string, interval: 'MONTHLY' | 'YEARLY', code?: string) => api.post<T.PlanQuote>(ws, '/billing/quote', { interval, code: code || null }),
+  checkout: (ws: string, interval: 'MONTHLY' | 'YEARLY', code?: string) => api.post<{ url: string }>(ws, '/billing/checkout', { interval, code: code || null }),
+};
+
+export const adminApi = {
+  codes: () => http.get<T.PlanCode[]>('/api/v1/admin/codes').then((r) => r.data),
+  createCode: (b: T.CodeInput) => http.post<T.PlanCode>('/api/v1/admin/codes', b).then((r) => r.data),
+  updateCode: (id: string, b: { active?: boolean; description?: string; setExpiry?: boolean; expiresAt?: string | null; setMax?: boolean; maxRedemptions?: number | null }) =>
+    http.patch<T.PlanCode>(`/api/v1/admin/codes/${id}`, { setExpiry: false, setMax: false, ...b }).then((r) => r.data),
+  redemptions: (id: string) => http.get<T.CodeRedemption[]>(`/api/v1/admin/codes/${id}/redemptions`).then((r) => r.data),
+  grant: (email: string, days: number, note?: string) => http.put<{ email: string; accessUntil: string }>('/api/v1/admin/grants', { email, days, note }).then((r) => r.data),
+};
+
 export const sampleApi = {
   load: (ws: string) => api.post<{ accounts: number; transactions: number }>(ws, '/sample-data'),
   clear: (ws: string) => api.del(ws, '/sample-data'),

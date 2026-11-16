@@ -15,6 +15,8 @@ interface AuthContextValue {
   workspace: Workspace | null;
   canEdit: boolean;
   isOwner: boolean;
+  /** Whether this person may manage codes and grant access. */
+  isAdmin: boolean;
   selectWorkspace: (id: string) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (body: { email: string; password: string; name: string; currency: string }) => Promise<void>;
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workspace,
       canEdit: role ? rank[role] >= rank.EDITOR : false,
       isOwner: role === 'OWNER',
+      isAdmin: !!me?.admin,
       selectWorkspace: (id) => {
         setWorkspaceId(id);
         try {

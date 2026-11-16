@@ -19,6 +19,8 @@ import { useRefunds } from '../../hooks/useRefunds';
 import { usePrefetch } from '../../lib/prefetch';
 import { usePrivacy } from '../../lib/privacy';
 import { ShortcutHelp, useShortcuts } from './Shortcuts';
+import { UpgradePrompt } from '../../features/billing/UpgradePrompt';
+import { useBilling } from '../../hooks/useBilling';
 
 export default function AppLayout() {
   return (
@@ -121,6 +123,7 @@ function Shell() {
       </div>
       <CommandPalette />
       <ShortcutHelp />
+      <UpgradePrompt />
     </div>
   );
 }
@@ -156,6 +159,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
   const refunds = useRefunds().data?.pendingCount ?? 0;
   const safe = useDashboard(monthKey(new Date())).data;
   const prefetch = usePrefetch();
+  const billing = useBilling().data;
   const link = (active: boolean) => cn(linkClass(active), collapsed && 'justify-center px-0');
   const subTabs = (path: string) => (path === '/plan' ? PLAN_TABS : path === '/wealth' ? WEALTH_TABS : null);
 
@@ -232,6 +236,11 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
         </div>
       </nav>
 
+      {!collapsed && billing?.enforced && billing.plan === 'FREE' && (
+        <Link to="/billing" className="mx-4 mt-3 rounded-xl px-3 py-2 text-caption bg-primary/[0.05] hover:bg-primary/[0.08] transition-colors flex items-center justify-between">
+          <span>Free plan</span><span className="text-accent font-medium">Upgrade</span>
+        </Link>
+      )}
       {!collapsed && safe && (
         <Link to="/dashboard" className="mx-4 mt-3 rounded-2xl p-3.5 bg-accent/[0.08] hover:bg-accent/[0.12] transition-colors">
           <p className="text-caption text-secondary">Safe to spend</p>

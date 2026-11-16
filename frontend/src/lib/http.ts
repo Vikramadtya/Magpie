@@ -85,6 +85,11 @@ export function refreshSession(): Promise<string | null> {
 http.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
+    if (error.response?.status === 402) {
+      // The Free plan does not allow this; the app shows an upgrade prompt with the server's wording.
+      const detail = (error.response.data as { detail?: string } | undefined)?.detail ?? 'This is part of the Pro plan.';
+      window.dispatchEvent(new CustomEvent('keeper:plan-limit', { detail }));
+    }
     const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
     const isAuthCall = original?.url?.includes('/api/v1/auth/');
     if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
