@@ -6,7 +6,8 @@ public enum Feature {
   DIGEST("The weekly digest"),
   HOUSEHOLD("Sharing with a household"),
   QUICK_ADD("Quick add keys and Discord"),
-  LIVE_INVESTMENTS("Live prices and history for investments");
+  LIVE_INVESTMENTS("Live prices and history for investments"),
+  RECEIPTS("Attaching receipts");
 
   private final String label;
 

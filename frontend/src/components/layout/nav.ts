@@ -1,5 +1,5 @@
 import {
-  CalendarCheck, Crown, Gem, Inbox, LayoutDashboard, ListTree, PieChart, Plane, Receipt, Settings, Store, Target, TrendingUp, Undo2, Upload, Users, Wallet, Repeat, Banknote, PiggyBank, ClipboardCheck,
+  CalendarCheck, CalendarDays, Crown, Wand2, Gem, Inbox, LayoutDashboard, ListTree, PieChart, Plane, Receipt, Settings, Store, Target, TrendingUp, Undo2, Upload, Users, Wallet, Repeat, Banknote, PiggyBank, ClipboardCheck,
 } from 'lucide-react';
 
 /** The five places you actually go. Everything else lives inside one of them or in Settings. */
@@ -23,6 +23,7 @@ export const SETTINGS = { path: '/settings', label: 'Settings', icon: Settings }
 export const PLAN_TABS = [
   { key: 'budgets', label: 'Budgets', icon: PiggyBank },
   { key: 'goals', label: 'Goals', icon: Target },
+  { key: 'bills', label: 'Bills', icon: CalendarDays },
   { key: 'recurring', label: 'Recurring', icon: Repeat },
   { key: 'trips', label: 'Trips', icon: Plane },
 ] as const;
@@ -40,6 +41,7 @@ export const MORE_PAGES = [
   { path: '/payees', label: 'Payees & tags', hint: 'Names, tags and automatic categories', icon: Store },
   { path: '/import', label: 'Import / export', hint: 'Bring in a bank file or take your data out', icon: Upload },
   { path: '/household', label: 'Household', hint: 'Share a combined view with family', icon: Users },
+  { path: '/rules', label: 'Rules', hint: 'File entries under a category automatically', icon: Wand2 },
   { path: '/billing', label: 'Plan & billing', hint: 'Your plan, what you have used, and codes', icon: Crown },
   { path: '/review', label: 'Monthly review', hint: 'A 2-minute look back, then next month’s budget', icon: ClipboardCheck },
 ] as const;

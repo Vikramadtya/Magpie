@@ -191,6 +191,31 @@ export function useBulkTransactions() {
   });
 }
 
+/** A change to every transaction a filter matches, not only the ones loaded on screen. */
+export function useBulkFiltered() {
+  const { id: ws, baseCurrency } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { filters: TransactionFilters; body: Parameters<typeof transactionsApi.bulkFiltered>[3] }) => transactionsApi.bulkFiltered(ws, a.filters, baseCurrency, a.body),
+    onSettled: () => void invalidateMoney(qc, ws),
+  });
+}
+
+/** Entries that look like the other half of this one (same amount, other account, nearby date). */
+export function useTransferMatches(id: string | null) {
+  const { id: ws } = useWorkspace();
+  return useQuery({ queryKey: ['ws', ws, 'transfer-matches', id], queryFn: () => transactionsApi.transferMatches(ws, id!), enabled: !!id });
+}
+
+export function useLinkTransfer() {
+  const { id: ws } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { firstId: string; secondId: string }) => transactionsApi.linkTransfer(ws, a.firstId, a.secondId),
+    onSettled: () => void invalidateMoney(qc, ws),
+  });
+}
+
 export function useComments(transactionId: string | null) {
   const { id: ws } = useWorkspace();
   return useQuery({

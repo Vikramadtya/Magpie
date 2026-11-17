@@ -2,13 +2,14 @@ import { Download, Undo2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { importApi } from '../api/endpoints';
-import type { ImportPreview } from '../api/types';
+import type { ColumnMapping, ImportPreview } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { Field } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
-import { useImportCommit, useImportPreview, useUndoImport } from '../hooks/useInsights';
+import { useDeleteImportMapping, useImportCommit, useImportMappings, useImportPreview, useSaveImportMapping, useUndoImport } from '../hooks/useInsights';
 import { useAccounts } from '../hooks/useReference';
 import { errorMessage } from '../lib/http';
 import { formatMoney } from '../lib/money';
@@ -28,10 +29,29 @@ export default function ImportPage() {
   const account = accounts.find((a) => a.id === (accountId || accounts[0]?.id));
   const currency = account?.currency ?? 'USD';
 
-  const runPreview = () => {
+  const [mapping, setMapping] = useState<ColumnMapping | null>(null);
+  const [mapName, setMapName] = useState('');
+  const saved = useImportMappings().data ?? [];
+  const saveMapping = useSaveImportMapping();
+  const deleteMapping = useDeleteImportMapping();
+
+  const runPreview = (m: ColumnMapping | null = mapping, fmt = dateFormat) => {
     if (!file || !account) return;
-    previewMut.mutate({ file, accountId: account.id, dateFormat }, { onSuccess: setPreview });
+    previewMut.mutate({ file, accountId: account.id, dateFormat: fmt, mapping: m }, { onSuccess: (p) => {
+      setPreview(p);
+      // An unreadable layout opens the column picker with sensible guesses.
+      if (p.strategy === 'unrecognized' && !m) setMapping(guess(p.headers));
+    } });
   };
+  const pickSaved = (id: string) => {
+    const m = saved.find((x) => x.id === id);
+    if (!m) return;
+    setMapping(m.mapping);
+    setDateFormat(m.dateFormat);
+    setMapName(m.name);
+    runPreview(m.mapping, m.dateFormat);
+  };
+  const setCol = (k: keyof ColumnMapping, v: string) => setMapping((m) => ({ ...(m ?? { dateCol: '' }), [k]: v || null }) as ColumnMapping);
 
   const runCommit = () => {
     if (!preview || !file || !account) return;
@@ -81,13 +101,50 @@ export default function ImportPage() {
             <Field label="File (max 5 MB)">
               <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border bg-surface px-3.5 text-sm text-secondary transition-colors hover:border-accent hover:text-primary focus-within:ring-4 focus-within:ring-accent/15">
                 <Upload className="w-4 h-4 shrink-0" /><span className="truncate">{file ? file.name : 'Choose a CSV file'}</span>
-                <input ref={input} type="file" accept=".csv,text/csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} className="sr-only" />
+                <input ref={input} type="file" accept=".csv,text/csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); setMapping(null); }} className="sr-only" />
               </label>
             </Field>
           </div>
-          <Button onClick={runPreview} disabled={!file || !account || previewMut.isPending}><Upload className="w-4 h-4 mr-2" />Preview</Button>
+          {saved.length > 0 && (
+            <Field label="Saved bank layout">
+              <div className="flex gap-2">
+                <Select value="" onChange={(e) => pickSaved(e.target.value)}>
+                  <option value="">Choose one to reuse…</option>
+                  {saved.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </Select>
+                {saved.some((m) => m.name === mapName) && <Button variant="outline" size="sm" onClick={() => deleteMapping.mutate(saved.find((m) => m.name === mapName)!.id)}>Forget</Button>}
+              </div>
+            </Field>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={() => runPreview(mapping)} disabled={!file || !account || previewMut.isPending}><Upload className="w-4 h-4 mr-2" />Preview</Button>
+            {file && !mapping && <Button variant="outline" onClick={() => setMapping(guess(preview?.headers ?? []))}>Choose columns</Button>}
+          </div>
 
-          {preview && (
+          {mapping && (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <p className="text-sm font-medium">{preview?.strategy === 'unrecognized' ? "We couldn't recognise this file's columns. Tell us which is which." : 'Which column is which'}</p>
+              {(preview?.headers.length ?? 0) === 0 && <p className="text-xs text-secondary">Press Preview once so we can read the column names.</p>}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {([['dateCol', 'Date'], ['descCol', 'Description'], ['amountCol', 'Amount (negative = spending)'], ['debitCol', 'Money out (instead of amount)'], ['creditCol', 'Money in (instead of amount)']] as const).map(([k, label]) => (
+                  <Field key={k} label={label}>
+                    <Select value={mapping[k] ?? ''} onChange={(e) => setCol(k, e.target.value)}>
+                      <option value="">{k === 'dateCol' ? 'Choose…' : 'None'}</option>
+                      {(preview?.headers ?? []).map((h) => <option key={h} value={h}>{h}</option>)}
+                    </Select>
+                  </Field>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <Button size="sm" disabled={!mapping.dateCol || !(mapping.amountCol || mapping.debitCol || mapping.creditCol) || previewMut.isPending} onClick={() => runPreview(mapping)}>Use these columns</Button>
+                <Input className="w-48" placeholder="Name this bank, e.g. HDFC" value={mapName} onChange={(e) => setMapName(e.target.value)} aria-label="Layout name" />
+                <Button size="sm" variant="outline" disabled={!mapName.trim() || !mapping.dateCol || saveMapping.isPending} onClick={() => saveMapping.mutate({ name: mapName.trim(), mapping, dateFormat }, { onSuccess: () => toast.success('Layout saved for next time') })}>Save layout</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setMapping(null); setMapName(''); }}>Auto-detect instead</Button>
+              </div>
+            </div>
+          )}
+
+          {preview && preview.strategy !== 'unrecognized' && (
             <div className="space-y-3">
               <p className="text-sm">
                 <strong>{preview.rows.length - preview.duplicates}</strong> new rows
@@ -124,4 +181,16 @@ export default function ImportPage() {
       )}
     </>
   );
+}
+
+/** First-guess column picks from header names; the user can change any of them. */
+function guess(headers: string[]): ColumnMapping {
+  const find = (...needles: string[]) => headers.find((h) => needles.some((n) => h.toLowerCase().includes(n))) ?? null;
+  return {
+    dateCol: find('date', 'posted', 'day') ?? '',
+    descCol: find('descr', 'narration', 'payee', 'details', 'memo', 'name', 'particulars'),
+    amountCol: find('amount'),
+    debitCol: find('debit', 'withdraw', 'money out'),
+    creditCol: find('credit', 'deposit', 'money in'),
+  };
 }

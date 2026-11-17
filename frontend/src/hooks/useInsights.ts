@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fxApi, holdingsApi, importApi, insightsApi, workspaceApi } from '../api/endpoints';
-import type { HoldingInput, ParsedRow } from '../api/types';
+import type { ColumnMapping, HoldingInput, ParsedRow } from '../api/types';
 import { useWorkspace } from '../auth/AuthProvider';
 import { invalidateMoney, qk } from './keys';
 
@@ -83,7 +83,27 @@ export const useDeleteHolding = () => useHoldingMutation((ws, id: string) => hol
 export function useImportPreview() {
   const { id } = useWorkspace();
   return useMutation({
-    mutationFn: (a: { file: File; accountId: string; dateFormat: string }) => importApi.preview(id, a.file, a.accountId, a.dateFormat),
+    mutationFn: (a: { file: File; accountId: string; dateFormat: string; mapping?: ColumnMapping | null }) => importApi.preview(id, a.file, a.accountId, a.dateFormat, a.mapping),
+  });
+}
+export function useImportMappings() {
+  const { id } = useWorkspace();
+  return useQuery({ queryKey: ['import-mappings', id], queryFn: () => importApi.mappings(id) });
+}
+export function useSaveImportMapping() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (b: { name: string; mapping: ColumnMapping; dateFormat: string }) => importApi.saveMapping(id, b),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['import-mappings', id] }),
+  });
+}
+export function useDeleteImportMapping() {
+  const { id } = useWorkspace();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mid: string) => importApi.deleteMapping(id, mid),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['import-mappings', id] }),
   });
 }
 export function useImportCommit() {

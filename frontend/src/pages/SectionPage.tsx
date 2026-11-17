@@ -7,6 +7,7 @@ import { PLAN_TABS, WEALTH_TABS } from '../components/layout/nav';
 const PAGES: Record<string, LazyExoticComponent<ComponentType>> = {
   budgets: lazy(() => import('./BudgetsPage')),
   goals: lazy(() => import('./GoalsPage')),
+  bills: lazy(() => import('./BillsPage')),
   recurring: lazy(() => import('./RecurringPage')),
   trips: lazy(() => import('./TripsPage')),
   accounts: lazy(() => import('./AccountsPage')),

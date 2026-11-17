@@ -30,7 +30,7 @@ export function useGoals() {
   return useQuery({ queryKey: qk.goals(id), queryFn: () => goalsApi.list(id) });
 }
 export const useSaveGoal = () =>
-  useMoneyMutation((ws, a: { id?: string; name: string; targetMinor: number; currency: string; targetDate?: string | null }) =>
+  useMoneyMutation((ws, a: { id?: string; name: string; targetMinor: number; currency: string; targetDate?: string | null; accountId?: string | null }) =>
     a.id ? goalsApi.update(ws, a.id, a) : goalsApi.create(ws, a));
 export const useDeleteGoal = () => useMoneyMutation((ws, id: string) => goalsApi.remove(ws, id));
 export const useContribute = () =>

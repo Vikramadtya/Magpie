@@ -28,7 +28,9 @@ public class GoalController {
       @NotBlank @Size(max = 160) String name,
       @Positive @Max(1_000_000_000_000L) long targetMinor,
       @NotBlank @Pattern(regexp = "^[A-Za-z]{3}$") String currency,
-      LocalDate targetDate) {}
+      LocalDate targetDate,
+      /** Follow this account's balance instead of recording deposits by hand. */
+      UUID accountId) {}
 
   @Serdeable
   public record Contribution(

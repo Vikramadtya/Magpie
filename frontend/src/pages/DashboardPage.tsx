@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { endOfMonth, parseISO } from 'date-fns';
-import { Banknote, ClipboardCheck, Inbox, LineChart, Lightbulb, PiggyBank, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Banknote, ClipboardCheck, Eye, EyeOff, Inbox, LineChart, Lightbulb, PiggyBank, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { sampleApi } from '../api/endpoints';
@@ -24,6 +24,8 @@ import { useDashboard } from '../hooks/useInsights';
 import { useCategories } from '../hooks/useReference';
 import { useRefunds } from '../hooks/useRefunds';
 import { cn } from '../lib/cn';
+import { useHomeLayout } from '../lib/homeLayout';
+import { IconButton } from '../components/ui/IconButton';
 import { isoDate, monthKey, shortDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { paletteColor } from '../lib/palette';
@@ -33,6 +35,47 @@ const NetWorthTrend = lazy(() => import('../features/analytics/DashboardCharts')
 const BudgetCompact = lazy(() => import('../features/analytics/DashboardCharts').then((m) => ({ default: m.BudgetCompact })));
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** The blocks of Home, in their default order; each can be moved or hidden. */
+const SECTIONS = ['summary', 'attention', 'month', 'breakdown', 'activity'];
+const SECTION_LABELS: Record<string, string> = {
+  summary: 'Safe to spend and net worth',
+  attention: 'Things to do',
+  month: 'Income, spending and pace',
+  breakdown: 'Categories, budgets and coming up',
+  activity: 'Recent activity and trend',
+};
+
+function section(id: string, d: Dashboard, month: string, setMonth: (m: string) => void): ReactNode {
+  switch (id) {
+    case 'summary':
+      return <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6 [&>*]:min-w-0"><SafeCard d={d} /><NetWorthCard d={d} /></div>;
+    case 'attention':
+      return <NeedsAttention d={d} month={month} />;
+    case 'month':
+      return (
+        <div className="grid lg:grid-cols-2 gap-6 [&>*]:min-w-0">
+          <MonthCard d={d} month={month} onMonth={setMonth} />
+          <Suspense fallback={<SkeletonCard lines={4} className="h-full" />}><PaceCard d={d} month={month} /></Suspense>
+        </div>
+      );
+    case 'breakdown':
+      return (
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 [&>*]:min-w-0">
+          <TopCategories d={d} month={month} />
+          <Suspense fallback={<SkeletonCard lines={4} />}><BudgetCompact d={d} /></Suspense>
+          <div className="md:col-span-2 xl:col-span-1 [&>section]:h-full"><UpcomingCard d={d} /></div>
+        </div>
+      );
+    default:
+      return (
+        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 [&>*]:min-w-0">
+          <RecentActivity d={d} />
+          <Suspense fallback={<SkeletonCard lines={4} />}><NetWorthTrend /></Suspense>
+        </div>
+      );
+  }
+}
 
 function greeting(name?: string | null) {
   const h = new Date().getHours();
@@ -48,6 +91,8 @@ export default function DashboardPage() {
   const d = dash.data;
   // Once setup has started it stays until finished, even though the first account makes the ledger non-empty.
   const [setup, setSetup] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const layout = useHomeLayout(SECTIONS);
   useEffect(() => {
     if (d && d.accounts.length === 0) setSetup(true);
   }, [d]);
@@ -56,7 +101,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={greeting(user?.name)} subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} />
+      <PageHeader title={greeting(user?.name)} subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} actions={!editing && <Button variant="outline" size="sm" onClick={() => setEditing(true)}><SlidersHorizontal className="w-4 h-4 mr-2" />Customise</Button>} />
       <StateView
         isLoading={dash.isLoading}
         error={dash.error}
@@ -73,29 +118,34 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <FxWarning currencies={d.missingCurrencies} base={d.currency} />
             <SampleBanner d={d} />
-
-            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-6 [&>*]:min-w-0">
-              <SafeCard d={d} />
-              <NetWorthCard d={d} />
-            </div>
-
-            <NeedsAttention d={d} month={month} />
-
-            <div className="grid lg:grid-cols-2 gap-6 [&>*]:min-w-0">
-              <MonthCard d={d} month={month} onMonth={setMonth} />
-              <Suspense fallback={<SkeletonCard lines={4} className="h-full" />}><PaceCard d={d} month={month} /></Suspense>
-            </div>
-
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 [&>*]:min-w-0">
-              <TopCategories d={d} month={month} />
-              <Suspense fallback={<SkeletonCard lines={4} />}><BudgetCompact d={d} /></Suspense>
-              <div className="md:col-span-2 xl:col-span-1 [&>section]:h-full"><UpcomingCard d={d} /></div>
-            </div>
-
-            <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 [&>*]:min-w-0">
-              <RecentActivity d={d} />
-              <Suspense fallback={<SkeletonCard lines={4} />}><NetWorthTrend /></Suspense>
-            </div>
+            {editing && (
+              <div className="glass-panel p-4 flex flex-wrap items-center justify-between gap-3 !bg-accent/[0.07]">
+                <p className="text-body">Arrange your Home: move sections up or down, or hide the ones you do not need.</p>
+                <div className="flex gap-2">
+                  {layout.customised && <Button size="sm" variant="ghost" onClick={layout.reset}>Reset</Button>}
+                  <Button size="sm" onClick={() => setEditing(false)}>Done</Button>
+                </div>
+              </div>
+            )}
+            {layout.visible.map((id, i) => (
+              <div key={id} className={cn('relative', editing && 'rounded-[22px] ring-2 ring-accent/30 ring-offset-4 ring-offset-background')}>
+                {editing && (
+                  <div className="absolute -top-3 right-3 z-10 flex items-center gap-0.5 rounded-xl bg-surface shadow-lift px-1 py-0.5">
+                    <span className="text-caption text-secondary px-2">{SECTION_LABELS[id]}</span>
+                    <IconButton label="Move up" disabled={i === 0} onClick={() => layout.move(id, -1)}><ArrowUp className="w-4 h-4" /></IconButton>
+                    <IconButton label="Move down" disabled={i === layout.visible.length - 1} onClick={() => layout.move(id, 1)}><ArrowDown className="w-4 h-4" /></IconButton>
+                    <IconButton label="Hide this section" onClick={() => layout.hide(id)}><EyeOff className="w-4 h-4" /></IconButton>
+                  </div>
+                )}
+                {section(id, d, month, setMonth)}
+              </div>
+            ))}
+            {editing && layout.hidden.length > 0 && (
+              <div className="glass-panel p-4">
+                <p className="text-caption text-secondary mb-2">Hidden</p>
+                <ul className="flex flex-wrap gap-2">{layout.hidden.map((id) => <li key={id}><Button size="sm" variant="outline" onClick={() => layout.show(id)}><Eye className="w-4 h-4 mr-1.5" />{SECTION_LABELS[id]}</Button></li>)}</ul>
+              </div>
+            )}
           </div>
         )}
       </StateView>

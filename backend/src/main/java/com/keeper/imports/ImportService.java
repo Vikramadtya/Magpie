@@ -35,7 +35,8 @@ public class ImportService {
   private static final int MAX_ROWS = 10_000;
 
   @io.micronaut.serde.annotation.Serdeable
-  public record Preview(String strategy, List<ParsedRow> rows, int skipped, int duplicates) {}
+  public record Preview(
+      String strategy, List<ParsedRow> rows, int skipped, int duplicates, List<String> headers) {}
 
   @io.micronaut.serde.annotation.Serdeable
   public record Result(UUID batchId, int imported, int duplicates) {}
@@ -63,6 +64,11 @@ public class ImportService {
   }
 
   public Preview preview(UUID ws, UUID accountId, String csv, String dateFormat) {
+    return preview(ws, accountId, csv, dateFormat, null);
+  }
+
+  public Preview preview(
+      UUID ws, UUID accountId, String csv, String dateFormat, ColumnMapping mapping) {
     Account account = account(ws, accountId);
     List<List<String>> table = CsvParser.parse(csv.startsWith("﻿") ? csv.substring(1) : csv);
     if (table.size() < 2) throw new BadRequestException("The file has no data rows");
@@ -72,14 +78,16 @@ public class ImportService {
     Map<String, Integer> header = new LinkedHashMap<>();
     List<String> head = table.get(0);
     for (int i = 0; i < head.size(); i++) header.put(head.get(i).toLowerCase().trim(), i);
-    CsvImportStrategy strategy =
-        strategies.stream()
-            .filter(s -> s.supports(header))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new BadRequestException(
-                        "Unrecognized columns. Expected date + amount (or debit/credit)"));
+    List<String> headers = head.stream().map(String::trim).toList();
+    CsvImportStrategy strategy = null;
+    if (mapping != null) {
+      if (!mapping.valid())
+        throw new BadRequestException("Pick a date column and an amount (or debit/credit) column");
+    } else {
+      strategy = strategies.stream().filter(s -> s.supports(header)).findFirst().orElse(null);
+      if (strategy == null)
+        return new Preview("unrecognized", List.of(), 0, 0, headers);
+    }
 
     List<ParsedRow> rows = new ArrayList<>();
     int skipped = 0;
@@ -87,7 +95,7 @@ public class ImportService {
     DateTimeFormatter fmt = formatter(dateFormat);
     for (List<String> cells : table.subList(1, table.size())) {
       try {
-        var raw = strategy.read(cells, header);
+        var raw = mapping != null ? mapping.read(cells, header) : strategy.read(cells, header);
         LocalDate date = LocalDate.parse(raw.date().trim(), fmt);
         long amount = parseAmount(raw.amount(), account.currency());
         if (amount == 0) throw new IllegalArgumentException("zero");
@@ -100,7 +108,7 @@ public class ImportService {
         skipped++;
       }
     }
-    return new Preview(strategy.name(), rows, skipped, duplicates);
+    return new Preview(mapping != null ? "custom columns" : strategy.name(), rows, skipped, duplicates, headers);
   }
 
   public Result commit(UUID ws, UUID actor, UUID accountId, String fileName, List<ParsedRow> rows) {

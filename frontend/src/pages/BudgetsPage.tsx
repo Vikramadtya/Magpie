@@ -12,6 +12,7 @@ import { MonthPicker } from '../components/ui/MonthPicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { Segmented } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
 import { groupCategories } from '../features/transactions/TransactionDialog';
@@ -22,7 +23,15 @@ import { formatMoney, parseMoney, toInputValue } from '../lib/money';
 import type { BudgetLine, BudgetSummary } from '../api/types';
 import { Ring } from '../components/ui/Ring';
 
+type Mode = 'categories' | 'flex';
+const MODE_KEY = 'keeper.budget.mode';
+function readMode(): Mode {
+  try { return localStorage.getItem(MODE_KEY) === 'flex' ? 'flex' : 'categories'; } catch { return 'categories'; }
+}
+
 export default function BudgetsPage() {
+  const [mode, setModeState] = useState<Mode>(readMode);
+  const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* private mode */ } };
   const { canEdit } = useWorkspace();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const budgets = useBudgets(month);
@@ -56,8 +65,9 @@ export default function BudgetsPage() {
       >
         {b && (
           <div className="space-y-6">
-            <Summary b={b} />
-            <ul className="grid md:grid-cols-2 gap-4">
+            <Segmented value={mode} onChange={setMode} options={[['categories', 'By category'], ['flex', 'One number']] as const} />
+            {mode === 'flex' ? <FlexSummary b={b} month={month} /> : <Summary b={b} />}
+            <ul className={mode === 'flex' ? 'hidden' : 'grid md:grid-cols-2 gap-4'}>
               {b.lines.map((l) => {
                 const total = l.amountMinor + l.rolloverMinor;
                 const pct = total > 0 ? (l.spentMinor / total) * 100 : l.spentMinor > 0 ? 101 : 0;
@@ -104,6 +114,29 @@ export default function BudgetsPage() {
       {history && <BudgetHistory categoryId={history.categoryId} name={history.categoryName} currency={b?.currency ?? 'USD'} onClose={() => setHistory(null)} />}
       {editing && <BudgetModal line={editing === 'new' ? null : editing} month={month} existing={new Set(b?.lines.map((l) => l.categoryId))} currency={b?.currency ?? 'USD'} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+/** One big "left to spend" figure for people who find per-category bars too fiddly. */
+function FlexSummary({ b, month }: { b: BudgetSummary; month: string }) {
+  const left = b.budgetedMinor - b.spentMinor;
+  const [y, m] = month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const today = new Date();
+  const current = today.getFullYear() === y && today.getMonth() + 1 === m;
+  const daysLeft = current ? daysInMonth - today.getDate() + 1 : 0;
+  const perDay = daysLeft > 0 && left > 0 ? Math.floor(left / daysLeft) : 0;
+  const pct = b.budgetedMinor > 0 ? Math.min(100, (b.spentMinor / b.budgetedMinor) * 100) : 0;
+  return (
+    <section className="glass-panel p-8 text-center">
+      <p className="text-sm text-secondary">{left < 0 ? 'Over budget this month' : 'Left to spend this month'}</p>
+      <p className={`mt-2 text-5xl sm:text-6xl font-semibold tabular-nums tracking-[-0.03em] ${left < 0 ? 'text-red-500' : ''}`}>{formatMoney(Math.abs(left), b.currency)}</p>
+      <div className="mx-auto mt-6 max-w-md"><ProgressBar value={pct} label="Spent so far" /></div>
+      <p className="mt-3 text-sm text-secondary tabular-nums">
+        {formatMoney(b.spentMinor, b.currency)} of {formatMoney(b.budgetedMinor, b.currency)}
+        {perDay > 0 && <> · about {formatMoney(perDay, b.currency)} a day for {daysLeft} more {daysLeft === 1 ? 'day' : 'days'}</>}
+      </p>
+    </section>
   );
 }
 

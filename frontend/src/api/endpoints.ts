@@ -85,6 +85,13 @@ export const transactionsApi = {
   transfer: (ws: string, b: T.TransferInput, key: string) => api.post<T.Transaction[]>(ws, '/transfers', b, { 'Idempotency-Key': key }),
   bulk: (ws: string, b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; ids: string[]; categoryId?: string; personId?: string | null }) =>
     api.post<{ affected: number }>(ws, '/transactions/bulk', b),
+  linkTransfer: (ws: string, firstId: string, secondId: string) => api.post<T.Transaction[]>(ws, '/transactions/link-transfer', { firstId, secondId }),
+  transferMatches: (ws: string, id: string) => api.get<T.Transaction[]>(ws, `/transactions/${id}/transfer-matches`),
+  /** Applies a change to everything a filter matches; `expected` is the count the person saw. */
+  bulkFiltered: (ws: string, filters: T.TransactionFilters, baseCurrency: string, b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; expected: number; categoryId?: string; personId?: string | null }) => {
+    const { sort: _sort, ...rest } = toQuery(filters, baseCurrency);
+    return api.post<{ matched: number; applied: number }>(ws, '/transactions/bulk-filtered', { ...rest, ...b });
+  },
   undo: (ws: string, id: string) =>
     api.post<{ action: 'RESTORED' | 'REVERTED'; transaction: T.Transaction }>(ws, `/transactions/${id}/undo`),
   restore: (ws: string, id: string) => api.post<T.Transaction>(ws, `/transactions/${id}/restore`),
@@ -106,8 +113,8 @@ export const budgetsApi = {
 
 export const goalsApi = {
   list: (ws: string) => api.get<T.Goal[]>(ws, '/goals'),
-  create: (ws: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null }) => api.post<T.Goal>(ws, '/goals', b),
-  update: (ws: string, id: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null }) => api.patch<T.Goal>(ws, `/goals/${id}`, b),
+  create: (ws: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null; accountId?: string | null }) => api.post<T.Goal>(ws, '/goals', b),
+  update: (ws: string, id: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null; accountId?: string | null }) => api.patch<T.Goal>(ws, `/goals/${id}`, b),
   remove: (ws: string, id: string) => api.del(ws, `/goals/${id}`),
   contribute: (ws: string, id: string, amountMinor: number, occurredOn: string) =>
     api.post<T.Goal>(ws, `/goals/${id}/contributions`, { amountMinor, occurredOn }),
@@ -143,11 +150,15 @@ export const insightsApi = {
 };
 
 export const importApi = {
-  preview: (ws: string, file: File, accountId: string, dateFormat: string) => {
+  preview: (ws: string, file: File, accountId: string, dateFormat: string, mapping?: T.ColumnMapping | null) => {
     const form = new FormData();
     form.append('file', file);
     form.append('accountId', accountId);
     form.append('dateFormat', dateFormat);
+    if (mapping) {
+      form.append('dateCol', mapping.dateCol);
+      for (const k of ['amountCol', 'debitCol', 'creditCol', 'descCol'] as const) if (mapping[k]) form.append(k, mapping[k] as string);
+    }
     return http
       .post<T.ImportPreview>(`/api/v1/workspaces/${ws}/imports/preview`, form, { headers: { 'Content-Type': undefined } })
       .then((r) => r.data);
@@ -155,6 +166,9 @@ export const importApi = {
   commit: (ws: string, accountId: string, fileName: string, rows: T.ParsedRow[]) =>
     api.post<T.ImportResult>(ws, '/imports/commit', { accountId, fileName, rows }),
   undo: (ws: string, batchId: string) => api.del(ws, `/imports/${batchId}`),
+  mappings: (ws: string) => api.get<T.SavedMapping[]>(ws, '/import-mappings'),
+  saveMapping: (ws: string, body: { name: string; mapping: T.ColumnMapping; dateFormat: string }) => api.post<T.SavedMapping>(ws, '/import-mappings', body),
+  deleteMapping: (ws: string, id: string) => api.del(ws, `/import-mappings/${id}`),
   exportCsv: (ws: string) =>
     http.get<Blob>(`/api/v1/workspaces/${ws}/export/transactions.csv`, { responseType: 'blob' }).then((r) => r.data),
 };
@@ -184,6 +198,34 @@ export const loansApi = {
   repay: (ws: string, id: string, b: { accountId: string; amountMinor: number; occurredOn: string; note?: string | null }) =>
     api.post<T.Loan>(ws, `/loans/${id}/payments`, b),
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
+};
+
+export const receiptsApi = {
+  list: (ws: string, txId: string) => api.get<T.ReceiptFile[]>(ws, `/transactions/${txId}/receipts`),
+  counts: (ws: string) => api.get<{ transactionId: string; count: number }[]>(ws, '/receipts/counts'),
+  upload: (ws: string, txId: string, file: Blob, filename: string) => {
+    const form = new FormData();
+    form.append('file', file, filename);
+    return http.post<T.ReceiptFile>(`/api/v1/workspaces/${ws}/transactions/${txId}/receipts`, form, { headers: { 'Content-Type': undefined } }).then((r) => r.data);
+  },
+  /** The file as a blob: it needs the sign-in header, so it cannot be a plain image address. */
+  file: (ws: string, id: string) => http.get<Blob>(`/api/v1/workspaces/${ws}/receipts/${id}`, { responseType: 'blob' }).then((r) => r.data),
+  remove: (ws: string, id: string) => api.del(ws, `/receipts/${id}`),
+};
+
+export const billsApi = {
+  calendar: (ws: string, month: string) => api.get<T.BillsCalendar>(ws, '/bills/calendar', { month }),
+  suggestions: (ws: string) => api.get<T.SpottedCharge[]>(ws, '/bills/suggestions'),
+};
+
+export const rulesApi = {
+  list: (ws: string) => api.get<T.Rule[]>(ws, '/rules'),
+  create: (ws: string, b: T.RuleInput) => api.post<T.Rule>(ws, '/rules', b),
+  update: (ws: string, id: string, b: T.RuleInput) => api.put<T.Rule>(ws, `/rules/${id}`, b),
+  remove: (ws: string, id: string) => api.del(ws, `/rules/${id}`),
+  order: (ws: string, ids: string[]) => api.put<void>(ws, '/rules/order', { ids }),
+  test: (ws: string, b: T.RuleInput) => api.post<T.RuleTest>(ws, '/rules/test', b),
+  apply: (ws: string, id?: string) => api.post<{ updated: number }>(ws, id ? `/rules/${id}/apply` : '/rules/apply'),
 };
 
 export const billingApi = {

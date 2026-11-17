@@ -103,6 +103,7 @@ function Compare({ b }: { b: Billing }) {
     ['Import a bank file', '', '✓'],
     ['Weekly digest and Discord', '', '✓'],
     ['Household sharing', '', '✓'],
+    ['Receipts on transactions', '', '✓'],
   ];
   return (
     <section className="glass-panel p-6">

@@ -17,7 +17,9 @@ import { useFxQuote } from '../hooks/useInsights';
 import { useAcceptItem, useApplyUpdate, useCaptures, useDismissItem, useInbox, useKeepItem, useRemoveRecords } from '../hooks/useInbox';
 import { useAccounts, useCategories } from '../hooks/useReference';
 import { useTrips } from '../hooks/useTrips';
+import { toast } from 'sonner';
 import { cn } from '../lib/cn';
+import { useSwipe } from '../lib/useSwipe';
 import { prettyDate } from '../lib/dates';
 import { formatMoney, parseMoney, toInputValue } from '../lib/money';
 
@@ -34,6 +36,7 @@ export default function InboxPage() {
   return (
     <>
       <PageHeader title="To review" subtitle="Things entered on your phone or sent by your expense-split app, waiting to be recorded in your ledger" />
+      {tab === 'todo' && items.some((i) => i.status === 'PENDING') && <p className="sm:hidden text-xs text-secondary mb-3">Tip: swipe a card right to record it, left to dismiss.</p>}
       <Segmented className="mb-6" value={tab} onChange={setTab} options={[['todo', 'To review'], ['done', 'Recorded']] as const} />
       <StateView
         isLoading={inbox.isLoading}
@@ -128,6 +131,13 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
     (fn === 'accept' ? accept : applyUpdate).mutate({ id: item.id, body: body() });
   };
 
+  const pending = item.status === 'PENDING';
+  const swipe = useSwipe({
+    enabled: pending,
+    onRight: () => (needsAccount && !accountId ? toast.info('Choose an account, then swipe right to record') : save('accept')),
+    onLeft: () => dismiss.mutate(item.id),
+  });
+
   const others = item.shares.filter((s) => s.shareMinor > 0);
   const summary = (() => {
     if (item.kind === 'TRANSFER') {
@@ -147,7 +157,13 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
   })();
 
   return (
-    <li className={cn('glass-panel p-5 space-y-4', (changed || removed) && 'border-amber-500/50')}>
+    <li className="relative">
+    {pending && swipe.dx !== 0 && (
+      <div className={cn('absolute inset-0 rounded-2xl flex items-center px-6 text-sm font-semibold text-white', swipe.dx > 0 ? 'bg-green-600 justify-start' : 'bg-red-500 justify-end')}>
+        {swipe.dx > 0 ? 'Record' : 'Dismiss'}
+      </div>
+    )}
+    <div {...swipe.bind} className={cn('glass-panel p-5 space-y-4 relative', (changed || removed) && 'border-amber-500/50')}>
       {(changed || removed) && (
         <p className="text-sm rounded-lg bg-amber-500/10 px-3 py-2">
           {removed ? 'This was deleted in the split app.' : 'This changed in the split app after you recorded it.'} Keeper still has the version you accepted.
@@ -226,6 +242,7 @@ function ReviewCard({ item, accounts }: { item: InboxItem; accounts: Account[] }
           </>
         )}
       </div>
+    </div>
     </li>
   );
 }

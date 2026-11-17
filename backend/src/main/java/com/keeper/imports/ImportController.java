@@ -46,10 +46,14 @@ public class ImportController {
   private final com.keeper.billing.Entitlements entitlements;
   private final TransactionService transactions;
 
+  private final MappingService mappings;
+
   public ImportController(
+      MappingService mappings,
       ImportService imports,
       TransactionService transactions,
       com.keeper.billing.Entitlements entitlements) {
+    this.mappings = mappings;
     this.entitlements = entitlements;
     this.imports = imports;
     this.transactions = transactions;
@@ -60,10 +64,42 @@ public class ImportController {
       @PathVariable UUID workspaceId,
       CompletedFileUpload file,
       UUID accountId,
-      @Nullable String dateFormat)
+      @Nullable String dateFormat,
+      @Nullable String dateCol,
+      @Nullable String amountCol,
+      @Nullable String debitCol,
+      @Nullable String creditCol,
+      @Nullable String descCol)
       throws IOException {
     String csv = new String(file.getBytes(), StandardCharsets.UTF_8);
-    return imports.preview(workspaceId, accountId, csv, dateFormat);
+    ColumnMapping mapping =
+        dateCol == null || dateCol.isBlank()
+            ? null
+            : new ColumnMapping(dateCol, amountCol, debitCol, creditCol, descCol);
+    return imports.preview(workspaceId, accountId, csv, dateFormat, mapping);
+  }
+
+  @Serdeable
+  public record MappingRequest(
+      @NotBlank @Size(max = 100) String name,
+      @NotNull @Valid ColumnMapping mapping,
+      @Nullable @Size(max = 8) String dateFormat) {}
+
+  @Get("/import-mappings")
+  public List<MappingService.Saved> mappings(@PathVariable UUID workspaceId) {
+    return mappings.list(workspaceId);
+  }
+
+  @Post("/import-mappings")
+  public MappingService.Saved saveMapping(
+      @PathVariable UUID workspaceId, @Valid @Body MappingRequest body) {
+    entitlements.require(workspaceId, com.keeper.billing.Feature.IMPORT);
+    return mappings.save(workspaceId, body.name(), body.mapping(), body.dateFormat());
+  }
+
+  @Delete("/import-mappings/{id}")
+  public void deleteMapping(@PathVariable UUID workspaceId, @PathVariable UUID id) {
+    mappings.delete(workspaceId, id);
   }
 
   @Post("/imports/commit")

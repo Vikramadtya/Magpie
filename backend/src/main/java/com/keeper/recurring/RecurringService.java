@@ -95,7 +95,11 @@ public class RecurringService {
   /** Occurrences falling in [today, today + days], for the "upcoming bills" widget. */
   public List<Upcoming> upcoming(UUID ws, int days) {
     LocalDate today = LocalDate.now();
-    LocalDate until = today.plusDays(days);
+    return occurrences(ws, today, today.plusDays(days));
+  }
+
+  /** Every scheduled occurrence of the active rules that falls between two dates. */
+  public List<Upcoming> occurrences(UUID ws, LocalDate today, LocalDate until) {
     List<Upcoming> result = new ArrayList<>();
     for (RecurringRule rule : rules.findAll(ws)) {
       if (!"ACTIVE".equals(rule.status())) continue;

@@ -224,4 +224,59 @@ class PolishFeaturesTest extends ApiTestBase {
     assertEquals(6_000, number((Map<?, ?>) value.get(value.size() - 1), "minor"));
     assertEquals(4_000, number((Map<?, ?>) invested.get(invested.size() - 1), "minor"));
   }
+
+  @Test
+  void aGoalCanFollowAnAccountAndItsProgressIsTheBalance() {
+    Session s = register("goal-account");
+    String savings = account(s, "Rainy day", "SAVINGS", 25_000);
+    Map<?, ?> goal =
+        post(
+            s.token(),
+            ws(s) + "/goals",
+            Map.of(
+                "name",
+                "Emergency fund",
+                "targetMinor",
+                100_000,
+                "currency",
+                "USD",
+                "accountId",
+                savings),
+            Map.class);
+    assertEquals(25_000, number(goal, "savedMinor"));
+    assertEquals(25, number(goal, "percent"));
+    assertEquals("Rainy day", goal.get("accountName"));
+
+    // money arriving in the account moves the goal by itself
+    post(
+        s.token(),
+        ws(s) + "/transactions",
+        Map.of(
+            "accountId",
+            savings,
+            "type",
+            "INCOME",
+            "amountMinor",
+            15_000,
+            "occurredOn",
+            LocalDate.now().toString()),
+        Map.class);
+    Map<?, ?> after = getList(s.token(), ws(s) + "/goals").get(0);
+    assertEquals(40_000, number(after, "savedMinor"));
+
+    // hand-entered deposits are refused, and a goal in another currency cannot follow it
+    var deposit =
+        HttpRequest.POST(
+                ws(s) + "/goals/" + goal.get("id") + "/contributions",
+                Map.of("amountMinor", 100, "occurredOn", LocalDate.now().toString()))
+            .bearerAuth(s.token());
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, statusOf(deposit));
+    var wrongCurrency =
+        HttpRequest.POST(
+                ws(s) + "/goals",
+                Map.of(
+                    "name", "Euro", "targetMinor", 1_000, "currency", "EUR", "accountId", savings))
+            .bearerAuth(s.token());
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, statusOf(wrongCurrency));
+  }
 }

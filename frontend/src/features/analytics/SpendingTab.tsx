@@ -10,6 +10,7 @@ import { isoDate } from '../../lib/dates';
 import { paletteColor } from '../../lib/palette';
 import { Columns, Donut, RankedBars, SpendTreemap, type TreeNode } from './charts';
 import { ChartCard, OTHER_COLOR, whenVisible } from './kit';
+import { MoneyFlow } from './MoneyFlow';
 import type { BreakdownBy } from '../../api/types';
 
 interface Range { from: string; to: string }
@@ -17,6 +18,7 @@ interface Range { from: string; to: string }
 export default function SpendingTab({ from, to }: Range) {
   return (
     <div className="space-y-6">
+      <MoneyFlow from={from} to={to} />
       <div className="grid lg:grid-cols-2 gap-6">
         <CategoryChart from={from} to={to} />
         <SubCategoryChart from={from} to={to} />

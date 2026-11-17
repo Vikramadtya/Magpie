@@ -11,7 +11,7 @@ export interface Me { user: User; workspaces: Workspace[]; admin?: boolean }
 // ---------- plans and codes ----------
 export interface PlanLimits {
   accounts: number | null; budgets: number | null; goals: number | null; holdings: number | null; transactionsPerMonth: number | null;
-  historyMonths: number | null; importFiles: boolean; digest: boolean; household: boolean; quickAdd: boolean; liveInvestments: boolean;
+  historyMonths: number | null; importFiles: boolean; digest: boolean; household: boolean; quickAdd: boolean; liveInvestments: boolean; receipts: boolean;
 }
 export interface Billing {
   plan: 'FREE' | 'PRO'; source: string; proUntil: string | null; enforced: boolean; paymentsOpen: boolean; limits: PlanLimits;
@@ -106,6 +106,8 @@ export interface BudgetSummary { month: string; currency: string; budgetedMinor:
 export interface Goal {
   id: string; name: string; targetMinor: number; currency: string; targetDate: string | null;
   savedMinor: number; percent: number; projectedDate: string | null;
+  /** Set when the goal follows an account's balance instead of recorded deposits. */
+  accountId: string | null; accountName: string | null;
 }
 export interface RecurringRule {
   id: string; name: string; accountId: string; categoryId: string | null; payeeId: string | null; type: 'INCOME' | 'EXPENSE';
@@ -146,7 +148,9 @@ export interface PayeeSpend { payeeId: string; name: string; totalMinor: number;
 export interface Activity { id: number; userName: string | null; entity: string; entityId: string | null; action: string; summary: string | null; at: string }
 
 export interface ParsedRow { date: string; amountMinor: number; description: string; duplicate: boolean }
-export interface ImportPreview { strategy: string; rows: ParsedRow[]; skipped: number; duplicates: number }
+export interface ImportPreview { strategy: string; rows: ParsedRow[]; skipped: number; duplicates: number; headers: string[] }
+export interface ColumnMapping { dateCol: string; amountCol?: string | null; debitCol?: string | null; creditCol?: string | null; descCol?: string | null }
+export interface SavedMapping { id: string; name: string; mapping: ColumnMapping; dateFormat: string }
 export interface ImportResult { batchId: string; imported: number; duplicates: number }
 
 export interface Holding {
@@ -307,6 +311,22 @@ export interface AccountSeries { id: string; name: string; type: string; values:
 export interface Wealth {
   currency: string; months: string[]; accounts: AccountSeries[]; investments: number[]; ownAssets: number[]; missingCurrencies: string[];
 }
+// ---------- rules ----------
+export interface Rule {
+  id: string; name: string; text: string | null; textOp: 'CONTAINS' | 'STARTS_WITH' | 'EQUALS'; amountOp: 'GT' | 'LT' | 'EQ' | 'BETWEEN' | null;
+  amountMin: number | null; amountMax: number | null; type: 'INCOME' | 'EXPENSE' | null; categoryId: string; categoryName: string; active: boolean; position: number;
+}
+export interface RuleInput {
+  name: string; text?: string | null; textOp?: Rule['textOp']; amountOp?: Rule['amountOp']; amountMin?: number | null; amountMax?: number | null;
+  type?: Rule['type']; categoryId: string; active?: boolean;
+}
+export interface RuleTest { matches: number; samples: { title: string; amountMinor: number; type: string }[] }
+// ---------- bills ----------
+/** POSTED: recorded. DUE: still to come. OVERDUE: past its date, not recorded. EXPECTED: a repeat charge Keeper spotted but you do not track. */
+export interface BillItem { date: string; name: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; currency: string; status: 'POSTED' | 'DUE' | 'OVERDUE' | 'EXPECTED'; ruleId: string | null }
+export interface BillsCalendar { month: string; items: BillItem[] }
+export interface SpottedCharge { payee: string; amountMinor: number; frequency: Frequency; lastDate: string; nextExpected: string; perYearMinor: number; charges: number; payeeId: string | null; categoryId: string | null }
+export interface ReceiptFile { id: string; transactionId: string; filename: string; contentType: string; sizeBytes: number; createdAt: string }
 export interface HistoryPoint { date: string; minor: number }
 /** One holding over time: price per unit, what it was worth, and what was paid in. */
 export interface HoldingHistory { currency: string; prices: HistoryPoint[]; value: HistoryPoint[]; invested: HistoryPoint[] }
