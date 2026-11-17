@@ -74,6 +74,8 @@ function Overview({ from, to }: { from: string; to: string }) {
   const cash = useCashFlow(isoDate(startOfMonth(subMonths(new Date(), 11))), isoDate(endOfMonth(new Date())));
   const worth = useNetWorth(12);
   const o = overview.data;
+  const [allCategories, setAllCategories] = useState(false);
+  const [allPurchases, setAllPurchases] = useState(false);
   const topCategory = Math.max(...(o?.categoryChanges.map((c) => c.currentMinor) ?? []), 1);
 
   return (
@@ -81,6 +83,12 @@ function Overview({ from, to }: { from: string; to: string }) {
       {o && (
         <div className="space-y-6">
           <FxWarning currencies={[...new Set([...o.missingCurrencies, ...(cash.data?.missingCurrencies ?? []), ...(worth.data?.missingCurrencies ?? [])])]} base={o.currency} />
+
+          <p className="text-lg sm:text-xl font-medium tracking-[-0.01em]">
+            {o.categoryChanges.length > 0
+              ? <>You spent <strong>{formatMoney(o.current.expenseMinor, o.currency)}</strong>, most of it on <strong>{o.categoryChanges[0].name}</strong>. {o.current.savingsMinor >= 0 ? `${formatMoney(o.current.savingsMinor, o.currency)} left over.` : `That is ${formatMoney(-o.current.savingsMinor, o.currency)} more than came in.`}</>
+              : 'No spending in this period yet.'}
+          </p>
 
           <div className="grid sm:grid-cols-3 gap-3 sm:gap-4">
             <Stat label="Income" value={formatMoney(o.current.incomeMinor, o.currency)} tone="income" />
@@ -95,7 +103,7 @@ function Overview({ from, to }: { from: string; to: string }) {
                 <p className="text-sm text-secondary py-6 text-center">No spending in this period.</p>
               ) : (
                 <ul className="space-y-3">
-                  {o.categoryChanges.map((c, i) => (
+                  {(allCategories ? o.categoryChanges : o.categoryChanges.slice(0, 5)).map((c, i) => (
                     <li key={c.categoryId}>
                       <Link to={`/transactions?category=${c.categoryId}&from=${from}&to=${to}`} className="flex justify-between gap-3 text-sm mb-1 hover:underline">
                         <span className="truncate">{c.name}</span>
@@ -106,6 +114,7 @@ function Overview({ from, to }: { from: string; to: string }) {
                   ))}
                 </ul>
               )}
+              {o.categoryChanges.length > 5 && <button type="button" onClick={() => setAllCategories((v) => !v)} className="mt-3 text-sm text-accent hover:underline">{allCategories ? 'Show fewer' : `Show all ${o.categoryChanges.length}`}</button>}
             </section>
 
             <section className="glass-panel p-5">
@@ -114,7 +123,7 @@ function Overview({ from, to }: { from: string; to: string }) {
                 <p className="text-sm text-secondary">Nothing yet.</p>
               ) : (
                 <ul className="divide-y divide-border">
-                  {o.largest.map((t) => (
+                  {(allPurchases ? o.largest : o.largest.slice(0, 5)).map((t) => (
                     <li key={t.id} className="py-2.5 flex justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{t.title}</p>
@@ -125,6 +134,7 @@ function Overview({ from, to }: { from: string; to: string }) {
                   ))}
                 </ul>
               )}
+              {o.largest.length > 5 && <button type="button" onClick={() => setAllPurchases((v) => !v)} className="mt-3 text-sm text-accent hover:underline">{allPurchases ? 'Show fewer' : `Show all ${o.largest.length}`}</button>}
             </section>
           </div>
 

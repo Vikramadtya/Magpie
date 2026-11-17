@@ -1,6 +1,7 @@
 import { Eye, EyeOff, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun, WifiOff, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Suspense, useEffect, useState } from 'react';
+import { WhatsNew } from './WhatsNew';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import logo from '../../assets/logo.svg';
 import { useAuth } from '../../auth/AuthProvider';
@@ -26,6 +27,7 @@ export default function AppLayout() {
   return (
     <TransactionDialogProvider>
       <Shell />
+      <WhatsNew />
     </TransactionDialogProvider>
   );
 }
