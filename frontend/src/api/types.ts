@@ -309,6 +309,16 @@ export interface AccountSeries { id: string; name: string; type: string; values:
 export interface Wealth {
   currency: string; months: string[]; accounts: AccountSeries[]; investments: number[]; ownAssets: number[]; missingCurrencies: string[];
 }
+// ---------- rules ----------
+export interface Rule {
+  id: string; name: string; text: string | null; textOp: 'CONTAINS' | 'STARTS_WITH' | 'EQUALS'; amountOp: 'GT' | 'LT' | 'EQ' | 'BETWEEN' | null;
+  amountMin: number | null; amountMax: number | null; type: 'INCOME' | 'EXPENSE' | null; categoryId: string; categoryName: string; active: boolean; position: number;
+}
+export interface RuleInput {
+  name: string; text?: string | null; textOp?: Rule['textOp']; amountOp?: Rule['amountOp']; amountMin?: number | null; amountMax?: number | null;
+  type?: Rule['type']; categoryId: string; active?: boolean;
+}
+export interface RuleTest { matches: number; samples: { title: string; amountMinor: number; type: string }[] }
 export interface HistoryPoint { date: string; minor: number }
 /** One holding over time: price per unit, what it was worth, and what was paid in. */
 export interface HoldingHistory { currency: string; prices: HistoryPoint[]; value: HistoryPoint[]; invested: HistoryPoint[] }

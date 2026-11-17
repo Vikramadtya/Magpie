@@ -193,6 +193,16 @@ export const loansApi = {
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
 };
 
+export const rulesApi = {
+  list: (ws: string) => api.get<T.Rule[]>(ws, '/rules'),
+  create: (ws: string, b: T.RuleInput) => api.post<T.Rule>(ws, '/rules', b),
+  update: (ws: string, id: string, b: T.RuleInput) => api.put<T.Rule>(ws, `/rules/${id}`, b),
+  remove: (ws: string, id: string) => api.del(ws, `/rules/${id}`),
+  order: (ws: string, ids: string[]) => api.put<void>(ws, '/rules/order', { ids }),
+  test: (ws: string, b: T.RuleInput) => api.post<T.RuleTest>(ws, '/rules/test', b),
+  apply: (ws: string, id?: string) => api.post<{ updated: number }>(ws, id ? `/rules/${id}/apply` : '/rules/apply'),
+};
+
 export const billingApi = {
   get: (ws: string) => api.get<T.Billing>(ws, '/billing'),
   redeem: (ws: string, code: string) => api.post<{ redeemed: { code: string; days: number; accessUntil: string }; summary: T.Billing }>(ws, '/billing/redeem', { code }),

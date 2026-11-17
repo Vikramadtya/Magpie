@@ -16,6 +16,7 @@ const AnalyticsPage = lazyPage(() => import('./pages/AnalyticsPage'));
 const PlanPage = lazy(() => import('./pages/SectionPage').then((m) => ({ default: m.PlanPage })));
 const WealthPage = lazy(() => import('./pages/SectionPage').then((m) => ({ default: m.WealthPage })));
 const ReviewPage = lazyPage(() => import('./pages/ReviewPage'));
+const RulesPage = lazyPage(() => import('./pages/RulesPage'));
 const BillingPage = lazyPage(() => import('./pages/BillingPage'));
 const AdminCodesPage = lazyPage(() => import('./pages/AdminCodesPage'));
 const RefundsPage = lazyPage(() => import('./pages/RefundsPage'));
@@ -88,6 +89,7 @@ export const router = createBrowserRouter([
       { path: '/assets', element: <Navigate to="/wealth/assets" replace /> },
       { path: '/trips', element: <Navigate to="/plan/trips" replace /> },
       { path: '/review', element: <ReviewPage /> },
+      { path: '/rules', element: <RulesPage /> },
       { path: '/billing', element: <BillingPage /> },
       { path: '/admin/codes', element: <AdminCodesPage /> },
       { path: '/inbox', element: <InboxPage /> },

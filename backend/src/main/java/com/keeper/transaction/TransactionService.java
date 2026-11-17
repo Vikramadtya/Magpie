@@ -38,6 +38,7 @@ public class TransactionService {
   private final Db db;
   private final List<EntryListener> listeners;
   private final TransactionSearch search;
+  private final com.keeper.rule.RuleService rules;
 
   public TransactionService(
       TransactionRepository transactions,
@@ -52,7 +53,9 @@ public class TransactionService {
       Audit audit,
       Db db,
       List<EntryListener> listeners,
-      TransactionSearch search) {
+      TransactionSearch search,
+      com.keeper.rule.RuleService rules) {
+    this.rules = rules;
     this.search = search;
     this.transactions = transactions;
     this.accounts = accounts;
@@ -153,7 +156,7 @@ public class TransactionService {
             .find(ws, r.accountId())
             .orElseThrow(() -> new BadRequestException("Unknown account"));
     requireSpendable(account, r.type());
-    UUID categoryId = validateCategoryAndPayee(ws, r);
+    UUID categoryId = validateCategoryAndPayee(ws, r, true);
     int direction = "INCOME".equals(r.type()) ? 1 : -1;
     Amounts amounts = resolveAmounts(account, r);
     Normalised base =
@@ -276,7 +279,7 @@ public class TransactionService {
                   .find(ws, r.accountId())
                   .orElseThrow(() -> new BadRequestException("Unknown account"));
           requireSpendable(account, r.type());
-          UUID categoryId = validateCategoryAndPayee(ws, req);
+          UUID categoryId = validateCategoryAndPayee(ws, req, false);
           int direction = "INCOME".equals(r.type()) ? 1 : -1;
           Amounts amounts = resolveAmounts(account, req);
           // A hand-set base amount survives edits that don't change what it was derived from.
@@ -522,7 +525,8 @@ public class TransactionService {
   }
 
   /** Returns the category to store: the given one, or the payee's default when none was chosen. */
-  private UUID validateCategoryAndPayee(UUID ws, TransactionController.Request r) {
+  private UUID validateCategoryAndPayee(
+      UUID ws, TransactionController.Request r, boolean useRules) {
     refs.payee(ws, r.payeeId());
     UUID categoryId = r.categoryId();
     if (categoryId == null && r.payeeId() != null) {
@@ -542,6 +546,20 @@ public class TransactionService {
       if (!c.kind().equals(r.type())) {
         throw new BadRequestException("Category kind " + c.kind() + " does not match " + r.type());
       }
+    }
+    if (categoryId == null && useRules) {
+      // still nothing: let the rules look at the payee, note and amount
+      String payeeName =
+          r.payeeId() == null
+              ? null
+              : db.one(
+                      "SELECT name FROM payees WHERE id = ? AND workspace_id = ?",
+                      rs -> rs.getString(1),
+                      r.payeeId(),
+                      ws)
+                  .orElse(null);
+      categoryId =
+          rules.firstMatch(ws, r.type(), r.amountMinor(), payeeName, r.note()).orElse(null);
     }
     return categoryId;
   }
