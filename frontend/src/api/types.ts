@@ -319,6 +319,11 @@ export interface RuleInput {
   type?: Rule['type']; categoryId: string; active?: boolean;
 }
 export interface RuleTest { matches: number; samples: { title: string; amountMinor: number; type: string }[] }
+// ---------- bills ----------
+/** POSTED: recorded. DUE: still to come. OVERDUE: past its date, not recorded. EXPECTED: a repeat charge Keeper spotted but you do not track. */
+export interface BillItem { date: string; name: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; currency: string; status: 'POSTED' | 'DUE' | 'OVERDUE' | 'EXPECTED'; ruleId: string | null }
+export interface BillsCalendar { month: string; items: BillItem[] }
+export interface SpottedCharge { payee: string; amountMinor: number; frequency: Frequency; lastDate: string; nextExpected: string; perYearMinor: number; charges: number; payeeId: string | null; categoryId: string | null }
 export interface HistoryPoint { date: string; minor: number }
 /** One holding over time: price per unit, what it was worth, and what was paid in. */
 export interface HoldingHistory { currency: string; prices: HistoryPoint[]; value: HistoryPoint[]; invested: HistoryPoint[] }

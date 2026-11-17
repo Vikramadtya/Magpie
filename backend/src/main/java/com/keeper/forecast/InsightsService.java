@@ -60,7 +60,9 @@ public class InsightsService {
       LocalDate lastDate,
       LocalDate nextExpected,
       long perYearMinor,
-      int charges) {}
+      int charges,
+      UUID payeeId,
+      UUID categoryId) {}
 
   @Serdeable
   public record SavingsMonth(String month, int ratePercent, long incomeMinor, long expenseMinor) {}
@@ -386,10 +388,19 @@ public class InsightsService {
               last.date(),
               last.date().plusDays(Math.round(gap)),
               Math.round(Forecaster.median(amounts)) * perYear,
-              sorted.size()));
+              sorted.size(),
+              last.payeeId(),
+              last.groupId()));
     }
     out.sort(Comparator.comparingLong(Subscription::perYearMinor).reversed());
-    return out.stream().limit(10).toList();
+    return out.stream().limit(25).toList();
+  }
+
+  /** Repeat charges that are not yet set up as recurring items: the "spotted" subscriptions. */
+  public List<Subscription> detectedSubscriptions(UUID ws) {
+    LocalDate today = LocalDate.now();
+    return subscriptions(
+        ws, history.expenses(ws, YearMonth.from(today).minusMonths(12).atDay(1)), today);
   }
 
   private List<SavingsMonth> savings(UUID ws, YearMonth now) {

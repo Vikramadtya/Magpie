@@ -193,6 +193,11 @@ export const loansApi = {
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
 };
 
+export const billsApi = {
+  calendar: (ws: string, month: string) => api.get<T.BillsCalendar>(ws, '/bills/calendar', { month }),
+  suggestions: (ws: string) => api.get<T.SpottedCharge[]>(ws, '/bills/suggestions'),
+};
+
 export const rulesApi = {
   list: (ws: string) => api.get<T.Rule[]>(ws, '/rules'),
   create: (ws: string, b: T.RuleInput) => api.post<T.Rule>(ws, '/rules', b),

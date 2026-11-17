@@ -1,5 +1,5 @@
 import {
-  CalendarCheck, Crown, Wand2, Gem, Inbox, LayoutDashboard, ListTree, PieChart, Plane, Receipt, Settings, Store, Target, TrendingUp, Undo2, Upload, Users, Wallet, Repeat, Banknote, PiggyBank, ClipboardCheck,
+  CalendarCheck, CalendarDays, Crown, Wand2, Gem, Inbox, LayoutDashboard, ListTree, PieChart, Plane, Receipt, Settings, Store, Target, TrendingUp, Undo2, Upload, Users, Wallet, Repeat, Banknote, PiggyBank, ClipboardCheck,
 } from 'lucide-react';
 
 /** The five places you actually go. Everything else lives inside one of them or in Settings. */
@@ -23,6 +23,7 @@ export const SETTINGS = { path: '/settings', label: 'Settings', icon: Settings }
 export const PLAN_TABS = [
   { key: 'budgets', label: 'Budgets', icon: PiggyBank },
   { key: 'goals', label: 'Goals', icon: Target },
+  { key: 'bills', label: 'Bills', icon: CalendarDays },
   { key: 'recurring', label: 'Recurring', icon: Repeat },
   { key: 'trips', label: 'Trips', icon: Plane },
 ] as const;
