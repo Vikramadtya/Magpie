@@ -11,7 +11,7 @@ export interface Me { user: User; workspaces: Workspace[]; admin?: boolean }
 // ---------- plans and codes ----------
 export interface PlanLimits {
   accounts: number | null; budgets: number | null; goals: number | null; holdings: number | null; transactionsPerMonth: number | null;
-  historyMonths: number | null; importFiles: boolean; digest: boolean; household: boolean; quickAdd: boolean; liveInvestments: boolean;
+  historyMonths: number | null; importFiles: boolean; digest: boolean; household: boolean; quickAdd: boolean; liveInvestments: boolean; receipts: boolean;
 }
 export interface Billing {
   plan: 'FREE' | 'PRO'; source: string; proUntil: string | null; enforced: boolean; paymentsOpen: boolean; limits: PlanLimits;
@@ -324,6 +324,7 @@ export interface RuleTest { matches: number; samples: { title: string; amountMin
 export interface BillItem { date: string; name: string; type: 'INCOME' | 'EXPENSE'; amountMinor: number; currency: string; status: 'POSTED' | 'DUE' | 'OVERDUE' | 'EXPECTED'; ruleId: string | null }
 export interface BillsCalendar { month: string; items: BillItem[] }
 export interface SpottedCharge { payee: string; amountMinor: number; frequency: Frequency; lastDate: string; nextExpected: string; perYearMinor: number; charges: number; payeeId: string | null; categoryId: string | null }
+export interface ReceiptFile { id: string; transactionId: string; filename: string; contentType: string; sizeBytes: number; createdAt: string }
 export interface HistoryPoint { date: string; minor: number }
 /** One holding over time: price per unit, what it was worth, and what was paid in. */
 export interface HoldingHistory { currency: string; prices: HistoryPoint[]; value: HistoryPoint[]; invested: HistoryPoint[] }

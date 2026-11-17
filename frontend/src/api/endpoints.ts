@@ -193,6 +193,19 @@ export const loansApi = {
   remove: (ws: string, id: string) => api.del(ws, `/loans/${id}`),
 };
 
+export const receiptsApi = {
+  list: (ws: string, txId: string) => api.get<T.ReceiptFile[]>(ws, `/transactions/${txId}/receipts`),
+  counts: (ws: string) => api.get<{ transactionId: string; count: number }[]>(ws, '/receipts/counts'),
+  upload: (ws: string, txId: string, file: Blob, filename: string) => {
+    const form = new FormData();
+    form.append('file', file, filename);
+    return http.post<T.ReceiptFile>(`/api/v1/workspaces/${ws}/transactions/${txId}/receipts`, form, { headers: { 'Content-Type': undefined } }).then((r) => r.data);
+  },
+  /** The file as a blob: it needs the sign-in header, so it cannot be a plain image address. */
+  file: (ws: string, id: string) => http.get<Blob>(`/api/v1/workspaces/${ws}/receipts/${id}`, { responseType: 'blob' }).then((r) => r.data),
+  remove: (ws: string, id: string) => api.del(ws, `/receipts/${id}`),
+};
+
 export const billsApi = {
   calendar: (ws: string, month: string) => api.get<T.BillsCalendar>(ws, '/bills/calendar', { month }),
   suggestions: (ws: string) => api.get<T.SpottedCharge[]>(ws, '/bills/suggestions'),

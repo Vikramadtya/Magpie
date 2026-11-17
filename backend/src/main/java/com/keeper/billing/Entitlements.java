@@ -32,12 +32,13 @@ public class Entitlements {
       boolean digest,
       boolean household,
       boolean quickAdd,
-      boolean liveInvestments) {}
+      boolean liveInvestments,
+      boolean receipts) {}
 
   public static final Limits FREE =
-      new Limits(2, 3, 1, 5, 300, 6, false, false, false, false, false);
+      new Limits(2, 3, 1, 5, 300, 6, false, false, false, false, false, false);
   public static final Limits PRO =
-      new Limits(null, null, null, null, null, null, true, true, true, true, true);
+      new Limits(null, null, null, null, null, null, true, true, true, true, true, true);
 
   /**
    * Where Pro comes from: OPEN (limits are not enforced yet), SUBSCRIPTION, CODE, ADMIN,

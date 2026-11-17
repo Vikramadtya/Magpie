@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Pencil, Plane, RotateCcw, Trash2, Undo2, User } from 'lucide-react';
+import { ArrowLeftRight, Banknote, CheckSquare, MessageSquare, Paperclip, Pencil, Plane, RotateCcw, Trash2, Undo2, User } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,6 +16,8 @@ import { Select } from '../components/ui/Select';
 import { Skeleton, SkeletonRows, StateView } from '../components/ui/StateView';
 import { canBeRefunded, MarkForRefund } from '../features/refunds/MarkForRefund';
 import { LinkTransferModal } from '../features/transactions/LinkTransfer';
+import { ReceiptsModal } from '../features/transactions/Receipts';
+import { useReceiptCounts } from '../hooks/useReceipts';
 import { FilterBar } from '../features/transactions/FilterBar';
 import { useRefunds } from '../hooks/useRefunds';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
@@ -60,6 +62,9 @@ export default function TransactionsPage() {
   // "Select everything this filter matches", beyond the rows loaded on screen.
   const [allMatching, setAllMatching] = useState(false);
   const [linkFor, setLinkFor] = useState<Transaction | null>(null);
+  const [receiptsFor, setReceiptsFor] = useState<Transaction | null>(null);
+  const receiptCounts = useReceiptCounts().data;
+  const receiptByTx = useMemo(() => new Map((receiptCounts ?? []).map((c) => [c.transactionId, c.count])), [receiptCounts]);
   const matchCount = summary.data?.count ?? 0;
   const canSelectAll = !!summary.data && !summary.data.capped && matchCount > selected.size && matchCount <= 2000;
   const change = (body: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; categoryId?: string; personId?: string | null }) => {
@@ -180,6 +185,8 @@ export default function TransactionsPage() {
                 canRefund={canBeRefunded(t)}
                 onRefund={() => (refundByTx.has(t.id) ? navigate('/refunds') : setRefundFor(t))}
                 onLink={() => setLinkFor(t)}
+                receipts={receiptByTx.get(t.id) ?? 0}
+                onReceipts={() => setReceiptsFor(t)}
                 onTrip={() => setTripFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
@@ -192,6 +199,7 @@ export default function TransactionsPage() {
         </div>
       </StateView>
 
+      {receiptsFor && <ReceiptsModal tx={receiptsFor} canEdit={canEdit} onClose={() => setReceiptsFor(null)} />}
       {linkFor && <LinkTransferModal tx={linkFor} onClose={() => setLinkFor(null)} />}
       {refundFor && <MarkForRefund tx={refundFor} onClose={() => setRefundFor(null)} />}
 
@@ -205,10 +213,10 @@ export default function TransactionsPage() {
 interface RowProps {
   tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canTrip: boolean;
   onTrip: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
-  refund?: Refund; canRefund: boolean; onRefund: () => void; category?: Category; onLink: () => void;
+  refund?: Refund; canRefund: boolean; onRefund: () => void; category?: Category; onLink: () => void; receipts: number; onReceipts: () => void;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund, category, onLink }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund, category, onLink, receipts, onReceipts }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
@@ -236,6 +244,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
           <div className="flex gap-0.5 w-full sm:w-auto justify-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
             {canEdit && canTrip && <IconButton label={tx.tripId ? 'Change trip' : 'Add to a trip'} onClick={onTrip}><Plane className="w-4 h-4" /></IconButton>}
+            {(canEdit || receipts > 0) && tx.type !== 'TRANSFER' && <IconButton label={receipts > 0 ? `Receipts (${receipts})` : 'Attach a receipt'} onClick={onReceipts}><Paperclip className={`w-4 h-4 ${receipts > 0 ? 'text-accent' : ''}`} /></IconButton>}
             {canEdit && (tx.type === 'EXPENSE' || tx.type === 'INCOME') && !tx.loanId && <IconButton label="Join with its other half as a transfer" onClick={onLink}><ArrowLeftRight className="w-4 h-4" /></IconButton>}
             {canEdit && canRefund && <IconButton label={refund ? 'See refund' : 'Mark for refund'} onClick={onRefund}><Undo2 className="w-4 h-4" /></IconButton>}
             {canEdit && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
