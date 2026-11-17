@@ -41,7 +41,7 @@ export default function BillsPage() {
 
   return (
     <>
-      <PageHeader title="Bills" subtitle="What was paid, what is due, and what Keeper expects next." actions={<MonthPicker month={month} onChange={setMonth} />} />
+      <PageHeader title="Bills" subtitle="What was paid, what is due, and what Keeper expects next." actions={<MonthPicker month={month} onChange={setMonth} allowFuture />} />
       <div className="space-y-6">
         <Spotted />
         <section className="glass-panel p-5">
