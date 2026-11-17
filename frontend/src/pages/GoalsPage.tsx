@@ -15,7 +15,9 @@ import { Modal } from '../components/ui/Modal';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { Select } from '../components/ui/Select';
 import { StateView } from '../components/ui/StateView';
+import { useAccounts } from '../hooks/useReference';
 import { useContribute, useDeleteGoal, useGoals, useSaveGoal } from '../hooks/usePlanning';
 import { today } from '../lib/dates';
 import { formatMoney, parseMoney, toInputValue } from '../lib/money';
@@ -66,11 +68,12 @@ export default function GoalsPage() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-secondary flex items-center gap-1.5 flex-wrap">
                     {done ? <Badge tone="good">Goal reached</Badge> : g.projectedDate ? <Badge tone="accent">On pace for {format(parseISO(g.projectedDate), 'd MMM yyyy')}</Badge> : <Badge>No pace yet</Badge>}
+                    {g.accountName && <Badge>Follows {g.accountName}</Badge>}
                     {g.targetDate && <span>Target {format(parseISO(g.targetDate), 'd MMM yyyy')}</span>}
                   </p>
                   <div className="flex items-center gap-1.5">
                     <Button size="sm" variant="ghost" onClick={() => setHistory(g)}><LineChart className="w-4 h-4 mr-1.5" />History</Button>
-                    {canEdit && !done && <Button size="sm" variant="outline" onClick={() => setFunding(g)}><Plus className="w-4 h-4 mr-1.5" />Add funds</Button>}
+                    {canEdit && !done && !g.accountId && <Button size="sm" variant="outline" onClick={() => setFunding(g)}><Plus className="w-4 h-4 mr-1.5" />Add funds</Button>}
                   </div>
                 </div>
               </li>
@@ -92,6 +95,8 @@ function GoalModal({ goal, currency, onClose }: { goal: Goal | null; currency: s
   const [name, setName] = useState(goal?.name ?? '');
   const [target, setTarget] = useState(goal ? toInputValue(goal.targetMinor, cur) : '');
   const [date, setDate] = useState(goal?.targetDate ?? '');
+  const [accountId, setAccountId] = useState(goal?.accountId ?? '');
+  const accounts = (useAccounts().data ?? []).filter((a) => !a.archived && !a.memo && a.currency === cur);
   const [error, setError] = useState('');
 
   const submit = (e: FormEvent) => {
@@ -99,7 +104,7 @@ function GoalModal({ goal, currency, onClose }: { goal: Goal | null; currency: s
     const minor = parseMoney(target, cur);
     if (!name.trim()) return setError('Name your goal');
     if (!minor) return setError('Enter a target amount');
-    save.mutate({ id: goal?.id, name: name.trim(), targetMinor: minor, currency: cur, targetDate: date || null }, { onSuccess: onClose });
+    save.mutate({ id: goal?.id, name: name.trim(), targetMinor: minor, currency: cur, targetDate: date || null, accountId: accountId || null }, { onSuccess: onClose });
   };
 
   return (
@@ -108,6 +113,12 @@ function GoalModal({ goal, currency, onClose }: { goal: Goal | null; currency: s
         <Field label="Name" error={error}><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} autoFocus /></Field>
         <Field label={`Target (${cur})`}><MoneyInput value={target} currency={cur} onChange={setTarget} /></Field>
         <Field label="Target date (optional)"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        <Field label="Follow an account (optional)" hint="Progress then becomes that account's balance and updates by itself. Without one, you add deposits by hand.">
+          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">No, I will add deposits myself</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </Select>
+        </Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={save.isPending}>Save</Button></div>
       </form>
     </Modal>

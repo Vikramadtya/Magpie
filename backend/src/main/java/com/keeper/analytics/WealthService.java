@@ -381,22 +381,34 @@ public class WealthService {
   }
 
   public List<GoalProgress> goals(UUID ws) {
-    record G(UUID id, String name, String currency, long target, LocalDate date) {}
+    record G(UUID id, String name, String currency, long target, LocalDate date, UUID account) {}
     List<G> goals =
         db.list(
-            "SELECT id, name, currency, target_minor, target_date FROM goals WHERE workspace_id = ? AND archived_at IS NULL ORDER BY created_at",
+            "SELECT id, name, currency, target_minor, target_date, account_id FROM goals WHERE workspace_id = ? AND archived_at IS NULL ORDER BY created_at",
             rs ->
                 new G(
                     rs.getObject(1, UUID.class),
                     rs.getString(2),
                     rs.getString(3),
                     rs.getLong(4),
-                    rs.getObject(5, LocalDate.class)),
+                    rs.getObject(5, LocalDate.class),
+                    rs.getObject(6, UUID.class)),
             ws);
     List<GoalProgress> out = new ArrayList<>();
     for (G g : goals) {
       List<GoalPoint> points = new ArrayList<>();
       long[] running = {0};
+      if (g.account() != null) {
+        // a goal that follows an account is that account's balance over time
+        for (AccountPoint p : accountHistory(ws, g.account()).points()) {
+          running[0] = Math.max(0, p.minor());
+          points.add(new GoalPoint(p.date(), running[0]));
+        }
+        out.add(
+            new GoalProgress(
+                g.id(), g.name(), g.currency(), g.target(), g.date(), running[0], points));
+        continue;
+      }
       db.list(
           "SELECT occurred_on, SUM(amount_minor) FROM goal_contributions WHERE goal_id = ? GROUP BY 1 ORDER BY 1",
           rs -> {

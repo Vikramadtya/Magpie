@@ -106,6 +106,8 @@ export interface BudgetSummary { month: string; currency: string; budgetedMinor:
 export interface Goal {
   id: string; name: string; targetMinor: number; currency: string; targetDate: string | null;
   savedMinor: number; percent: number; projectedDate: string | null;
+  /** Set when the goal follows an account's balance instead of recorded deposits. */
+  accountId: string | null; accountName: string | null;
 }
 export interface RecurringRule {
   id: string; name: string; accountId: string; categoryId: string | null; payeeId: string | null; type: 'INCOME' | 'EXPENSE';

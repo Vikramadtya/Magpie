@@ -106,8 +106,8 @@ export const budgetsApi = {
 
 export const goalsApi = {
   list: (ws: string) => api.get<T.Goal[]>(ws, '/goals'),
-  create: (ws: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null }) => api.post<T.Goal>(ws, '/goals', b),
-  update: (ws: string, id: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null }) => api.patch<T.Goal>(ws, `/goals/${id}`, b),
+  create: (ws: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null; accountId?: string | null }) => api.post<T.Goal>(ws, '/goals', b),
+  update: (ws: string, id: string, b: { name: string; targetMinor: number; currency: string; targetDate?: string | null; accountId?: string | null }) => api.patch<T.Goal>(ws, `/goals/${id}`, b),
   remove: (ws: string, id: string) => api.del(ws, `/goals/${id}`),
   contribute: (ws: string, id: string, amountMinor: number, occurredOn: string) =>
     api.post<T.Goal>(ws, `/goals/${id}/contributions`, { amountMinor, occurredOn }),
