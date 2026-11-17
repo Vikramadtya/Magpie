@@ -148,7 +148,9 @@ export interface PayeeSpend { payeeId: string; name: string; totalMinor: number;
 export interface Activity { id: number; userName: string | null; entity: string; entityId: string | null; action: string; summary: string | null; at: string }
 
 export interface ParsedRow { date: string; amountMinor: number; description: string; duplicate: boolean }
-export interface ImportPreview { strategy: string; rows: ParsedRow[]; skipped: number; duplicates: number }
+export interface ImportPreview { strategy: string; rows: ParsedRow[]; skipped: number; duplicates: number; headers: string[] }
+export interface ColumnMapping { dateCol: string; amountCol?: string | null; debitCol?: string | null; creditCol?: string | null; descCol?: string | null }
+export interface SavedMapping { id: string; name: string; mapping: ColumnMapping; dateFormat: string }
 export interface ImportResult { batchId: string; imported: number; duplicates: number }
 
 export interface Holding {

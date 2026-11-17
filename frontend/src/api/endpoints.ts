@@ -150,11 +150,15 @@ export const insightsApi = {
 };
 
 export const importApi = {
-  preview: (ws: string, file: File, accountId: string, dateFormat: string) => {
+  preview: (ws: string, file: File, accountId: string, dateFormat: string, mapping?: T.ColumnMapping | null) => {
     const form = new FormData();
     form.append('file', file);
     form.append('accountId', accountId);
     form.append('dateFormat', dateFormat);
+    if (mapping) {
+      form.append('dateCol', mapping.dateCol);
+      for (const k of ['amountCol', 'debitCol', 'creditCol', 'descCol'] as const) if (mapping[k]) form.append(k, mapping[k] as string);
+    }
     return http
       .post<T.ImportPreview>(`/api/v1/workspaces/${ws}/imports/preview`, form, { headers: { 'Content-Type': undefined } })
       .then((r) => r.data);
@@ -162,6 +166,9 @@ export const importApi = {
   commit: (ws: string, accountId: string, fileName: string, rows: T.ParsedRow[]) =>
     api.post<T.ImportResult>(ws, '/imports/commit', { accountId, fileName, rows }),
   undo: (ws: string, batchId: string) => api.del(ws, `/imports/${batchId}`),
+  mappings: (ws: string) => api.get<T.SavedMapping[]>(ws, '/import-mappings'),
+  saveMapping: (ws: string, body: { name: string; mapping: T.ColumnMapping; dateFormat: string }) => api.post<T.SavedMapping>(ws, '/import-mappings', body),
+  deleteMapping: (ws: string, id: string) => api.del(ws, `/import-mappings/${id}`),
   exportCsv: (ws: string) =>
     http.get<Blob>(`/api/v1/workspaces/${ws}/export/transactions.csv`, { responseType: 'blob' }).then((r) => r.data),
 };
