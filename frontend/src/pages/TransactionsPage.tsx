@@ -15,12 +15,14 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Skeleton, SkeletonRows, StateView } from '../components/ui/StateView';
 import { canBeRefunded, MarkForRefund } from '../features/refunds/MarkForRefund';
+import { LinkTransferModal } from '../features/transactions/LinkTransfer';
 import { FilterBar } from '../features/transactions/FilterBar';
 import { useRefunds } from '../hooks/useRefunds';
 import { groupCategories, useTransactionDialog } from '../features/transactions/TransactionDialog';
+import { errorMessage } from '../lib/http';
 import { countActive, parseFilters, toParams } from '../lib/txFilters';
 import { useCategories, usePeople } from '../hooks/useReference';
-import { useAddComment, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList, useTransactionSummary } from '../hooks/useTransactions';
+import { useAddComment, useBulkFiltered, useBulkTransactions, useComments, useDeleteTransaction, useDeletedTransactions, useRestoreTransaction, useTransactionList, useTransactionSummary } from '../hooks/useTransactions';
 import { useAssignToTrip, useTrips } from '../hooks/useTrips';
 import { prettyDate } from '../lib/dates';
 import { formatMoney } from '../lib/money';
@@ -54,6 +56,20 @@ export default function TransactionsPage() {
   const refundByTx = useMemo(() => new Map((refundList ?? []).map((r) => [r.transactionId, r])), [refundList]);
   const del = useDeleteTransaction();
   const bulk = useBulkTransactions();
+  const bulkAll = useBulkFiltered();
+  // "Select everything this filter matches", beyond the rows loaded on screen.
+  const [allMatching, setAllMatching] = useState(false);
+  const [linkFor, setLinkFor] = useState<Transaction | null>(null);
+  const matchCount = summary.data?.count ?? 0;
+  const canSelectAll = !!summary.data && !summary.data.capped && matchCount > selected.size && matchCount <= 2000;
+  const change = (body: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; categoryId?: string; personId?: string | null }) => {
+    if (allMatching) {
+      if (body.action === 'DELETE' && !window.confirm(`Delete all ${matchCount} matching transactions? You can undo from Recently deleted.`)) return;
+      bulkAll.mutate({ filters, body: { ...body, expected: matchCount } }, { onSuccess: (r) => toast.success(`Changed ${r.applied} transactions`), onError: (e) => toast.error(errorMessage(e)) });
+    } else bulk.mutate({ ...body, ids: [...selected] });
+    setSelecting(false);
+    setAllMatching(false);
+  };
   const assign = useAssignToTrip();
   const addSelectedToTrip = (tripId: string | null) => {
     const ids = rows.filter((t) => selected.has(t.id) && t.type === 'EXPENSE' && !t.loanId).map((t) => t.id);
@@ -62,7 +78,7 @@ export default function TransactionsPage() {
   };
 
   useEffect(() => {
-    if (!selecting) setSelected(new Set());
+    if (!selecting) { setSelected(new Set()); setAllMatching(false); }
   }, [selecting]);
 
   const toggle = (id: string) =>
@@ -100,27 +116,30 @@ export default function TransactionsPage() {
 
       {selecting && selected.size > 0 && (
         <div className="sticky top-0 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-2 shadow">
-          <span className="text-sm">{selected.size} selected</span>
+          <span className="text-sm flex items-center gap-3">
+            {allMatching ? `All ${matchCount} matching this filter are selected` : `${selected.size} selected`}
+            {allMatching ? <button type="button" className="text-accent" onClick={() => setAllMatching(false)}>Only the ones I ticked</button> : canSelectAll && <button type="button" className="text-accent" onClick={() => setAllMatching(true)}>Select all {matchCount} matching</button>}
+          </span>
           <div className="flex gap-2">
             {people.length > 0 && (
-              <Select className="h-9 w-40" value="" onChange={(e) => { const v = e.target.value; if (v) { bulk.mutate({ action: 'SPENT_BY', ids: [...selected], personId: v === '__me' ? null : v }); setSelecting(false); } }} aria-label="Set spent by">
+              <Select className="h-9 w-40" value="" onChange={(e) => { const v = e.target.value; if (v) { change({ action: 'SPENT_BY', personId: v === '__me' ? null : v }); setSelecting(false); } }} aria-label="Set spent by">
                 <option value="">Spent by…</option>
                 <option value="__me">Me</option>
                 {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             )}
-            {trips.length > 0 && (
+            {trips.length > 0 && !allMatching && (
               <Select className="h-9 w-44" value="" onChange={(e) => { const v = e.target.value; if (v) addSelectedToTrip(v === '__none' ? null : v); }} aria-label="Add selected to a trip">
                 <option value="">Add to trip…</option>
                 {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 <option value="__none">Remove from trip</option>
               </Select>
             )}
-            <Select className="h-9 w-48" defaultValue="" onChange={(e) => { if (e.target.value) { bulk.mutate({ action: 'RECATEGORIZE', ids: [...selected], categoryId: e.target.value }); setSelecting(false); } }} aria-label="Recategorize selected">
+            <Select className="h-9 w-48" defaultValue="" onChange={(e) => { if (e.target.value) change({ action: 'RECATEGORIZE', categoryId: e.target.value }); }} aria-label="Recategorize selected">
               <option value="">Set category…</option>
               {[...expenseGroups, ...incomeGroups].flatMap((g) => [g.parent, ...g.children]).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
-            <Button variant="destructive" size="sm" onClick={() => { bulk.mutate({ action: 'DELETE', ids: [...selected] }); setSelecting(false); }}>Delete</Button>
+            <Button variant="destructive" size="sm" onClick={() => change({ action: 'DELETE' })}>Delete</Button>
           </div>
         </div>
       )}
@@ -160,6 +179,7 @@ export default function TransactionsPage() {
                 category={categoryById.get(t.categoryId ?? '')}
                 canRefund={canBeRefunded(t)}
                 onRefund={() => (refundByTx.has(t.id) ? navigate('/refunds') : setRefundFor(t))}
+                onLink={() => setLinkFor(t)}
                 onTrip={() => setTripFor(t)}
                 onToggle={() => toggle(t.id)}
                 onEdit={() => dialog.open(t)}
@@ -172,6 +192,7 @@ export default function TransactionsPage() {
         </div>
       </StateView>
 
+      {linkFor && <LinkTransferModal tx={linkFor} onClose={() => setLinkFor(null)} />}
       {refundFor && <MarkForRefund tx={refundFor} onClose={() => setRefundFor(null)} />}
 
       <CommentsModal tx={commentsFor} onClose={() => setCommentsFor(null)} />
@@ -184,10 +205,10 @@ export default function TransactionsPage() {
 interface RowProps {
   tx: Transaction; showDate: boolean; selecting: boolean; selected: boolean; canEdit: boolean; canTrip: boolean;
   onTrip: () => void; onToggle: () => void; onEdit: () => void; onDelete: () => void; onComments: () => void;
-  refund?: Refund; canRefund: boolean; onRefund: () => void; category?: Category;
+  refund?: Refund; canRefund: boolean; onRefund: () => void; category?: Category; onLink: () => void;
 }
 
-function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund, category }: RowProps) {
+function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onToggle, onEdit, onDelete, onComments, refund, canRefund, onRefund, category, onLink }: RowProps) {
   const pending = tx.id.startsWith('pending-');
   const title = tx.type === 'TRANSFER' ? `Transfer ${tx.direction === -1 ? 'out' : 'in'}` : tx.payeeName ?? tx.note ?? tx.categoryName ?? 'Transaction';
   return (
@@ -215,6 +236,7 @@ function Row({ tx, showDate, selecting, selected, canEdit, canTrip, onTrip, onTo
           <div className="flex gap-0.5 w-full sm:w-auto justify-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <IconButton label="Comments" onClick={onComments}><MessageSquare className="w-4 h-4" /></IconButton>
             {canEdit && canTrip && <IconButton label={tx.tripId ? 'Change trip' : 'Add to a trip'} onClick={onTrip}><Plane className="w-4 h-4" /></IconButton>}
+            {canEdit && (tx.type === 'EXPENSE' || tx.type === 'INCOME') && !tx.loanId && <IconButton label="Join with its other half as a transfer" onClick={onLink}><ArrowLeftRight className="w-4 h-4" /></IconButton>}
             {canEdit && canRefund && <IconButton label={refund ? 'See refund' : 'Mark for refund'} onClick={onRefund}><Undo2 className="w-4 h-4" /></IconButton>}
             {canEdit && <IconButton label="Edit" onClick={onEdit}><Pencil className="w-4 h-4" /></IconButton>}
             {canEdit && <IconButton label="Delete" onClick={onDelete}><Trash2 className="w-4 h-4" /></IconButton>}

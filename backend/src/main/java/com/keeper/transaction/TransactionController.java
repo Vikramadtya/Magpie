@@ -342,4 +342,92 @@ public class TransactionController {
         };
     return new BulkResult(n);
   }
+
+  @Serdeable
+  public record LinkRequest(@NotNull UUID firstId, @NotNull UUID secondId) {}
+
+  /** Joins a spending entry and an income entry of the same amount into one transfer. */
+  @Post("/transactions/link-transfer")
+  public List<TransactionView> linkTransfer(
+      Authentication auth, @PathVariable UUID workspaceId, @Valid @Body LinkRequest body) {
+    return service.linkTransfer(workspaceId, Actor.id(auth), body.firstId(), body.secondId());
+  }
+
+  @Get("/transactions/{id}/transfer-matches")
+  public List<TransactionView> transferMatches(
+      @PathVariable UUID workspaceId, @PathVariable UUID id) {
+    return service.transferMatches(workspaceId, id);
+  }
+
+  private static final int BULK_CAP = 2000;
+
+  /** A change applied to everything a filter matches, not just what is on screen. */
+  @Serdeable
+  public record BulkFilteredRequest(
+      @NotNull @Pattern(regexp = "^(DELETE|RECATEGORIZE|SPENT_BY)$") String action,
+      UUID categoryId,
+      UUID personId,
+      /**
+       * How many the person saw they were changing; refused if the filter now matches another
+       * number.
+       */
+      @Min(1) int expected,
+      LocalDate from,
+      LocalDate to,
+      @Size(max = 2000) String accountIds,
+      @Size(max = 2000) String categoryIds,
+      @Size(max = 2000) String payeeIds,
+      @Size(max = 2000) String tagIds,
+      boolean uncategorised,
+      @Min(0) @Max(MAX_MINOR) Long minAmount,
+      @Min(0) @Max(MAX_MINOR) Long maxAmount,
+      @Pattern(regexp = "^(INCOME|EXPENSE|TRANSFER)$") String type,
+      @Size(max = 100) String q,
+      UUID tripId,
+      @Pattern(regexp = "^(me|[0-9a-fA-F-]{36})$") String spentBy) {}
+
+  @Serdeable
+  public record BulkFilteredResult(int matched, int applied) {}
+
+  @Post("/transactions/bulk-filtered")
+  public BulkFilteredResult bulkFiltered(
+      Authentication auth, @PathVariable UUID workspaceId, @Valid @Body BulkFilteredRequest b) {
+    UUID actor = Actor.id(auth);
+    var filter =
+        filter(
+            b.from(),
+            b.to(),
+            b.accountIds(),
+            b.categoryIds(),
+            b.payeeIds(),
+            b.tagIds(),
+            b.uncategorised(),
+            b.minAmount(),
+            b.maxAmount(),
+            b.type(),
+            b.q(),
+            b.tripId(),
+            b.spentBy(),
+            null,
+            null,
+            null,
+            null,
+            null);
+    var matched = service.idsMatching(workspaceId, filter, BULK_CAP);
+    if (matched.capped())
+      throw new com.keeper.common.exception.BusinessRuleException(
+          "That is more than " + BULK_CAP + " transactions. Narrow the filter and try again.");
+    if (matched.ids().size() != b.expected())
+      throw new com.keeper.common.exception.ConflictException(
+          "The list changed: it now matches "
+              + matched.ids().size()
+              + " transactions. Check it and try again.");
+    int n =
+        switch (b.action()) {
+          case "DELETE" -> service.bulkDelete(workspaceId, actor, matched.ids());
+          case "SPENT_BY" -> service.bulkSpentBy(workspaceId, actor, matched.ids(), b.personId());
+          default -> service.bulkRecategorize(workspaceId, actor, matched.ids(), b.categoryId());
+        };
+    return new BulkFilteredResult(matched.ids().size(), n);
+  }
 }

@@ -85,6 +85,13 @@ export const transactionsApi = {
   transfer: (ws: string, b: T.TransferInput, key: string) => api.post<T.Transaction[]>(ws, '/transfers', b, { 'Idempotency-Key': key }),
   bulk: (ws: string, b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; ids: string[]; categoryId?: string; personId?: string | null }) =>
     api.post<{ affected: number }>(ws, '/transactions/bulk', b),
+  linkTransfer: (ws: string, firstId: string, secondId: string) => api.post<T.Transaction[]>(ws, '/transactions/link-transfer', { firstId, secondId }),
+  transferMatches: (ws: string, id: string) => api.get<T.Transaction[]>(ws, `/transactions/${id}/transfer-matches`),
+  /** Applies a change to everything a filter matches; `expected` is the count the person saw. */
+  bulkFiltered: (ws: string, filters: T.TransactionFilters, baseCurrency: string, b: { action: 'DELETE' | 'RECATEGORIZE' | 'SPENT_BY'; expected: number; categoryId?: string; personId?: string | null }) => {
+    const { sort: _sort, ...rest } = toQuery(filters, baseCurrency);
+    return api.post<{ matched: number; applied: number }>(ws, '/transactions/bulk-filtered', { ...rest, ...b });
+  },
   undo: (ws: string, id: string) =>
     api.post<{ action: 'RESTORED' | 'REVERTED'; transaction: T.Transaction }>(ws, `/transactions/${id}/undo`),
   restore: (ws: string, id: string) => api.post<T.Transaction>(ws, `/transactions/${id}/restore`),

@@ -555,4 +555,116 @@ public class TransactionService {
   private static String clean(String note) {
     return note == null || note.isBlank() ? null : note.trim();
   }
+
+  /**
+   * Every transaction matching a filter, up to the cap, for a bulk change; the flag says it was cut
+   * off.
+   */
+  public record Matched(List<UUID> ids, boolean capped) {}
+
+  public Matched idsMatching(UUID ws, TransactionFilter filter, int cap) {
+    List<UUID> ids = new java.util.ArrayList<>();
+    String cursor = null;
+    do {
+      CursorPage<TransactionView> page = list(ws, filter, cursor, 200);
+      for (TransactionView v : page.items()) {
+        if (ids.size() >= cap) return new Matched(ids, true);
+        ids.add(v.id());
+      }
+      cursor = page.nextCursor();
+    } while (cursor != null);
+    return new Matched(ids, false);
+  }
+
+  private record Leg(
+      UUID id,
+      UUID accountId,
+      String type,
+      long amount,
+      String currency,
+      UUID loanId,
+      UUID transferId,
+      java.time.LocalDate on) {}
+
+  private Leg leg(UUID ws, UUID id) {
+    return db.one(
+            "SELECT id, account_id, type, amount_minor, currency, loan_id, transfer_id, occurred_on FROM transactions "
+                + "WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL",
+            rs ->
+                new Leg(
+                    rs.getObject(1, UUID.class),
+                    rs.getObject(2, UUID.class),
+                    rs.getString(3),
+                    rs.getLong(4),
+                    rs.getString(5),
+                    rs.getObject(6, UUID.class),
+                    rs.getObject(7, UUID.class),
+                    rs.getObject(8, java.time.LocalDate.class)),
+            id,
+            ws)
+        .orElseThrow(() -> new ResourceNotFoundException("Transaction", id.toString()));
+  }
+
+  /**
+   * Joins an expense in one account and an income of the same amount in another into one transfer.
+   * Balances do not change: the two entries simply stop counting as spending and income.
+   */
+  public List<TransactionView> linkTransfer(UUID ws, UUID actor, UUID firstId, UUID secondId) {
+    if (firstId.equals(secondId))
+      throw new BadRequestException("Choose two different transactions");
+    Leg a = leg(ws, firstId);
+    Leg b = leg(ws, secondId);
+    Leg out = "EXPENSE".equals(a.type()) ? a : b;
+    Leg in = out == a ? b : a;
+    if (!"EXPENSE".equals(out.type()) || !"INCOME".equals(in.type()))
+      throw new BusinessRuleException("Pick one spending entry and one income entry to join");
+    if (out.loanId() != null || in.loanId() != null)
+      throw new BusinessRuleException("A loan payment cannot be turned into a transfer");
+    if (out.accountId().equals(in.accountId()))
+      throw new BusinessRuleException("A transfer moves money between two different accounts");
+    if (out.amount() != in.amount() || !out.currency().equals(in.currency()))
+      throw new BusinessRuleException("The two amounts must match to be one transfer");
+    UUID transferId = UUID.randomUUID();
+    db.tx(
+        () -> {
+          for (Leg l : List.of(out, in)) {
+            revisions.record(ws, actor, "UPDATE", get(ws, l.id()));
+            db.update(
+                "UPDATE transactions SET type = 'TRANSFER', transfer_id = ?, category_id = NULL, payee_id = NULL, "
+                    + "trip_id = NULL, spent_by = NULL, version = version + 1, updated_at = NOW() WHERE id = ? AND workspace_id = ?",
+                transferId,
+                l.id(),
+                ws);
+          }
+        });
+    audit.record(
+        ws, actor, "transaction", out.id(), "LINK_TRANSFER", "joined two entries into a transfer");
+    return List.of(get(ws, out.id()), get(ws, in.id()));
+  }
+
+  /**
+   * Entries that look like the other half of this one: opposite kind, same amount, another account,
+   * nearby date.
+   */
+  public List<TransactionView> transferMatches(UUID ws, UUID id) {
+    Leg l = leg(ws, id);
+    if (l.loanId() != null || l.transferId() != null || "TRANSFER".equals(l.type()))
+      return List.of();
+    String opposite = "EXPENSE".equals(l.type()) ? "INCOME" : "EXPENSE";
+    List<UUID> ids =
+        db.list(
+            "SELECT id FROM transactions WHERE workspace_id = ? AND deleted_at IS NULL AND type = ? AND account_id <> ? "
+                + "AND amount_minor = ? AND currency = ? AND loan_id IS NULL AND transfer_id IS NULL "
+                + "AND occurred_on BETWEEN ? AND ? ORDER BY ABS(occurred_on - ?::date), occurred_on LIMIT 5",
+            rs -> rs.getObject(1, UUID.class),
+            ws,
+            opposite,
+            l.accountId(),
+            l.amount(),
+            l.currency(),
+            l.on().minusDays(5),
+            l.on().plusDays(5),
+            l.on());
+    return ids.stream().map(x -> get(ws, x)).toList();
+  }
 }
