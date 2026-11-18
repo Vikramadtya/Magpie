@@ -8,14 +8,14 @@ export default {
     extend: {
       // One type scale for the whole app: use these, not one-off pixel sizes.
       fontSize: {
-        display: ['2.5rem', { lineHeight: '1.05', letterSpacing: '-0.035em', fontWeight: '600' }],
-        title: ['1.75rem', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '600' }],
+        display: ['2.5rem', { lineHeight: '1.05', letterSpacing: '-0.03em', fontWeight: '700' }],
+        title: ['2rem', { lineHeight: '1.15', letterSpacing: '-0.025em', fontWeight: '700' }],
         heading: ['1.0625rem', { lineHeight: '1.4', letterSpacing: '-0.01em', fontWeight: '600' }],
         body: ['0.875rem', { lineHeight: '1.5' }],
         caption: ['0.75rem', { lineHeight: '1.4' }],
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'system-ui', 'sans-serif'],
       },
       colors: {
         background: channel('bg'),
@@ -26,16 +26,17 @@ export default {
         accent: channel('accent'),
         border: channel('border'),
         // A calmer pair than the stock red/green, used for money going out and in.
-        red: { 400: '#FB7185', 500: '#E5484D', 600: '#CE2C31' },
-        green: { 400: '#4ADE80', 500: '#30A46C', 600: '#218358' },
+        red: { 400: '#FF6961', 500: '#FF3B30', 600: '#D70015' },
+        green: { 400: '#30D158', 500: '#34C759', 600: '#248A3D' },
+        amber: { 400: '#FFB340', 500: '#FF9500', 600: '#C93400' },
       },
       boxShadow: {
         card: 'var(--shadow-card)',
         lift: 'var(--shadow-lift)',
       },
       borderRadius: {
-        xl: '14px',
-        '2xl': '20px',
+        xl: '12px',
+        '2xl': '18px',
       },
       keyframes: {
         rise: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },

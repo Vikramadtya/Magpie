@@ -76,7 +76,7 @@ function Shell() {
       {/* Desktop sidebar / mobile drawer */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 bg-sidebar flex flex-col pt-5 pb-4 transition-[transform,width] duration-200 md:static md:translate-x-0 shadow-[1px_0_0_var(--border-color)]',
+          'fixed inset-y-0 left-0 z-40 bg-sidebar/85 backdrop-blur-2xl backdrop-saturate-150 flex flex-col pt-5 pb-4 transition-[transform,width] duration-200 md:static md:translate-x-0 shadow-[0.5px_0_0_var(--border-color)]',
           collapsed ? 'w-[72px]' : 'w-[256px]',
           menuOpen ? 'translate-x-0' : '-translate-x-full',
         )}
@@ -86,7 +86,7 @@ function Shell() {
       {menuOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMenuOpen(false)} />}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-sidebar shadow-[0_1px_0_var(--border-color)]">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-sidebar/80 backdrop-blur-2xl shadow-[0_0.5px_0_var(--border-color)]">
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu" className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10">
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -98,7 +98,7 @@ function Shell() {
             {collapsed ? <PanelLeftOpen className="w-[18px] h-[18px]" /> : <PanelLeftClose className="w-[18px] h-[18px]" />}
           </button>
           <div className="flex items-center gap-1">
-            <button onClick={() => window.dispatchEvent(new Event('keeper:search'))} className="hidden lg:flex items-center gap-2 h-9 pl-3 pr-2 mr-1 rounded-xl bg-primary/[0.05] hover:bg-primary/[0.08] text-secondary text-body transition-colors">
+            <button onClick={() => window.dispatchEvent(new Event('keeper:search'))} className="hidden lg:flex items-center gap-2 h-9 pl-3 pr-2 mr-1 rounded-[10px] bg-primary/[0.06] hover:bg-primary/[0.09] text-secondary text-body transition-colors">
               <Search className="w-4 h-4" /> Search
               <kbd className="ml-6 text-[11px] rounded-md bg-surface px-1.5 py-0.5 shadow-card tabular-nums">⌘K</kbd>
             </button>
@@ -148,7 +148,7 @@ function ViewControls({ privacy, onPrivacy }: { privacy: boolean; onPrivacy: () 
 }
 
 const linkClass = (active: boolean) =>
-  cn('flex items-center gap-3 px-3 py-2 text-body font-medium rounded-xl transition-colors', active ? 'bg-accent/10 text-accent' : 'text-primary/75 hover:bg-black/5 dark:hover:bg-white/5');
+  cn('flex items-center gap-3 px-3 py-[7px] text-[15px] font-medium rounded-[10px] transition-colors', active ? 'bg-primary/[0.08] text-primary [&_svg]:text-accent' : 'text-primary/80 hover:bg-primary/[0.05]');
 
 function Badge({ n, label }: { n: number; label: string }) {
   return <span className="ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 bg-accent text-white tabular-nums" aria-label={label}>{n}</span>;
@@ -168,7 +168,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
   return (
     <>
       <div className={cn('mb-5 flex items-center', collapsed ? 'justify-center' : 'px-5')}>
-        <h1 className="text-[19px] font-bold tracking-tight flex items-center gap-2.5">
+        <h1 className="text-[19px] font-bold tracking-[-0.02em] flex items-center gap-2.5">
           <img src={logo} alt="Keeper" className="w-8 h-8 rounded-[10px]" />
           {!collapsed && 'Keeper'}
         </h1>
@@ -279,7 +279,7 @@ function TabBar() {
   const location = useLocation();
   const prefetch = usePrefetch();
   return (
-    <nav aria-label="Sections" className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-sidebar/95 backdrop-blur shadow-[0_-1px_0_var(--border-color)] safe-bottom">
+    <nav aria-label="Sections" className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-sidebar/80 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_-0.5px_0_var(--border-color)] safe-bottom">
       <ul className="grid grid-cols-5">
         {SECTIONS.map((item) => {
           const active = sectionOwns(item, location.pathname);
@@ -319,7 +319,7 @@ function AddButton({ compact }: { compact?: boolean }) {
       onClick={() => dialog.open()}
       aria-label="Add transaction"
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-background font-medium shadow-[0_1px_2px_rgb(0_0_0/0.25),inset_0_1px_0_rgb(255_255_255/0.14)] hover:opacity-90 active:scale-[0.98] transition-all',
+        'inline-flex items-center justify-center gap-2 rounded-full bg-accent text-white font-medium hover:brightness-110 active:scale-[0.98] transition-all',
         compact ? 'h-11 w-11 mx-auto' : 'w-full h-11 text-sm',
       )}
     >

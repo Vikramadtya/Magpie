@@ -8,7 +8,7 @@ export function IconButton({ label, children, className, ...props }: { label: st
       type="button"
       aria-label={label}
       title={label}
-      className={cn('p-2 rounded-lg text-secondary transition-colors hover:text-primary hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/20', className)}
+      className={cn('p-2 rounded-full text-secondary transition-colors hover:text-primary hover:bg-primary/[0.07] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/20', className)}
       {...props}
     >
       {children}
