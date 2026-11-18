@@ -32,7 +32,7 @@ function Section({ base, tabs }: { base: string; tabs: readonly Tab[] }) {
             key={t.key}
             to={`${base}/${t.key}`}
             className={({ isActive }) =>
-              cn('inline-flex items-center gap-2 px-3.5 h-9 rounded-full text-body font-medium whitespace-nowrap transition-colors', isActive ? 'bg-primary text-background' : 'text-secondary hover:text-primary hover:bg-primary/[0.06]')
+              cn('inline-flex items-center gap-2 px-3.5 h-9 rounded-full text-body font-medium whitespace-nowrap transition-colors', isActive ? 'bg-accent text-white' : 'text-secondary hover:text-primary hover:bg-primary/[0.06]')
             }
           >
             <t.icon className="w-4 h-4" />

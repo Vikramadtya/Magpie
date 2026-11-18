@@ -32,18 +32,18 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-md" onClick={onClose} />
       <div
         ref={panel}
         className={cn(
-          'relative w-full sm:max-w-lg bg-surface text-primary border border-border shadow-2xl',
-          'rounded-t-2xl sm:rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
+          'relative w-full sm:max-w-lg bg-surface/95 backdrop-blur-2xl text-primary shadow-[0_24px_80px_-12px_rgb(0_0_0/0.35)]',
+          'rounded-t-[22px] sm:rounded-[22px] overflow-hidden animate-in fade-in zoom-in-95 duration-150',
           className,
         )}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-          <button data-close onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-secondary hover:bg-black/5 dark:hover:bg-white/10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/70">
+          <h2 className="text-[17px] font-semibold tracking-[-0.015em]">{title}</h2>
+          <button data-close onClick={onClose} aria-label="Close" className="p-1.5 rounded-full text-secondary bg-primary/[0.06] hover:bg-primary/[0.1]">
             <X className="w-5 h-5" />
           </button>
         </div>
