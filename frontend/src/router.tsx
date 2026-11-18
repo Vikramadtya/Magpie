@@ -1,4 +1,4 @@
-import logo from './assets/logo.svg';
+import { LoadingScreen } from './components/LoadingScreen';
 import { lazy } from 'react';
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
@@ -28,14 +28,7 @@ const PayeesPage = lazyPage(() => import('./pages/PayeesPage'));
 const ImportPage = lazyPage(() => import('./pages/ImportPage'));
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage'));
 
-function Splash() {
-  return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-5" role="status" aria-label="Loading">
-      <img src={logo} alt="" className="w-16 h-16 rounded-[18px] shadow-lift saved-ring" />
-      <div className="w-24 h-1 rounded-full skeleton" />
-    </div>
-  );
-}
+const Splash = LoadingScreen;
 
 /** The server did not answer; the session is probably fine, so offer another try instead of the login page. */
 function Unreachable() {
