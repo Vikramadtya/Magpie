@@ -8,14 +8,25 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: { navigateFallbackDenylist: [/^\/api/, /^\/oauth/, /^\/health/] },
+      // index.html is never precached: a precached shell is what kept showing the previous build
+      // after a deploy. Pages come from the network first (fast, static) and fall back to cache offline.
+      workbox: {
+        globPatterns: ['**/*.{js,css,ico,png,svg,webmanifest,woff2}'],
+        navigateFallback: null,
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
+        runtimeCaching: [
+          { urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate', handler: 'NetworkFirst', options: { cacheName: 'pages', networkTimeoutSeconds: 4 } },
+        ],
+      },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
       manifest: {
         name: 'Keeper',
         short_name: 'Keeper',
         description: 'Your money, calmly.',
-        theme_color: '#4A5BF0',
-        background_color: '#F6F6F3',
+        theme_color: '#007AFF',
+        background_color: '#F2F2F7',
         display: 'standalone',
         start_url: '/dashboard',
         icons: [
