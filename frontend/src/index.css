@@ -155,3 +155,17 @@ html.privacy [data-money]:hover { filter: none; }
 
 /* Pressing feels like something: a short scale on buttons. */
 button:active:not(:disabled) { transform: scale(0.97); }
+
+/* Loading: coins drop into the jar, which gives a little bump as each lands. */
+@keyframes coin-drop {
+  0%   { transform: translateY(0); opacity: 0; }
+  12%  { opacity: 1; }
+  62%  { transform: translateY(78px); opacity: 1; }
+  80%  { transform: translateY(78px); opacity: 0; }
+  100% { transform: translateY(78px); opacity: 0; }
+}
+@keyframes jar-bump { 0%, 55% { transform: scale(1); } 62% { transform: scale(1.04, 0.97); } 72%, 100% { transform: scale(1); } }
+@keyframes jar-fill { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.coin-jar .coin { animation: coin-drop 1.65s ease-in infinite; }
+.coin-jar .jar-body { transform-origin: 60px 106px; animation: jar-bump 1.65s ease-out infinite; }
+.coin-jar .jar-fill { animation: jar-fill 1.65s ease-in-out infinite; }

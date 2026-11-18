@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
 import { env } from '../lib/env';
 
 export function BackendWakeup() {
@@ -9,19 +8,10 @@ export function BackendWakeup() {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
-    let toastId: string | number | undefined;
     let isReady = false;
 
     const checkHealth = async () => {
-      // If the backend doesn't respond quickly (1.5s), assume it's waking up from sleep and show a toast
-      const timeoutId = setTimeout(() => {
-        if (!isReady) {
-          toastId = toast.loading('Backend server is waking up from sleep... Please wait.', {
-            duration: Infinity, // Never disappear until ready
-            dismissible: false,
-          });
-        }
-      }, 1500);
+      const timeoutId = setTimeout(() => undefined, 0);
 
       const poll = async () => {
         try {
@@ -39,9 +29,6 @@ export function BackendWakeup() {
           if (res.ok) {
             isReady = true;
             clearTimeout(timeoutId);
-            if (toastId) {
-              toast.success('Backend server is ready!', { id: toastId, duration: 4000 });
-            }
             return; // Success, stop polling
           }
         } catch (err) {
